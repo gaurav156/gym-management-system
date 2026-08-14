@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore'
 import type { Branch, Plan } from '../types'
 
 interface HourlyCount { hour: number; count: number }
+interface MemberSummary { id: string; name: string; email: string; checkinPin: string | null }
 
 export default function ManagerDashboard() {
   const user = useAuthStore((s) => s.user)
@@ -11,24 +12,36 @@ export default function ManagerDashboard() {
   const [selectedBranch, setSelectedBranch] = useState('')
   const [plans, setPlans] = useState<Plan[]>([])
   const [summary, setSummary] = useState<HourlyCount[]>([])
-  const [branchLoadError, setBranchLoadError] = useState('')
+  const [members, setMembers] = useState<MemberSummary[]>([])
 
   const [planName, setPlanName] = useState('')
   const [planMonths, setPlanMonths] = useState(1)
   const [planPrice, setPlanPrice] = useState('')
-  const [planError, setPlanError] = useState('')
 
   const [checkinPin, setCheckinPin] = useState('')
   const [checkinMessage, setCheckinMessage] = useState('')
+  const [planError, setPlanError] = useState('')
+  const [branchLoadError, setBranchLoadError] = useState('')
+
+  const [purchaseMemberId, setPurchaseMemberId] = useState('')
+  const [purchasePlanId, setPurchasePlanId] = useState('')
+  const [purchaseMessage, setPurchaseMessage] = useState('')
 
   useEffect(() => {
     if (!user) return
-    api.get<Branch[]>('/api/branches/mine', { params: { userId: user.userId } })
+    // Owner has implicit access to every branch (no branch_assignments row of their own);
+    // a Manager only sees branches they're actually assigned to.
+    const request = user.role === 'OWNER'
+      ? api.get<Branch[]>('/api/branches')
+      : api.get<Branch[]>('/api/branches/mine', { params: { userId: user.userId } })
+
+    request
       .then((res) => {
         setBranches(res.data)
         if (res.data.length > 0) setSelectedBranch(res.data[0].id)
-      }).catch((err) => {
-        setBranchLoadError(err.response?.data?.error || 'Failed to load your branches - check the backend logs.')
+      })
+      .catch((err) => {
+        setBranchLoadError(err.response?.data?.error || 'Failed to load branches - check the backend logs.')
       })
   }, [user])
 
@@ -36,32 +49,33 @@ export default function ManagerDashboard() {
     if (!selectedBranch) return
     api.get<Plan[]>('/api/plans', { params: { branchId: selectedBranch } }).then((res) => setPlans(res.data))
     api.get<HourlyCount[]>(`/api/attendance/summary/${selectedBranch}`).then((res) => setSummary(res.data))
+    api.get<MemberSummary[]>('/api/members', { params: { branchId: selectedBranch } }).then((res) => setMembers(res.data))
   }, [selectedBranch])
 
-async function createPlan(e: FormEvent) {
-     e.preventDefault()
-     setPlanError('')
+  async function createPlan(e: FormEvent) {
+    e.preventDefault()
+    setPlanError('')
 
-     if (!selectedBranch) {
-       setPlanError('No branch is selected yet - make sure your manager account is assigned to a branch.')
-       return
-     }
-     if (!planPrice || Number.isNaN(Number(planPrice))) {
-       setPlanError('Enter a valid price.')
-       return
-     }
+    if (!selectedBranch) {
+      setPlanError('No branch is selected yet - make sure your manager account is assigned to a branch.')
+      return
+    }
+    if (!planPrice || Number.isNaN(Number(planPrice))) {
+      setPlanError('Enter a valid price.')
+      return
+    }
 
-     try {
-       await api.post('/api/plans/manage', {
-         branchId: selectedBranch, name: planName, durationMonths: planMonths, price: Number(planPrice),
-       })
-       setPlanName(''); setPlanPrice('')
-       const res = await api.get<Plan[]>('/api/plans', { params: { branchId: selectedBranch } })
-       setPlans(res.data)
-     } catch (err: any) {
-       setPlanError(err.response?.data?.error || JSON.stringify(err.response?.data) || 'Failed to create plan')
-     }
-   }
+    try {
+      await api.post('/api/plans/manage', {
+        branchId: selectedBranch, name: planName, durationMonths: planMonths, price: Number(planPrice),
+      })
+      setPlanName(''); setPlanPrice('')
+      const res = await api.get<Plan[]>('/api/plans', { params: { branchId: selectedBranch } })
+      setPlans(res.data)
+    } catch (err: any) {
+      setPlanError(err.response?.data?.error || JSON.stringify(err.response?.data) || 'Failed to create plan')
+    }
+  }
 
   async function kioskCheckin(e: FormEvent) {
     e.preventDefault()
@@ -77,11 +91,33 @@ async function createPlan(e: FormEvent) {
     }
   }
 
+  async function recordPurchase(e: FormEvent) {
+    e.preventDefault()
+    setPurchaseMessage('')
+    if (!purchaseMemberId || !purchasePlanId) {
+      setPurchaseMessage('Select a member and a plan.')
+      return
+    }
+    try {
+      const { data } = await api.post(
+        '/api/memberships/purchase',
+        { planId: purchasePlanId },
+        { params: { memberId: purchaseMemberId } }
+      )
+      setPurchaseMessage(`Recorded - ${data.planName} valid until ${data.endDate}.`)
+      setPurchaseMemberId(''); setPurchasePlanId('')
+    } catch (err: any) {
+      setPurchaseMessage(err.response?.data?.error || 'Failed to record purchase')
+    }
+  }
+
   const maxCount = Math.max(1, ...summary.map((s) => s.count))
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold">Manager dashboard</h1>
+      <h1 className="text-2xl font-semibold">
+        {user?.role === 'OWNER' ? 'Branch operations (Owner view)' : 'Manager dashboard'}
+      </h1>
       {branchLoadError && <p className="mt-2 text-sm text-red-600">{branchLoadError}</p>}
 
       {branches.length > 1 && (
@@ -107,6 +143,31 @@ async function createPlan(e: FormEvent) {
         </div>
 
         <div className="rounded-lg border border-gray-200 p-6">
+          <h2 className="font-medium">Record a membership purchase</h2>
+          <p className="mt-1 text-xs text-gray-500">Cash collected at the front desk - members can't self-purchase.</p>
+          <form onSubmit={recordPurchase} className="mt-4 space-y-3">
+            <select required value={purchaseMemberId} onChange={(e) => setPurchaseMemberId(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              <option value="">Select member</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>{m.name} ({m.email}) - PIN {m.checkinPin ?? '—'}</option>
+              ))}
+            </select>
+            <select required value={purchasePlanId} onChange={(e) => setPurchasePlanId(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              <option value="">Select plan</option>
+              {plans.map((p) => <option key={p.id} value={p.id}>{p.name} - ₹{p.price}</option>)}
+            </select>
+            <button className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
+              Record purchase
+            </button>
+            {purchaseMessage && <p className="text-sm text-gray-700">{purchaseMessage}</p>}
+          </form>
+        </div>
+      </div>
+
+      <div className="mt-8 grid gap-8 sm:grid-cols-2">
+        <div className="rounded-lg border border-gray-200 p-6">
           <h2 className="font-medium">Add a membership plan</h2>
           <form onSubmit={createPlan} className="mt-4 space-y-3">
             <input placeholder="Plan name (e.g. 3 Month)" required value={planName} onChange={(e) => setPlanName(e.target.value)}
@@ -131,25 +192,25 @@ async function createPlan(e: FormEvent) {
             ))}
           </ul>
         </div>
-      </div>
 
-      <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">Today's crowd by hour</h2>
-        <div className="mt-4 flex h-40 items-end gap-1">
-          {Array.from({ length: 24 }, (_, hour) => {
-            const entry = summary.find((s) => s.hour === hour)
-            const count = entry?.count ?? 0
-            return (
-              <div key={hour} className="flex flex-1 flex-col items-center justify-end">
-                <div
-                  className="w-full rounded-t bg-brand/70"
-                  style={{ height: `${(count / maxCount) * 100}%`, minHeight: count > 0 ? '4px' : '0' }}
-                  title={`${count} check-ins`}
-                />
-                {hour % 4 === 0 && <span className="mt-1 text-[10px] text-gray-400">{hour}h</span>}
-              </div>
-            )
-          })}
+        <div className="rounded-lg border border-gray-200 p-6">
+          <h2 className="font-medium">Today's crowd by hour</h2>
+          <div className="mt-4 flex h-40 items-end gap-1">
+            {Array.from({ length: 24 }, (_, hour) => {
+              const entry = summary.find((s) => s.hour === hour)
+              const count = entry?.count ?? 0
+              return (
+                <div key={hour} className="flex flex-1 flex-col items-center justify-end">
+                  <div
+                    className="w-full rounded-t bg-brand/70"
+                    style={{ height: `${(count / maxCount) * 100}%`, minHeight: count > 0 ? '4px' : '0' }}
+                    title={`${count} check-ins`}
+                  />
+                  {hour % 4 === 0 && <span className="mt-1 text-[10px] text-gray-400">{hour}h</span>}
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
     </div>

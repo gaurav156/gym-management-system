@@ -58,6 +58,11 @@ public class SecurityConfig {
                 // manager + owner endpoints
                 .requestMatchers("/api/branches/**").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers("/api/plans/manage/**").hasAnyRole("OWNER", "MANAGER")
+                .requestMatchers("/api/members/**").hasAnyRole("OWNER", "MANAGER")
+
+                // membership purchase is recorded by front-desk staff against cash payment,
+                // not self-service by the member - see MembershipService.purchase()
+                .requestMatchers("/api/memberships/purchase").hasAnyRole("OWNER", "MANAGER")
 
                 // attendance check-in can be triggered from a reception kiosk (manager/owner)
                 // as well as by the member's own QR/PIN screen

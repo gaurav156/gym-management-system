@@ -22,9 +22,9 @@ public class MembershipService {
     private final UserRepository userRepository;
 
     public MembershipService(MembershipPlanRepository planRepository,
-                              MembershipRepository membershipRepository,
-                              BranchRepository branchRepository,
-                              UserRepository userRepository) {
+                             MembershipRepository membershipRepository,
+                             BranchRepository branchRepository,
+                             UserRepository userRepository) {
         this.planRepository = planRepository;
         this.membershipRepository = membershipRepository;
         this.branchRepository = branchRepository;
@@ -50,9 +50,12 @@ public class MembershipService {
                 .map(this::toPlanResponse).toList();
     }
 
-    // NOTE: this creates the membership record marked ACTIVE directly - in Phase 2 wire this
-    // through a Payment record first (cash recorded by a manager, or online via a gateway),
-    // then flip status to ACTIVE only once payment is confirmed.
+    // Called by a manager/owner after collecting cash payment (see SecurityConfig - this
+    // is no longer member-self-service). If the member already has an active, unexpired
+    // membership, we extend it rather than create a second row that's simultaneously
+    // "ACTIVE" - simplest correct behavior for now. This does mean we lose a distinct
+    // purchase history per transaction; a proper Payment/audit-trail entity (Phase 2)
+    // is the right place to preserve that, this just keeps membership status unambiguous.
     @Transactional
     public MembershipResponse purchase(UUID memberId, PurchaseRequest req) {
         User member = userRepository.findById(memberId)
@@ -60,17 +63,28 @@ public class MembershipService {
         MembershipPlan plan = planRepository.findById(req.planId())
                 .orElseThrow(() -> new IllegalArgumentException("Plan not found"));
 
-        LocalDate start = LocalDate.now();
-        LocalDate end = start.plusMonths(plan.getDurationMonths());
+        var existingActive = membershipRepository
+                .findFirstByMemberIdAndStatusOrderByEndDateDesc(memberId, MembershipStatus.ACTIVE)
+                .filter(m -> !m.getEndDate().isBefore(LocalDate.now()));
 
-        Membership membership = Membership.builder()
-                .member(member)
-                .plan(plan)
-                .branch(plan.getBranch())
-                .startDate(start)
-                .endDate(end)
-                .status(MembershipStatus.ACTIVE)
-                .build();
+        Membership membership;
+        if (existingActive.isPresent()) {
+            membership = existingActive.get();
+            membership.setPlan(plan);
+            membership.setBranch(plan.getBranch());
+            membership.setEndDate(membership.getEndDate().plusMonths(plan.getDurationMonths()));
+        } else {
+            LocalDate start = LocalDate.now();
+            LocalDate end = start.plusMonths(plan.getDurationMonths());
+            membership = Membership.builder()
+                    .member(member)
+                    .plan(plan)
+                    .branch(plan.getBranch())
+                    .startDate(start)
+                    .endDate(end)
+                    .status(MembershipStatus.ACTIVE)
+                    .build();
+        }
         membership = membershipRepository.save(membership);
         return toMembershipResponse(membership);
     }

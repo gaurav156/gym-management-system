@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import type { Branch } from '../types'
 
@@ -44,6 +45,9 @@ export default function OwnerDashboard() {
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-2xl font-semibold">Owner dashboard</h1>
       <p className="mt-1 text-sm text-gray-600">Manage branches and manager accounts across your gym chain.</p>
+      <Link to="/manager" className="mt-3 inline-block text-sm font-medium text-brand hover:text-brand-dark">
+        Go to branch operations (check-in, plans, purchases, crowd report) →
+      </Link>
 
       <div className="mt-8 grid gap-8 sm:grid-cols-2">
         <div className="rounded-lg border border-gray-200 p-6">

@@ -31,6 +31,7 @@ public class MembershipController {
     }
 
     @PostMapping("/memberships/purchase")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
     public MembershipResponse purchase(@RequestParam UUID memberId, @Valid @RequestBody PurchaseRequest req) {
         return membershipService.purchase(memberId, req);
     }

@@ -19,6 +19,8 @@ export default function MemberDashboard() {
       .then((res) => setMemberships(res.data))
       .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your memberships'))
 
+    // Use the member's own branch assignment(s) - not an arbitrary/first branch overall -
+    // so plans shown here always match where this member actually signed up.
     api.get<Branch[]>('/api/branches/mine', { params: { userId: user.userId } })
       .then(async (res) => {
         setBranches(res.data)
@@ -30,19 +32,6 @@ export default function MemberDashboard() {
       })
       .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load plans for your branch'))
   }, [user])
-
-  async function purchase(planId: string) {
-    if (!user) return
-    setMessage('')
-    try {
-      await api.post('/api/memberships/purchase', { planId }, { params: { memberId: user.userId } })
-      setMessage('Membership purchased! (Payment recorded as cash at the front desk for now.)')
-      const res = await api.get<Membership[]>('/api/memberships/mine', { params: { memberId: user.userId } })
-      setMemberships(res.data)
-    } catch (err: any) {
-      setMessage(err.response?.data?.error || 'Purchase failed')
-    }
-  }
 
   const activeMembership = memberships.find((m) => m.status === 'ACTIVE')
 
@@ -80,15 +69,15 @@ export default function MemberDashboard() {
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">Available plans</h2>
+        <p className="mt-1 text-xs text-gray-500">
+          Memberships are activated at the front desk against cash payment - show your QR code or tell the manager your PIN.
+        </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           {plans.map((p) => (
             <div key={p.id} className="rounded-md border border-gray-200 p-4 text-center">
               <p className="font-medium">{p.name}</p>
               <p className="mt-1 text-2xl font-semibold">₹{p.price}</p>
-              <button onClick={() => purchase(p.id)}
-                className="mt-3 w-full rounded-md bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-dark">
-                Purchase
-              </button>
+              <p className="mt-1 text-xs text-gray-400">{p.durationMonths} month{p.durationMonths > 1 ? 's' : ''}</p>
             </div>
           ))}
           {plans.length === 0 && <p className="text-sm text-gray-400">No plans published yet.</p>}
