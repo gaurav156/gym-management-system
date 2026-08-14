@@ -51,6 +51,10 @@ public class SecurityConfig {
                 // owner-only endpoints
                 .requestMatchers("/api/owner/**").hasRole("OWNER")
 
+                // a member needs to see their own assigned branch (e.g. to load plans) -
+                // this specific rule must come before the broader /api/branches/** rule below
+                .requestMatchers("/api/branches/mine").hasAnyRole("OWNER", "MANAGER", "MEMBER")
+
                 // manager + owner endpoints
                 .requestMatchers("/api/branches/**").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers("/api/plans/manage/**").hasAnyRole("OWNER", "MANAGER")

@@ -10,18 +10,25 @@ export default function MemberDashboard() {
   const [plans, setPlans] = useState<Plan[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [message, setMessage] = useState('')
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     if (!user) return
+
     api.get<Membership[]>('/api/memberships/mine', { params: { memberId: user.userId } })
       .then((res) => setMemberships(res.data))
-    // Public branch list to discover plans across locations
-    api.get<Branch[]>('/api/branches').then((res) => {
-      setBranches(res.data)
-      if (res.data.length > 0) {
-        api.get<Plan[]>('/api/plans', { params: { branchId: res.data[0].id } }).then((r) => setPlans(r.data))
-      }
-    })
+      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your memberships'))
+
+    api.get<Branch[]>('/api/branches/mine', { params: { userId: user.userId } })
+      .then(async (res) => {
+        setBranches(res.data)
+        if (res.data.length === 0) return
+        const perBranch = await Promise.all(
+          res.data.map((b) => api.get<Plan[]>('/api/plans', { params: { branchId: b.id } }))
+        )
+        setPlans(perBranch.flatMap((r) => r.data))
+      })
+      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load plans for your branch'))
   }, [user])
 
   async function purchase(planId: string) {
@@ -44,6 +51,7 @@ export default function MemberDashboard() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <h1 className="text-2xl font-semibold">Welcome, {user.name}</h1>
+      {loadError && <p className="mt-2 text-sm text-red-600">{loadError}</p>}
 
       <div className="mt-8 grid gap-8 sm:grid-cols-2">
         <div className="rounded-lg border border-gray-200 p-6 text-center">
