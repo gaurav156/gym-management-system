@@ -1,6 +1,7 @@
 package com.gymapp.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.UUID;
 
@@ -18,8 +19,8 @@ public class BranchDtos {
     ) {}
 
     public record TransferRequest(
-            @NotBlank UUID userId,
-            @NotBlank UUID fromBranchId,
-            @NotBlank UUID toBranchId
+            @NotNull UUID userId,
+            @NotNull UUID fromBranchId,
+            @NotNull UUID toBranchId
     ) {}
 }

@@ -2,6 +2,7 @@ package com.gymapp.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public class AuthDtos {
@@ -11,7 +12,7 @@ public class AuthDtos {
             @NotBlank @Email String email,
             String phone,
             @NotBlank @Size(min = 6) String password,
-            @NotBlank java.util.UUID branchId
+            @NotNull java.util.UUID branchId
     ) {}
 
     public record LoginRequest(
@@ -32,6 +33,6 @@ public class AuthDtos {
             @NotBlank @Email String email,
             String phone,
             @NotBlank @Size(min = 6) String password,
-            @NotBlank java.util.UUID branchId
+            @NotNull java.util.UUID branchId
     ) {}
 }

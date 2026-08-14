@@ -11,7 +11,7 @@ import java.util.UUID;
 public class MembershipDtos {
 
     public record CreatePlanRequest(
-            @NotBlank UUID branchId,
+            @NotNull UUID branchId,
             @NotBlank String name,
             @Positive Integer durationMonths,
             @NotNull BigDecimal price
@@ -25,7 +25,7 @@ public class MembershipDtos {
     ) {}
 
     public record PurchaseRequest(
-            @NotBlank UUID planId
+            @NotNull UUID planId
     ) {}
 
     public record MembershipResponse(
