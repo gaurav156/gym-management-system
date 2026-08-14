@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
-import type { Branch, Plan } from '../types'
+import type { Branch, Plan, Payment } from '../types'
 
 interface HourlyCount { hour: number; count: number }
 interface MemberSummary { id: string; name: string; email: string; checkinPin: string | null }
@@ -13,6 +13,7 @@ export default function ManagerDashboard() {
   const [plans, setPlans] = useState<Plan[]>([])
   const [summary, setSummary] = useState<HourlyCount[]>([])
   const [members, setMembers] = useState<MemberSummary[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
 
   const [planName, setPlanName] = useState('')
   const [planMonths, setPlanMonths] = useState(1)
@@ -45,11 +46,17 @@ export default function ManagerDashboard() {
       })
   }, [user])
 
+  function loadPayments() {
+    if (!selectedBranch) return
+    api.get<Payment[]>(`/api/payments/branch/${selectedBranch}`).then((res) => setPayments(res.data))
+  }
+
   useEffect(() => {
     if (!selectedBranch) return
     api.get<Plan[]>('/api/plans', { params: { branchId: selectedBranch } }).then((res) => setPlans(res.data))
     api.get<HourlyCount[]>(`/api/attendance/summary/${selectedBranch}`).then((res) => setSummary(res.data))
     api.get<MemberSummary[]>('/api/members', { params: { branchId: selectedBranch } }).then((res) => setMembers(res.data))
+    loadPayments()
   }, [selectedBranch])
 
   async function createPlan(e: FormEvent) {
@@ -106,6 +113,7 @@ export default function ManagerDashboard() {
       )
       setPurchaseMessage(`Recorded - ${data.planName} valid until ${data.endDate}.`)
       setPurchaseMemberId(''); setPurchasePlanId('')
+      loadPayments()
     } catch (err: any) {
       setPurchaseMessage(err.response?.data?.error || 'Failed to record purchase')
     }
@@ -163,6 +171,38 @@ export default function ManagerDashboard() {
             </button>
             {purchaseMessage && <p className="text-sm text-gray-700">{purchaseMessage}</p>}
           </form>
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-lg border border-gray-200 p-6">
+        <h2 className="font-medium">Payment history</h2>
+        <p className="mt-1 text-xs text-gray-500">All cash collected at this branch, most recent first.</p>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-gray-500">
+                <th className="pb-2 pr-4">Date</th>
+                <th className="pb-2 pr-4">Member</th>
+                <th className="pb-2 pr-4">Plan</th>
+                <th className="pb-2 pr-4">Amount</th>
+                <th className="pb-2 pr-4">Mode</th>
+                <th className="pb-2">Recorded by</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {payments.map((p) => (
+                <tr key={p.id}>
+                  <td className="py-2 pr-4 text-gray-500">{new Date(p.createdAt).toLocaleString()}</td>
+                  <td className="py-2 pr-4">{p.memberName}</td>
+                  <td className="py-2 pr-4">{p.planName ?? '—'}</td>
+                  <td className="py-2 pr-4">₹{p.amount}</td>
+                  <td className="py-2 pr-4">{p.mode}</td>
+                  <td className="py-2">{p.recordedByName}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {payments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
         </div>
       </div>
 

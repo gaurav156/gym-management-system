@@ -4,6 +4,7 @@ import com.gymapp.dto.MembershipDtos.*;
 import com.gymapp.service.MembershipService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,8 +33,11 @@ public class MembershipController {
 
     @PostMapping("/memberships/purchase")
     @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
-    public MembershipResponse purchase(@RequestParam UUID memberId, @Valid @RequestBody PurchaseRequest req) {
-        return membershipService.purchase(memberId, req);
+    public MembershipResponse purchase(@RequestParam UUID memberId,
+                                       @Valid @RequestBody PurchaseRequest req,
+                                       Authentication authentication) {
+        UUID recordedBy = UUID.fromString((String) authentication.getDetails());
+        return membershipService.purchase(memberId, req, recordedBy);
     }
 
     @GetMapping("/memberships/mine")

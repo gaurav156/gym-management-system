@@ -64,6 +64,11 @@ public class SecurityConfig {
                 // not self-service by the member - see MembershipService.purchase()
                 .requestMatchers("/api/memberships/purchase").hasAnyRole("OWNER", "MANAGER")
 
+                // payment history - branch view for staff, "my payments" for the member
+                // themselves (ownership is checked in PaymentController.mine())
+                .requestMatchers("/api/payments/branch/**").hasAnyRole("OWNER", "MANAGER")
+                .requestMatchers("/api/payments/mine").hasRole("MEMBER")
+
                 // attendance check-in can be triggered from a reception kiosk (manager/owner)
                 // as well as by the member's own QR/PIN screen
                 .requestMatchers("/api/attendance/checkin").hasAnyRole("OWNER", "MANAGER", "MEMBER")

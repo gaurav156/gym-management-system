@@ -5,6 +5,7 @@ import com.gymapp.entity.*;
 import com.gymapp.repository.BranchRepository;
 import com.gymapp.repository.MembershipPlanRepository;
 import com.gymapp.repository.MembershipRepository;
+import com.gymapp.repository.PaymentRepository;
 import com.gymapp.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,15 +21,18 @@ public class MembershipService {
     private final MembershipRepository membershipRepository;
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
+    private final PaymentRepository paymentRepository;
 
     public MembershipService(MembershipPlanRepository planRepository,
                              MembershipRepository membershipRepository,
                              BranchRepository branchRepository,
-                             UserRepository userRepository) {
+                             UserRepository userRepository,
+                             PaymentRepository paymentRepository) {
         this.planRepository = planRepository;
         this.membershipRepository = membershipRepository;
         this.branchRepository = branchRepository;
         this.userRepository = userRepository;
+        this.paymentRepository = paymentRepository;
     }
 
     public PlanResponse createPlan(CreatePlanRequest req) {
@@ -50,18 +54,19 @@ public class MembershipService {
                 .map(this::toPlanResponse).toList();
     }
 
-    // Called by a manager/owner after collecting cash payment (see SecurityConfig - this
-    // is no longer member-self-service). If the member already has an active, unexpired
-    // membership, we extend it rather than create a second row that's simultaneously
-    // "ACTIVE" - simplest correct behavior for now. This does mean we lose a distinct
-    // purchase history per transaction; a proper Payment/audit-trail entity (Phase 2)
-    // is the right place to preserve that, this just keeps membership status unambiguous.
+    // Called by a manager/owner after collecting cash payment (see SecurityConfig). If the
+    // member already has an active, unexpired membership, we extend it rather than create a
+    // second row that's simultaneously "ACTIVE". recordedByUserId is the authenticated
+    // manager/owner's own ID (from the JWT), never trusted from the request body, so the
+    // Payment audit trail can't be spoofed as having been collected by someone else.
     @Transactional
-    public MembershipResponse purchase(UUID memberId, PurchaseRequest req) {
+    public MembershipResponse purchase(UUID memberId, PurchaseRequest req, UUID recordedByUserId) {
         User member = userRepository.findById(memberId)
                 .orElseThrow(() -> new IllegalArgumentException("Member not found"));
         MembershipPlan plan = planRepository.findById(req.planId())
                 .orElseThrow(() -> new IllegalArgumentException("Plan not found"));
+        User recordedBy = userRepository.findById(recordedByUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Recording user not found"));
 
         var existingActive = membershipRepository
                 .findFirstByMemberIdAndStatusOrderByEndDateDesc(memberId, MembershipStatus.ACTIVE)
@@ -86,6 +91,18 @@ public class MembershipService {
                     .build();
         }
         membership = membershipRepository.save(membership);
+
+        Payment payment = Payment.builder()
+                .member(member)
+                .branch(plan.getBranch())
+                .recordedBy(recordedBy)
+                .membership(membership)
+                .amount(plan.getPrice())
+                .type(PaymentType.MEMBERSHIP)
+                .mode(PaymentMode.CASH)
+                .build();
+        paymentRepository.save(payment);
+
         return toMembershipResponse(membership);
     }
 

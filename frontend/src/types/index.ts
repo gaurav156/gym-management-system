@@ -28,3 +28,14 @@ export interface Membership {
   endDate: string
   status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED'
 }
+
+export interface Payment {
+  id: string
+  memberName: string
+  recordedByName: string
+  planName: string | null
+  amount: number
+  type: string
+  mode: string
+  createdAt: string
+}

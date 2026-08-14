@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
-import type { Membership, Plan, Branch } from '../types'
+import type { Membership, Plan, Branch, Payment } from '../types'
 
 export default function MemberDashboard() {
   const user = useAuthStore((s) => s.user)
   const [memberships, setMemberships] = useState<Membership[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
   const [message, setMessage] = useState('')
   const [loadError, setLoadError] = useState('')
 
@@ -18,6 +19,10 @@ export default function MemberDashboard() {
     api.get<Membership[]>('/api/memberships/mine', { params: { memberId: user.userId } })
       .then((res) => setMemberships(res.data))
       .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your memberships'))
+
+    api.get<Payment[]>('/api/payments/mine', { params: { memberId: user.userId } })
+      .then((res) => setPayments(res.data))
+      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your payment history'))
 
     // Use the member's own branch assignment(s) - not an arbitrary/first branch overall -
     // so plans shown here always match where this member actually signed up.
@@ -83,6 +88,19 @@ export default function MemberDashboard() {
           {plans.length === 0 && <p className="text-sm text-gray-400">No plans published yet.</p>}
         </div>
         {message && <p className="mt-4 text-sm text-gray-700">{message}</p>}
+      </div>
+
+      <div className="mt-8 rounded-lg border border-gray-200 p-6">
+        <h2 className="font-medium">Your payment history</h2>
+        <ul className="mt-4 divide-y divide-gray-100 text-sm">
+          {payments.map((p) => (
+            <li key={p.id} className="flex justify-between py-2">
+              <span>{p.planName ?? 'Payment'} - {new Date(p.createdAt).toLocaleDateString()}</span>
+              <span className="text-gray-500">₹{p.amount} ({p.mode})</span>
+            </li>
+          ))}
+          {payments.length === 0 && <li className="py-2 text-gray-400">No payments recorded yet.</li>}
+        </ul>
       </div>
     </div>
   )
