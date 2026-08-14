@@ -33,6 +33,7 @@ public class BranchService {
     }
 
     // Used to scope a MANAGER's dashboard to only the branches they're assigned to
+    @Transactional(readOnly = true)
     public List<BranchResponse> listForUser(UUID userId) {
         return branchAssignmentRepository.findByUserId(userId).stream()
                 .map(BranchAssignment::getBranch)

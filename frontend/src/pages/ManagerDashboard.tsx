@@ -11,10 +11,12 @@ export default function ManagerDashboard() {
   const [selectedBranch, setSelectedBranch] = useState('')
   const [plans, setPlans] = useState<Plan[]>([])
   const [summary, setSummary] = useState<HourlyCount[]>([])
+  const [branchLoadError, setBranchLoadError] = useState('')
 
   const [planName, setPlanName] = useState('')
   const [planMonths, setPlanMonths] = useState(1)
   const [planPrice, setPlanPrice] = useState('')
+  const [planError, setPlanError] = useState('')
 
   const [checkinPin, setCheckinPin] = useState('')
   const [checkinMessage, setCheckinMessage] = useState('')
@@ -25,6 +27,8 @@ export default function ManagerDashboard() {
       .then((res) => {
         setBranches(res.data)
         if (res.data.length > 0) setSelectedBranch(res.data[0].id)
+      }).catch((err) => {
+        setBranchLoadError(err.response?.data?.error || 'Failed to load your branches - check the backend logs.')
       })
   }, [user])
 
@@ -34,15 +38,30 @@ export default function ManagerDashboard() {
     api.get<HourlyCount[]>(`/api/attendance/summary/${selectedBranch}`).then((res) => setSummary(res.data))
   }, [selectedBranch])
 
-  async function createPlan(e: FormEvent) {
-    e.preventDefault()
-    await api.post('/api/plans/manage', {
-      branchId: selectedBranch, name: planName, durationMonths: planMonths, price: Number(planPrice),
-    })
-    setPlanName(''); setPlanPrice('')
-    const res = await api.get<Plan[]>('/api/plans', { params: { branchId: selectedBranch } })
-    setPlans(res.data)
-  }
+async function createPlan(e: FormEvent) {
+     e.preventDefault()
+     setPlanError('')
+
+     if (!selectedBranch) {
+       setPlanError('No branch is selected yet - make sure your manager account is assigned to a branch.')
+       return
+     }
+     if (!planPrice || Number.isNaN(Number(planPrice))) {
+       setPlanError('Enter a valid price.')
+       return
+     }
+
+     try {
+       await api.post('/api/plans/manage', {
+         branchId: selectedBranch, name: planName, durationMonths: planMonths, price: Number(planPrice),
+       })
+       setPlanName(''); setPlanPrice('')
+       const res = await api.get<Plan[]>('/api/plans', { params: { branchId: selectedBranch } })
+       setPlans(res.data)
+     } catch (err: any) {
+       setPlanError(err.response?.data?.error || JSON.stringify(err.response?.data) || 'Failed to create plan')
+     }
+   }
 
   async function kioskCheckin(e: FormEvent) {
     e.preventDefault()
@@ -63,6 +82,7 @@ export default function ManagerDashboard() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-2xl font-semibold">Manager dashboard</h1>
+      {branchLoadError && <p className="mt-2 text-sm text-red-600">{branchLoadError}</p>}
 
       {branches.length > 1 && (
         <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}
@@ -100,6 +120,7 @@ export default function ManagerDashboard() {
             <button className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
               Add plan
             </button>
+            {planError && <p className="text-sm text-red-600">{planError}</p>}
           </form>
           <ul className="mt-4 divide-y divide-gray-100 text-sm">
             {plans.map((p) => (

@@ -75,6 +75,7 @@ public class MembershipService {
         return toMembershipResponse(membership);
     }
 
+    @Transactional(readOnly = true)
     public List<MembershipResponse> listForMember(UUID memberId) {
         return membershipRepository.findByMemberId(memberId).stream()
                 .map(this::toMembershipResponse).toList();
