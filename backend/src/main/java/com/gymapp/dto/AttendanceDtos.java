@@ -1,7 +1,7 @@
 package com.gymapp.dto;
 
 import com.gymapp.entity.CheckinMethod;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -15,7 +15,7 @@ public class AttendanceDtos {
             String pin,
             String qrToken,
             UUID branchId,
-            @NotBlank CheckinMethod method
+            @NotNull CheckinMethod method
     ) {}
 
     public record CheckinResponse(
