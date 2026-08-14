@@ -1,0 +1,27 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/gymdb}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: update   # use 'validate' once you introduce a migration tool like Flyway for production
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-this-to-a-long-random-string-in-your-env-file-min-32-chars}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}   # 24 hours
+  cors:
+    allowed-origins: ${CORS_ORIGIN:http://localhost:5173}
+  seed:
+    owner-email: ${OWNER_EMAIL:owner@mygym.com}
+    owner-password: ${OWNER_PASSWORD:ChangeMe123!}
+    owner-name: ${OWNER_NAME:Gym Owner}
