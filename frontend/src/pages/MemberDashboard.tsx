@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
+import { getEffectiveStatus } from '../utils/membership'
 import type { Membership, Plan, Branch, Payment } from '../types'
 
 export default function MemberDashboard() {
@@ -49,8 +50,11 @@ export default function MemberDashboard() {
     return () => window.removeEventListener('focus', onFocus)
   }, [user])
 
-  const activeMembership = memberships.find((m) => m.status === 'ACTIVE')
-  const pausedMembership = memberships.find((m) => m.status === 'PAUSED')
+  const activeMembership = memberships.find((m) => getEffectiveStatus(m) === 'ACTIVE')
+  const pausedMembership = memberships.find((m) => getEffectiveStatus(m) === 'PAUSED')
+  const upcomingMembership = memberships
+    .filter((m) => getEffectiveStatus(m) === 'SCHEDULED')
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))[0]
 
   if (!user) return null
 
@@ -83,11 +87,19 @@ export default function MemberDashboard() {
             <div className="mt-3 text-sm">
               <p className="font-medium text-green-700">Active</p>
               <p className="mt-1 text-gray-500">Valid until {activeMembership.endDate}</p>
+              {upcomingMembership && (
+                <p className="mt-1 text-xs text-gray-400">Next plan starts {upcomingMembership.startDate}</p>
+              )}
             </div>
           ) : pausedMembership ? (
             <div className="mt-3 text-sm">
               <p className="font-medium text-amber-600">Paused</p>
               <p className="mt-1 text-gray-500">Visit the front desk to resume - your remaining time is preserved.</p>
+            </div>
+          ) : upcomingMembership ? (
+            <div className="mt-3 text-sm">
+              <p className="font-medium text-blue-600">Plan purchased - not yet active</p>
+              <p className="mt-1 text-gray-500">Starts {upcomingMembership.startDate}. No gym access until then.</p>
             </div>
           ) : (
             <p className="mt-3 text-sm text-red-600">No active membership - purchase a plan to get gym access.</p>

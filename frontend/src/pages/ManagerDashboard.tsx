@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
+import { getEffectiveStatus, statusColorClass, statusLabel, type EffectiveStatus } from '../utils/membership'
 import type { Branch, Plan, Payment, MembershipAdmin } from '../types'
 
 interface HourlyCount { hour: number; count: number }
@@ -17,6 +18,7 @@ export default function ManagerDashboard() {
   const [members, setMembers] = useState<MemberSummary[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [memberships, setMemberships] = useState<MembershipAdmin[]>([])
+  const [showExpired, setShowExpired] = useState(false)
 
   const [planName, setPlanName] = useState('')
   const [planMonths, setPlanMonths] = useState(1)
@@ -33,6 +35,10 @@ export default function ManagerDashboard() {
   const [purchaseStartDate, setPurchaseStartDate] = useState('')
   const [purchaseMessage, setPurchaseMessage] = useState('')
   const [membershipActionMessage, setMembershipActionMessage] = useState('')
+
+  const [memberSearch, setMemberSearch] = useState('')
+  const [memberStatusFilter, setMemberStatusFilter] = useState<'ALL' | EffectiveStatus | 'NONE'>('ALL')
+  const [memberSort, setMemberSort] = useState<'NAME' | 'STATUS'>('NAME')
 
   useEffect(() => {
     if (!user) return
@@ -276,8 +282,16 @@ export default function ManagerDashboard() {
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">Manage memberships</h2>
-        <p className="mt-1 text-xs text-gray-500">Pause, resume, cancel, or correct a member's dates.</p>
+        <div className="flex items-center justify-between">
+          <h2 className="font-medium">Manage memberships</h2>
+          <label className="flex items-center gap-1.5 text-xs text-gray-500">
+            <input type="checkbox" checked={showExpired} onChange={(e) => setShowExpired(e.target.checked)} />
+            Show expired
+          </label>
+        </div>
+        <p className="mt-1 text-xs text-gray-500">
+          Pause, resume, cancel, or correct dates. Scheduled = paid for, not started yet.
+        </p>
         {membershipActionMessage && <p className="mt-2 text-sm text-red-600">{membershipActionMessage}</p>}
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -292,44 +306,109 @@ export default function ManagerDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {memberships.map((m) => (
-                <tr key={m.id}>
-                  <td className="py-2 pr-4">{m.memberName}</td>
-                  <td className="py-2 pr-4">{m.planName}</td>
-                  <td className="py-2 pr-4 text-gray-500">{m.startDate}</td>
-                  <td className="py-2 pr-4 text-gray-500">{m.endDate}</td>
-                  <td className="py-2 pr-4">
-                    <span className={
-                      m.status === 'ACTIVE' ? 'text-green-700' :
-                      m.status === 'PAUSED' ? 'text-amber-600' :
-                      'text-gray-400'
-                    }>{m.status}</span>
-                  </td>
-                  <td className="py-2 space-x-2 whitespace-nowrap">
-                    {m.status === 'ACTIVE' && (
-                      <button onClick={() => pauseMembership(m.id)} className="text-xs text-amber-600 hover:underline">
-                        Pause
+              {memberships
+                .map((m) => ({ m, effective: getEffectiveStatus(m) }))
+                .filter(({ effective }) => showExpired || effective !== 'EXPIRED')
+                .map(({ m, effective }) => (
+                  <tr key={m.id}>
+                    <td className="py-2 pr-4">{m.memberName}</td>
+                    <td className="py-2 pr-4">{m.planName}</td>
+                    <td className="py-2 pr-4 text-gray-500">{m.startDate}</td>
+                    <td className="py-2 pr-4 text-gray-500">{m.endDate}</td>
+                    <td className="py-2 pr-4">
+                      <span className={statusColorClass(effective)}>{statusLabel(effective)}</span>
+                    </td>
+                    <td className="py-2 space-x-2 whitespace-nowrap">
+                      {effective === 'ACTIVE' && (
+                        <button onClick={() => pauseMembership(m.id)} className="text-xs text-amber-600 hover:underline">
+                          Pause
+                        </button>
+                      )}
+                      {effective === 'PAUSED' && (
+                        <button onClick={() => resumeMembership(m.id)} className="text-xs text-green-700 hover:underline">
+                          Resume
+                        </button>
+                      )}
+                      {(effective === 'ACTIVE' || effective === 'PAUSED' || effective === 'SCHEDULED') && (
+                        <button onClick={() => cancelMembership(m.id)} className="text-xs text-red-600 hover:underline">
+                          Cancel
+                        </button>
+                      )}
+                      <button onClick={() => editMembership(m.id, m.endDate)} className="text-xs text-gray-600 hover:underline">
+                        Edit end date
                       </button>
-                    )}
-                    {m.status === 'PAUSED' && (
-                      <button onClick={() => resumeMembership(m.id)} className="text-xs text-green-700 hover:underline">
-                        Resume
-                      </button>
-                    )}
-                    {(m.status === 'ACTIVE' || m.status === 'PAUSED') && (
-                      <button onClick={() => cancelMembership(m.id)} className="text-xs text-red-600 hover:underline">
-                        Cancel
-                      </button>
-                    )}
-                    <button onClick={() => editMembership(m.id, m.endDate)} className="text-xs text-gray-600 hover:underline">
-                      Edit end date
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
           {memberships.length === 0 && <p className="py-4 text-sm text-gray-400">No memberships recorded yet.</p>}
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-lg border border-gray-200 p-6">
+        <h2 className="font-medium">All members</h2>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input placeholder="Search name or email..." value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
+            className="flex-1 min-w-[180px] rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          <select value={memberStatusFilter} onChange={(e) => setMemberStatusFilter(e.target.value as any)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm">
+            <option value="ALL">All statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="SCHEDULED">Scheduled</option>
+            <option value="PAUSED">Paused</option>
+            <option value="NONE">No plan</option>
+          </select>
+          <select value={memberSort} onChange={(e) => setMemberSort(e.target.value as any)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm">
+            <option value="NAME">Sort: Name</option>
+            <option value="STATUS">Sort: Status</option>
+          </select>
+        </div>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-gray-500">
+                <th className="pb-2 pr-4">Name</th>
+                <th className="pb-2 pr-4">Email</th>
+                <th className="pb-2 pr-4">PIN</th>
+                <th className="pb-2">Membership status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {members
+                .map((mem) => {
+                  const relevant = memberships
+                    .filter((ms) => ms.memberId === mem.id)
+                    .map((ms) => getEffectiveStatus(ms))
+                  const currentStatus: EffectiveStatus | 'NONE' =
+                    relevant.includes('ACTIVE') ? 'ACTIVE' :
+                    relevant.includes('SCHEDULED') ? 'SCHEDULED' :
+                    relevant.includes('PAUSED') ? 'PAUSED' : 'NONE'
+                  return { mem, currentStatus }
+                })
+                .filter(({ mem }) =>
+                  mem.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+                  mem.email.toLowerCase().includes(memberSearch.toLowerCase()))
+                .filter(({ currentStatus }) => memberStatusFilter === 'ALL' || currentStatus === memberStatusFilter)
+                .sort((a, b) => memberSort === 'NAME'
+                  ? a.mem.name.localeCompare(b.mem.name)
+                  : a.currentStatus.localeCompare(b.currentStatus))
+                .map(({ mem, currentStatus }) => (
+                  <tr key={mem.id}>
+                    <td className="py-2 pr-4">{mem.name}</td>
+                    <td className="py-2 pr-4 text-gray-500">{mem.email}</td>
+                    <td className="py-2 pr-4 text-gray-500">{mem.checkinPin ?? '—'}</td>
+                    <td className="py-2">
+                      <span className={currentStatus === 'NONE' ? 'text-gray-400' : statusColorClass(currentStatus)}>
+                        {currentStatus === 'NONE' ? 'No plan' : statusLabel(currentStatus)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+          {members.length === 0 && <p className="py-4 text-sm text-gray-400">No members at this branch yet.</p>}
         </div>
       </div>
 

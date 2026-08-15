@@ -55,10 +55,13 @@ public class MembershipService {
                 .map(this::toPlanResponse).toList();
     }
 
-    // Called by a manager/owner after collecting payment at the front desk. If the member
-    // already has an active, unexpired membership, we extend it (ignoring any supplied
-    // startDate - it always continues the day after the current one ends). Otherwise a new
-    // membership starts on the given startDate, or today if none was supplied.
+    // Called by a manager/owner after collecting payment at the front desk. Each purchase
+    // becomes its OWN row (not merged into an existing one) - this keeps the plan actually
+    // purchased visible and correct, rather than being overwritten by whatever's bought next.
+    // If the member already has paid-for time that hasn't lapsed yet, this new purchase
+    // queues up starting the day after that time runs out, regardless of any startDate
+    // supplied. Only when they have nothing currently queued does the requested startDate
+    // (or today, if none given) actually apply.
     // recordedByUserId is the authenticated manager/owner's own ID (from the JWT), never
     // trusted from the request body, so the Payment audit trail can't be spoofed.
     @Transactional
@@ -70,29 +73,22 @@ public class MembershipService {
         User recordedBy = userRepository.findById(recordedByUserId)
                 .orElseThrow(() -> new IllegalArgumentException("Recording user not found"));
 
-        var existingActive = membershipRepository
-                .findFirstByMemberIdAndStatusOrderByEndDateDesc(memberId, MembershipStatus.ACTIVE)
-                .filter(m -> !m.getEndDate().isBefore(LocalDate.now()));
+        LocalDate today = LocalDate.now();
+        LocalDate latestQueuedEnd = membershipRepository.findLatestQueuedEndDate(memberId, today);
 
-        Membership membership;
-        if (existingActive.isPresent()) {
-            membership = existingActive.get();
-            // Deliberately NOT overwriting membership.plan or applying req.startDate() here -
-            // the label shown to the member should stay as their original plan, and a renewal
-            // always continues from the current end date regardless of any date supplied.
-            membership.setEndDate(membership.getEndDate().plusMonths(plan.getDurationMonths()));
-        } else {
-            LocalDate start = req.startDate() != null ? req.startDate() : LocalDate.now();
-            LocalDate end = start.plusMonths(plan.getDurationMonths());
-            membership = Membership.builder()
-                    .member(member)
-                    .plan(plan)
-                    .branch(plan.getBranch())
-                    .startDate(start)
-                    .endDate(end)
-                    .status(MembershipStatus.ACTIVE)
-                    .build();
-        }
+        LocalDate start = latestQueuedEnd != null
+                ? latestQueuedEnd.plusDays(1)
+                : (req.startDate() != null ? req.startDate() : today);
+        LocalDate end = start.plusMonths(plan.getDurationMonths());
+
+        Membership membership = Membership.builder()
+                .member(member)
+                .plan(plan)
+                .branch(plan.getBranch())
+                .startDate(start)
+                .endDate(end)
+                .status(MembershipStatus.ACTIVE)
+                .build();
         membership = membershipRepository.save(membership);
 
         Payment payment = Payment.builder()
@@ -118,15 +114,19 @@ public class MembershipService {
         return toAdminResponse(m);
     }
 
+    // Pausing only makes sense for the segment that's actually running right now - a
+    // future-dated (not yet started) row should be cancelled or edited instead.
     @Transactional
     public MembershipAdminResponse pause(UUID membershipId) {
         Membership m = membershipRepository.findById(membershipId)
                 .orElseThrow(() -> new IllegalArgumentException("Membership not found"));
-        if (m.getStatus() != MembershipStatus.ACTIVE) {
-            throw new IllegalArgumentException("Only an active membership can be paused");
+        LocalDate today = LocalDate.now();
+        if (m.getStatus() != MembershipStatus.ACTIVE
+                || m.getStartDate().isAfter(today) || m.getEndDate().isBefore(today)) {
+            throw new IllegalArgumentException("Only the currently running membership can be paused");
         }
         m.setStatus(MembershipStatus.PAUSED);
-        m.setPausedAt(LocalDate.now());
+        m.setPausedAt(today);
         m = membershipRepository.save(m);
         return toAdminResponse(m);
     }

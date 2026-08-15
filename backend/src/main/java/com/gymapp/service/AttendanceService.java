@@ -26,9 +26,9 @@ public class AttendanceService {
     private final MembershipRepository membershipRepository;
 
     public AttendanceService(AttendanceRepository attendanceRepository,
-                              UserRepository userRepository,
-                              BranchRepository branchRepository,
-                              MembershipRepository membershipRepository) {
+                             UserRepository userRepository,
+                             BranchRepository branchRepository,
+                             MembershipRepository membershipRepository) {
         this.attendanceRepository = attendanceRepository;
         this.userRepository = userRepository;
         this.branchRepository = branchRepository;
@@ -58,19 +58,26 @@ public class AttendanceService {
             throw new IllegalArgumentException("This member account is inactive");
         }
 
-        Membership activeMembership = membershipRepository
-                .findFirstByMemberIdAndStatusOrderByEndDateDesc(member.getId(), MembershipStatus.ACTIVE)
-                .orElseThrow(() -> new IllegalArgumentException("No active membership - access denied"));
+        LocalDate today = LocalDate.now();
 
-        if (activeMembership.getEndDate().isBefore(LocalDate.now())) {
-            activeMembership.setStatus(MembershipStatus.EXPIRED);
-            membershipRepository.save(activeMembership);
-            throw new IllegalArgumentException("Membership has expired - access denied");
-        }
+        Membership usableMembership = membershipRepository
+                .findCurrentlyUsable(member.getId(), today)
+                .orElseGet(() -> {
+                    // No membership is usable today - check if there's an upcoming
+                    // (paid for, but not yet started) one to give a clearer message
+                    // than a bare "no access", then deny either way.
+                    var upcoming = membershipRepository.findFirstByMemberIdAndStatusAndStartDateAfterOrderByStartDateAsc(
+                            member.getId(), MembershipStatus.ACTIVE, today);
+                    if (upcoming.isPresent()) {
+                        throw new IllegalArgumentException(
+                                "Membership not yet active - starts on " + upcoming.get().getStartDate());
+                    }
+                    throw new IllegalArgumentException("No active membership - access denied");
+                });
 
         Branch branch = req.branchId() != null
                 ? branchRepository.findById(req.branchId()).orElseThrow(() -> new IllegalArgumentException("Branch not found"))
-                : activeMembership.getBranch();
+                : usableMembership.getBranch();
 
         Attendance attendance = Attendance.builder()
                 .member(member)
