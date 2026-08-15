@@ -1,7 +1,7 @@
 # Gym Management System
 
 ## Stack
-- **Backend**: Spring Boot 3 (Java 17), Spring Security + JWT, Spring Data JPA, PostgreSQL
+- **Backend**: Spring Boot 3 (Java 17), Spring Security + JWT, Spring Data JPA, PostgreSQL, Flyway
 - **Frontend**: Vite + React + TypeScript + Tailwind CSS, TanStack Query, Zustand, React Router
 
 ---
@@ -12,7 +12,7 @@ Install these once:
 - **Java 17** — `java -version` should show 17+
 - **Maven** — `mvn -version` (or use the `mvnw` wrapper if you generate one via `mvn -N wrapper:wrapper` — this scaffold assumes a system Maven install)
 - **Node.js 18+** and npm — `node -v`
-- A free **PostgreSQL** database — sign up at [supabase.com](https://supabase.com) or [neon.tech](https://neon.tech) and create a new project/database. Copy the connection details (host, port, database name, username, password).
+- A free **PostgreSQL** database — sign up at [supabase.com](https://supabase.com) or [neon.tech](https://neon.tech) and create a new project/database. Copy the connection details (host, port, database name, username, password). If you're on Supabase, use the **Session mode connection pooler** string (`aws-0-<region>.pooler.supabase.com`), not the direct `db.<project-ref>.supabase.co` host — the direct host is IPv6-only and will time out on most networks.
 
 ---
 
@@ -48,12 +48,12 @@ mvn spring-boot:run
 ```
 
 On first run:
-- Hibernate auto-creates all tables (`ddl-auto: update`) — no manual SQL needed for local dev.
+- **Flyway** creates the schema by running the migration scripts in `src/main/resources/db/migration/` in order. Hibernate's `ddl-auto` is set to `validate` — it checks the schema matches the entities and fails fast at startup if it doesn't, rather than silently altering anything. See [§4 Database Migrations](#4-database-migrations-flyway) below before making any entity change.
 - The `DataSeeder` creates your **one master OWNER account** using `OWNER_EMAIL` / `OWNER_PASSWORD`. This is the only way an Owner account is ever created — there's deliberately no public signup for it.
 
 The API should now be running at `http://localhost:8080`.
 
-**Quick check**: `curl http://localhost:8080/api/branches` should return `[]` (empty array — you haven't created a branch yet). If you get a connection error, double check your DB credentials.
+**Quick check**: `curl http://localhost:8080/api/public/branches` should return `[]` (empty array — you haven't created a branch yet). If you get a connection error, double check your DB credentials.
 
 ---
 

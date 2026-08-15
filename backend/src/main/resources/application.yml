@@ -8,12 +8,25 @@ spring:
     password: ${DB_PASSWORD:postgres}
   jpa:
     hibernate:
-      ddl-auto: update   # use 'validate' once you introduce a migration tool like Flyway for production
+      # Flyway now owns schema changes - Hibernate only checks the schema matches what
+      # the entities expect at startup and fails fast if it doesn't, rather than silently
+      # altering things (which is what let the stale CHECK constraint bug happen).
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
         format_sql: true
     open-in-view: false
+  flyway:
+    enabled: true
+    # Your existing dev database already has all these tables (Hibernate created them via
+    # ddl-auto: update over the life of this project so far). baseline-on-migrate tells
+    # Flyway: on a non-empty schema with no flyway_schema_history table yet, treat
+    # baseline-version as already applied without re-running its script, then continue
+    # normally from the next version. A brand-new empty database (e.g. a fresh Render/
+    # Supabase setup) is unaffected by this - it just runs every migration from V1 onward.
+    baseline-on-migrate: true
+    baseline-version: 1
 
 app:
   jwt:
