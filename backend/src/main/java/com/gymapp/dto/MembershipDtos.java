@@ -1,5 +1,6 @@
 package com.gymapp.dto;
 
+import com.gymapp.entity.PaymentMode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -25,14 +26,42 @@ public class MembershipDtos {
     ) {}
 
     public record PurchaseRequest(
-            @NotNull UUID planId
+            @NotNull UUID planId,
+            @NotNull PaymentMode mode,
+            // Only used when the member has no current unexpired ACTIVE membership - if
+            // they do, the new plan always starts the day after the current one ends and
+            // this is ignored, regardless of what's supplied here.
+            LocalDate startDate
     ) {}
 
+    // Returned from the member's own "my memberships" view - deliberately does NOT
+    // surface which specific plan was purchased as the headline label (status + expiry
+    // date is all a member needs; which plan contributed to that date is visible in
+    // their payment history instead, where it belongs).
     public record MembershipResponse(
             UUID id,
             String planName,
             LocalDate startDate,
             LocalDate endDate,
-            String status
+            String status,
+            LocalDate pausedAt
+    ) {}
+
+    // Returned from manager/owner-facing endpoints, where knowing the member and plan
+    // matters for day-to-day front-desk operations.
+    public record MembershipAdminResponse(
+            UUID id,
+            UUID memberId,
+            String memberName,
+            String planName,
+            LocalDate startDate,
+            LocalDate endDate,
+            String status,
+            LocalDate pausedAt
+    ) {}
+
+    public record EditMembershipRequest(
+            LocalDate startDate,
+            LocalDate endDate
     ) {}
 }

@@ -4,6 +4,7 @@ import com.gymapp.security.JwtAuthFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -63,6 +64,16 @@ public class SecurityConfig {
                 // membership purchase is recorded by front-desk staff against cash payment,
                 // not self-service by the member - see MembershipService.purchase()
                 .requestMatchers("/api/memberships/purchase").hasAnyRole("OWNER", "MANAGER")
+
+                // membership admin actions - branch listing and lifecycle changes. The PUT
+                // matcher is deliberately method-specific: GET /api/memberships/mine and
+                // PUT /api/memberships/{id} are both a single path segment, so without
+                // pinning this to PUT it would also (wrongly) restrict the member's own
+                // GET /mine endpoint.
+                .requestMatchers("/api/memberships/branch/**").hasAnyRole("OWNER", "MANAGER")
+                .requestMatchers("/api/memberships/*/cancel", "/api/memberships/*/pause",
+                        "/api/memberships/*/resume").hasAnyRole("OWNER", "MANAGER")
+                .requestMatchers(HttpMethod.PUT, "/api/memberships/*").hasAnyRole("OWNER", "MANAGER")
 
                 // payment history - branch view for staff, "my payments" for the member
                 // themselves (ownership is checked in PaymentController.mine())

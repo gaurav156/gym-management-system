@@ -1,10 +1,12 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
-import type { Branch, Plan, Payment } from '../types'
+import type { Branch, Plan, Payment, MembershipAdmin } from '../types'
 
 interface HourlyCount { hour: number; count: number }
 interface MemberSummary { id: string; name: string; email: string; checkinPin: string | null }
+
+const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
 
 export default function ManagerDashboard() {
   const user = useAuthStore((s) => s.user)
@@ -14,6 +16,7 @@ export default function ManagerDashboard() {
   const [summary, setSummary] = useState<HourlyCount[]>([])
   const [members, setMembers] = useState<MemberSummary[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
+  const [memberships, setMemberships] = useState<MembershipAdmin[]>([])
 
   const [planName, setPlanName] = useState('')
   const [planMonths, setPlanMonths] = useState(1)
@@ -26,7 +29,10 @@ export default function ManagerDashboard() {
 
   const [purchaseMemberId, setPurchaseMemberId] = useState('')
   const [purchasePlanId, setPurchasePlanId] = useState('')
+  const [purchaseMode, setPurchaseMode] = useState('CASH')
+  const [purchaseStartDate, setPurchaseStartDate] = useState('')
   const [purchaseMessage, setPurchaseMessage] = useState('')
+  const [membershipActionMessage, setMembershipActionMessage] = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -51,12 +57,18 @@ export default function ManagerDashboard() {
     api.get<Payment[]>(`/api/payments/branch/${selectedBranch}`).then((res) => setPayments(res.data))
   }
 
+  function loadMemberships() {
+    if (!selectedBranch) return
+    api.get<MembershipAdmin[]>(`/api/memberships/branch/${selectedBranch}`).then((res) => setMemberships(res.data))
+  }
+
   useEffect(() => {
     if (!selectedBranch) return
     api.get<Plan[]>('/api/plans', { params: { branchId: selectedBranch } }).then((res) => setPlans(res.data))
     api.get<HourlyCount[]>(`/api/attendance/summary/${selectedBranch}`).then((res) => setSummary(res.data))
     api.get<MemberSummary[]>('/api/members', { params: { branchId: selectedBranch } }).then((res) => setMembers(res.data))
     loadPayments()
+    loadMemberships()
   }, [selectedBranch])
 
   async function createPlan(e: FormEvent) {
@@ -108,14 +120,62 @@ export default function ManagerDashboard() {
     try {
       const { data } = await api.post(
         '/api/memberships/purchase',
-        { planId: purchasePlanId },
+        {
+          planId: purchasePlanId,
+          mode: purchaseMode,
+          startDate: purchaseStartDate || null,
+        },
         { params: { memberId: purchaseMemberId } }
       )
-      setPurchaseMessage(`Recorded - ${data.planName} valid until ${data.endDate}.`)
-      setPurchaseMemberId(''); setPurchasePlanId('')
+      setPurchaseMessage(`Recorded - valid until ${data.endDate}.`)
+      setPurchaseMemberId(''); setPurchasePlanId(''); setPurchaseStartDate('')
       loadPayments()
+      loadMemberships()
     } catch (err: any) {
       setPurchaseMessage(err.response?.data?.error || 'Failed to record purchase')
+    }
+  }
+
+  async function cancelMembership(id: string) {
+    if (!confirm('Cancel this membership? The member will lose gym access immediately.')) return
+    setMembershipActionMessage('')
+    try {
+      await api.post(`/api/memberships/${id}/cancel`)
+      loadMemberships()
+    } catch (err: any) {
+      setMembershipActionMessage(err.response?.data?.error || 'Failed to cancel')
+    }
+  }
+
+  async function pauseMembership(id: string) {
+    setMembershipActionMessage('')
+    try {
+      await api.post(`/api/memberships/${id}/pause`)
+      loadMemberships()
+    } catch (err: any) {
+      setMembershipActionMessage(err.response?.data?.error || 'Failed to pause')
+    }
+  }
+
+  async function resumeMembership(id: string) {
+    setMembershipActionMessage('')
+    try {
+      await api.post(`/api/memberships/${id}/resume`)
+      loadMemberships()
+    } catch (err: any) {
+      setMembershipActionMessage(err.response?.data?.error || 'Failed to resume')
+    }
+  }
+
+  async function editMembership(id: string, currentEndDate: string) {
+    const newEndDate = prompt('New end date (YYYY-MM-DD):', currentEndDate)
+    if (!newEndDate) return
+    setMembershipActionMessage('')
+    try {
+      await api.put(`/api/memberships/${id}`, { endDate: newEndDate })
+      loadMemberships()
+    } catch (err: any) {
+      setMembershipActionMessage(err.response?.data?.error || 'Failed to update')
     }
   }
 
@@ -166,6 +226,15 @@ export default function ManagerDashboard() {
               <option value="">Select plan</option>
               {plans.map((p) => <option key={p.id} value={p.id}>{p.name} - ₹{p.price}</option>)}
             </select>
+            <select required value={purchaseMode} onChange={(e) => setPurchaseMode(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              {PAYMENT_MODES.map((m) => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
+            </select>
+            <div>
+              <label className="text-xs text-gray-500">Start date (only used if member has no active plan)</label>
+              <input type="date" value={purchaseStartDate} onChange={(e) => setPurchaseStartDate(e.target.value)}
+                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            </div>
             <button className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
               Record purchase
             </button>
@@ -203,6 +272,64 @@ export default function ManagerDashboard() {
             </tbody>
           </table>
           {payments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-lg border border-gray-200 p-6">
+        <h2 className="font-medium">Manage memberships</h2>
+        <p className="mt-1 text-xs text-gray-500">Pause, resume, cancel, or correct a member's dates.</p>
+        {membershipActionMessage && <p className="mt-2 text-sm text-red-600">{membershipActionMessage}</p>}
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-gray-500">
+                <th className="pb-2 pr-4">Member</th>
+                <th className="pb-2 pr-4">Plan</th>
+                <th className="pb-2 pr-4">Start</th>
+                <th className="pb-2 pr-4">End</th>
+                <th className="pb-2 pr-4">Status</th>
+                <th className="pb-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {memberships.map((m) => (
+                <tr key={m.id}>
+                  <td className="py-2 pr-4">{m.memberName}</td>
+                  <td className="py-2 pr-4">{m.planName}</td>
+                  <td className="py-2 pr-4 text-gray-500">{m.startDate}</td>
+                  <td className="py-2 pr-4 text-gray-500">{m.endDate}</td>
+                  <td className="py-2 pr-4">
+                    <span className={
+                      m.status === 'ACTIVE' ? 'text-green-700' :
+                      m.status === 'PAUSED' ? 'text-amber-600' :
+                      'text-gray-400'
+                    }>{m.status}</span>
+                  </td>
+                  <td className="py-2 space-x-2 whitespace-nowrap">
+                    {m.status === 'ACTIVE' && (
+                      <button onClick={() => pauseMembership(m.id)} className="text-xs text-amber-600 hover:underline">
+                        Pause
+                      </button>
+                    )}
+                    {m.status === 'PAUSED' && (
+                      <button onClick={() => resumeMembership(m.id)} className="text-xs text-green-700 hover:underline">
+                        Resume
+                      </button>
+                    )}
+                    {(m.status === 'ACTIVE' || m.status === 'PAUSED') && (
+                      <button onClick={() => cancelMembership(m.id)} className="text-xs text-red-600 hover:underline">
+                        Cancel
+                      </button>
+                    )}
+                    <button onClick={() => editMembership(m.id, m.endDate)} className="text-xs text-gray-600 hover:underline">
+                      Edit end date
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {memberships.length === 0 && <p className="py-4 text-sm text-gray-400">No memberships recorded yet.</p>}
         </div>
       </div>
 

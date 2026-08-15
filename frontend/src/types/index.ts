@@ -26,7 +26,19 @@ export interface Membership {
   planName: string
   startDate: string
   endDate: string
-  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED'
+  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'PAUSED'
+  pausedAt: string | null
+}
+
+export interface MembershipAdmin {
+  id: string
+  memberId: string
+  memberName: string
+  planName: string
+  startDate: string
+  endDate: string
+  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'PAUSED'
+  pausedAt: string | null
 }
 
 export interface Payment {

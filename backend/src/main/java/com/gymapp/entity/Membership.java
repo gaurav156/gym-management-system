@@ -44,4 +44,8 @@ public class Membership {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private MembershipStatus status;
+
+    // Set when status = PAUSED - used to compute how many days to add back to endDate
+    // on resume, so pausing doesn't cost the member any paid-for time.
+    private LocalDate pausedAt;
 }

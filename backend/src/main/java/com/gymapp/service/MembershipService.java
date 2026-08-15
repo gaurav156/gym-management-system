@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -54,11 +55,12 @@ public class MembershipService {
                 .map(this::toPlanResponse).toList();
     }
 
-    // Called by a manager/owner after collecting cash payment (see SecurityConfig). If the
-    // member already has an active, unexpired membership, we extend it rather than create a
-    // second row that's simultaneously "ACTIVE". recordedByUserId is the authenticated
-    // manager/owner's own ID (from the JWT), never trusted from the request body, so the
-    // Payment audit trail can't be spoofed as having been collected by someone else.
+    // Called by a manager/owner after collecting payment at the front desk. If the member
+    // already has an active, unexpired membership, we extend it (ignoring any supplied
+    // startDate - it always continues the day after the current one ends). Otherwise a new
+    // membership starts on the given startDate, or today if none was supplied.
+    // recordedByUserId is the authenticated manager/owner's own ID (from the JWT), never
+    // trusted from the request body, so the Payment audit trail can't be spoofed.
     @Transactional
     public MembershipResponse purchase(UUID memberId, PurchaseRequest req, UUID recordedByUserId) {
         User member = userRepository.findById(memberId)
@@ -75,14 +77,12 @@ public class MembershipService {
         Membership membership;
         if (existingActive.isPresent()) {
             membership = existingActive.get();
-            // Deliberately NOT overwriting membership.plan here - the label shown to the
-            // member should stay as their original plan, since a renewal (even with a
-            // different plan tier) only extends the access window, not "replaces" it.
-            // Each individual purchase's plan is still recorded correctly on its own
-            // Payment row, so that detail isn't lost - just not used as the display label.
+            // Deliberately NOT overwriting membership.plan or applying req.startDate() here -
+            // the label shown to the member should stay as their original plan, and a renewal
+            // always continues from the current end date regardless of any date supplied.
             membership.setEndDate(membership.getEndDate().plusMonths(plan.getDurationMonths()));
         } else {
-            LocalDate start = LocalDate.now();
+            LocalDate start = req.startDate() != null ? req.startDate() : LocalDate.now();
             LocalDate end = start.plusMonths(plan.getDurationMonths());
             membership = Membership.builder()
                     .member(member)
@@ -102,11 +102,62 @@ public class MembershipService {
                 .membership(membership)
                 .amount(plan.getPrice())
                 .type(PaymentType.MEMBERSHIP)
-                .mode(PaymentMode.CASH)
+                .mode(req.mode())
                 .build();
         paymentRepository.save(payment);
 
         return toMembershipResponse(membership);
+    }
+
+    @Transactional
+    public MembershipAdminResponse cancel(UUID membershipId) {
+        Membership m = membershipRepository.findById(membershipId)
+                .orElseThrow(() -> new IllegalArgumentException("Membership not found"));
+        m.setStatus(MembershipStatus.CANCELLED);
+        m = membershipRepository.save(m);
+        return toAdminResponse(m);
+    }
+
+    @Transactional
+    public MembershipAdminResponse pause(UUID membershipId) {
+        Membership m = membershipRepository.findById(membershipId)
+                .orElseThrow(() -> new IllegalArgumentException("Membership not found"));
+        if (m.getStatus() != MembershipStatus.ACTIVE) {
+            throw new IllegalArgumentException("Only an active membership can be paused");
+        }
+        m.setStatus(MembershipStatus.PAUSED);
+        m.setPausedAt(LocalDate.now());
+        m = membershipRepository.save(m);
+        return toAdminResponse(m);
+    }
+
+    // Resuming adds back however many days the membership was paused, so a member never
+    // loses paid-for time by pausing.
+    @Transactional
+    public MembershipAdminResponse resume(UUID membershipId) {
+        Membership m = membershipRepository.findById(membershipId)
+                .orElseThrow(() -> new IllegalArgumentException("Membership not found"));
+        if (m.getStatus() != MembershipStatus.PAUSED || m.getPausedAt() == null) {
+            throw new IllegalArgumentException("Membership is not currently paused");
+        }
+        long daysPaused = ChronoUnit.DAYS.between(m.getPausedAt(), LocalDate.now());
+        m.setEndDate(m.getEndDate().plusDays(daysPaused));
+        m.setStatus(MembershipStatus.ACTIVE);
+        m.setPausedAt(null);
+        m = membershipRepository.save(m);
+        return toAdminResponse(m);
+    }
+
+    // Manual correction tool for a manager/owner - e.g. fixing a mis-entered date. Deliberately
+    // minimal (dates only) rather than allowing arbitrary field edits.
+    @Transactional
+    public MembershipAdminResponse edit(UUID membershipId, EditMembershipRequest req) {
+        Membership m = membershipRepository.findById(membershipId)
+                .orElseThrow(() -> new IllegalArgumentException("Membership not found"));
+        if (req.startDate() != null) m.setStartDate(req.startDate());
+        if (req.endDate() != null) m.setEndDate(req.endDate());
+        m = membershipRepository.save(m);
+        return toAdminResponse(m);
     }
 
     @Transactional(readOnly = true)
@@ -115,11 +166,23 @@ public class MembershipService {
                 .map(this::toMembershipResponse).toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<MembershipAdminResponse> listForBranch(UUID branchId) {
+        return membershipRepository.findByBranchIdOrderByEndDateDesc(branchId).stream()
+                .map(this::toAdminResponse).toList();
+    }
+
     private PlanResponse toPlanResponse(MembershipPlan p) {
         return new PlanResponse(p.getId(), p.getName(), p.getDurationMonths(), p.getPrice());
     }
 
     private MembershipResponse toMembershipResponse(Membership m) {
-        return new MembershipResponse(m.getId(), m.getPlan().getName(), m.getStartDate(), m.getEndDate(), m.getStatus().name());
+        return new MembershipResponse(m.getId(), m.getPlan().getName(), m.getStartDate(),
+                m.getEndDate(), m.getStatus().name(), m.getPausedAt());
+    }
+
+    private MembershipAdminResponse toAdminResponse(Membership m) {
+        return new MembershipAdminResponse(m.getId(), m.getMember().getId(), m.getMember().getName(),
+                m.getPlan().getName(), m.getStartDate(), m.getEndDate(), m.getStatus().name(), m.getPausedAt());
     }
 }

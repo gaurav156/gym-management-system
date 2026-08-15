@@ -44,4 +44,34 @@ public class MembershipController {
     public List<MembershipResponse> mine(@RequestParam UUID memberId) {
         return membershipService.listForMember(memberId);
     }
+
+    @GetMapping("/memberships/branch/{branchId}")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public List<MembershipAdminResponse> listForBranch(@PathVariable UUID branchId) {
+        return membershipService.listForBranch(branchId);
+    }
+
+    @PostMapping("/memberships/{id}/cancel")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public MembershipAdminResponse cancel(@PathVariable UUID id) {
+        return membershipService.cancel(id);
+    }
+
+    @PostMapping("/memberships/{id}/pause")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public MembershipAdminResponse pause(@PathVariable UUID id) {
+        return membershipService.pause(id);
+    }
+
+    @PostMapping("/memberships/{id}/resume")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public MembershipAdminResponse resume(@PathVariable UUID id) {
+        return membershipService.resume(id);
+    }
+
+    @PutMapping("/memberships/{id}")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public MembershipAdminResponse edit(@PathVariable UUID id, @RequestBody EditMembershipRequest req) {
+        return membershipService.edit(id, req);
+    }
 }

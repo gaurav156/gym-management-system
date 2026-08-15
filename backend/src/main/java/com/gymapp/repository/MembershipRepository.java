@@ -12,4 +12,5 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     List<Membership> findByMemberId(UUID memberId);
     Optional<Membership> findFirstByMemberIdAndStatusOrderByEndDateDesc(UUID memberId, MembershipStatus status);
     List<Membership> findByStatus(MembershipStatus status);
+    List<Membership> findByBranchIdOrderByEndDateDesc(UUID branchId);
 }

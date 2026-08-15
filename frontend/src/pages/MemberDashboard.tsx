@@ -50,6 +50,7 @@ export default function MemberDashboard() {
   }, [user])
 
   const activeMembership = memberships.find((m) => m.status === 'ACTIVE')
+  const pausedMembership = memberships.find((m) => m.status === 'PAUSED')
 
   if (!user) return null
 
@@ -80,8 +81,13 @@ export default function MemberDashboard() {
           <h2 className="font-medium">Membership status</h2>
           {activeMembership ? (
             <div className="mt-3 text-sm">
-              <p className="font-medium text-green-700">Active - {activeMembership.planName}</p>
+              <p className="font-medium text-green-700">Active</p>
               <p className="mt-1 text-gray-500">Valid until {activeMembership.endDate}</p>
+            </div>
+          ) : pausedMembership ? (
+            <div className="mt-3 text-sm">
+              <p className="font-medium text-amber-600">Paused</p>
+              <p className="mt-1 text-gray-500">Visit the front desk to resume - your remaining time is preserved.</p>
             </div>
           ) : (
             <p className="mt-3 text-sm text-red-600">No active membership - purchase a plan to get gym access.</p>
