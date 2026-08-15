@@ -75,8 +75,11 @@ public class MembershipService {
         Membership membership;
         if (existingActive.isPresent()) {
             membership = existingActive.get();
-            membership.setPlan(plan);
-            membership.setBranch(plan.getBranch());
+            // Deliberately NOT overwriting membership.plan here - the label shown to the
+            // member should stay as their original plan, since a renewal (even with a
+            // different plan tier) only extends the access window, not "replaces" it.
+            // Each individual purchase's plan is still recorded correctly on its own
+            // Payment row, so that detail isn't lost - just not used as the display label.
             membership.setEndDate(membership.getEndDate().plusMonths(plan.getDurationMonths()));
         } else {
             LocalDate start = LocalDate.now();

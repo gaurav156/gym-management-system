@@ -13,9 +13,8 @@ export default function MemberDashboard() {
   const [message, setMessage] = useState('')
   const [loadError, setLoadError] = useState('')
 
-  useEffect(() => {
+  function loadMembershipData() {
     if (!user) return
-
     api.get<Membership[]>('/api/memberships/mine', { params: { memberId: user.userId } })
       .then((res) => setMemberships(res.data))
       .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your memberships'))
@@ -23,6 +22,16 @@ export default function MemberDashboard() {
     api.get<Payment[]>('/api/payments/mine', { params: { memberId: user.userId } })
       .then((res) => setPayments(res.data))
       .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your payment history'))
+  }
+
+  useEffect(() => {
+    if (!user) return
+    loadMembershipData()
+
+    // Purchases are recorded from the manager's screen, not this page - if a member
+    // leaves this tab open, refetch when they come back to it so status doesn't go stale.
+    function onFocus() { loadMembershipData() }
+    window.addEventListener('focus', onFocus)
 
     // Use the member's own branch assignment(s) - not an arbitrary/first branch overall -
     // so plans shown here always match where this member actually signed up.
@@ -36,6 +45,8 @@ export default function MemberDashboard() {
         setPlans(perBranch.flatMap((r) => r.data))
       })
       .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load plans for your branch'))
+
+    return () => window.removeEventListener('focus', onFocus)
   }, [user])
 
   const activeMembership = memberships.find((m) => m.status === 'ACTIVE')
@@ -44,7 +55,13 @@ export default function MemberDashboard() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="text-2xl font-semibold">Welcome, {user.name}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Welcome, {user.name}</h1>
+        <button onClick={loadMembershipData}
+          className="rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200">
+          Refresh status
+        </button>
+      </div>
       {loadError && <p className="mt-2 text-sm text-red-600">{loadError}</p>}
 
       <div className="mt-8 grid gap-8 sm:grid-cols-2">
