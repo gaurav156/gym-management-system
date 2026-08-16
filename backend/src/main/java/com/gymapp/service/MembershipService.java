@@ -149,13 +149,22 @@ public class MembershipService {
     }
 
     // Manual correction tool for a manager/owner - e.g. fixing a mis-entered date. Deliberately
-    // minimal (dates only) rather than allowing arbitrary field edits.
+    // minimal (dates only) rather than allowing arbitrary field edits. Status is never edited
+    // directly here - it's derived from these dates wherever it's displayed, so correcting the
+    // dates is enough to correct the displayed status too.
     @Transactional
     public MembershipAdminResponse edit(UUID membershipId, EditMembershipRequest req) {
         Membership m = membershipRepository.findById(membershipId)
                 .orElseThrow(() -> new IllegalArgumentException("Membership not found"));
-        if (req.startDate() != null) m.setStartDate(req.startDate());
-        if (req.endDate() != null) m.setEndDate(req.endDate());
+
+        LocalDate newStart = req.startDate() != null ? req.startDate() : m.getStartDate();
+        LocalDate newEnd = req.endDate() != null ? req.endDate() : m.getEndDate();
+        if (newEnd.isBefore(newStart)) {
+            throw new IllegalArgumentException("End date cannot be before start date");
+        }
+
+        m.setStartDate(newStart);
+        m.setEndDate(newEnd);
         m = membershipRepository.save(m);
         return toAdminResponse(m);
     }

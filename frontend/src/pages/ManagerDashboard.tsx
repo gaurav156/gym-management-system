@@ -173,12 +173,30 @@ export default function ManagerDashboard() {
     }
   }
 
-  async function editMembership(id: string, currentEndDate: string) {
-    const newEndDate = prompt('New end date (YYYY-MM-DD):', currentEndDate)
-    if (!newEndDate) return
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editStartDate, setEditStartDate] = useState('')
+  const [editEndDate, setEditEndDate] = useState('')
+
+  function startEdit(m: MembershipAdmin) {
+    setEditingId(m.id)
+    setEditStartDate(m.startDate)
+    setEditEndDate(m.endDate)
+    setMembershipActionMessage('')
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+  }
+
+  async function saveEdit(id: string) {
+    if (editEndDate < editStartDate) {
+      setMembershipActionMessage('End date cannot be before start date.')
+      return
+    }
     setMembershipActionMessage('')
     try {
-      await api.put(`/api/memberships/${id}`, { endDate: newEndDate })
+      await api.put(`/api/memberships/${id}`, { startDate: editStartDate, endDate: editEndDate })
+      setEditingId(null)
       loadMemberships()
     } catch (err: any) {
       setMembershipActionMessage(err.response?.data?.error || 'Failed to update')
@@ -313,31 +331,55 @@ export default function ManagerDashboard() {
                   <tr key={m.id}>
                     <td className="py-2 pr-4">{m.memberName}</td>
                     <td className="py-2 pr-4">{m.planName}</td>
-                    <td className="py-2 pr-4 text-gray-500">{m.startDate}</td>
-                    <td className="py-2 pr-4 text-gray-500">{m.endDate}</td>
-                    <td className="py-2 pr-4">
-                      <span className={statusColorClass(effective)}>{statusLabel(effective)}</span>
-                    </td>
-                    <td className="py-2 space-x-2 whitespace-nowrap">
-                      {effective === 'ACTIVE' && (
-                        <button onClick={() => pauseMembership(m.id)} className="text-xs text-amber-600 hover:underline">
-                          Pause
-                        </button>
-                      )}
-                      {effective === 'PAUSED' && (
-                        <button onClick={() => resumeMembership(m.id)} className="text-xs text-green-700 hover:underline">
-                          Resume
-                        </button>
-                      )}
-                      {(effective === 'ACTIVE' || effective === 'PAUSED' || effective === 'SCHEDULED') && (
-                        <button onClick={() => cancelMembership(m.id)} className="text-xs text-red-600 hover:underline">
-                          Cancel
-                        </button>
-                      )}
-                      <button onClick={() => editMembership(m.id, m.endDate)} className="text-xs text-gray-600 hover:underline">
-                        Edit end date
-                      </button>
-                    </td>
+                    {editingId === m.id ? (
+                      <>
+                        <td className="py-2 pr-4">
+                          <input type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)}
+                            className="rounded-md border border-gray-300 px-2 py-1 text-xs" />
+                        </td>
+                        <td className="py-2 pr-4">
+                          <input type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)}
+                            className="rounded-md border border-gray-300 px-2 py-1 text-xs" />
+                        </td>
+                        <td className="py-2 pr-4 text-xs text-gray-400">Updates on save</td>
+                        <td className="py-2 space-x-2 whitespace-nowrap">
+                          <button onClick={() => saveEdit(m.id)} className="text-xs text-green-700 hover:underline">
+                            Save
+                          </button>
+                          <button onClick={cancelEdit} className="text-xs text-gray-500 hover:underline">
+                            Cancel
+                          </button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="py-2 pr-4 text-gray-500">{m.startDate}</td>
+                        <td className="py-2 pr-4 text-gray-500">{m.endDate}</td>
+                        <td className="py-2 pr-4">
+                          <span className={statusColorClass(effective)}>{statusLabel(effective)}</span>
+                        </td>
+                        <td className="py-2 space-x-2 whitespace-nowrap">
+                          {effective === 'ACTIVE' && (
+                            <button onClick={() => pauseMembership(m.id)} className="text-xs text-amber-600 hover:underline">
+                              Pause
+                            </button>
+                          )}
+                          {effective === 'PAUSED' && (
+                            <button onClick={() => resumeMembership(m.id)} className="text-xs text-green-700 hover:underline">
+                              Resume
+                            </button>
+                          )}
+                          {(effective === 'ACTIVE' || effective === 'PAUSED' || effective === 'SCHEDULED') && (
+                            <button onClick={() => cancelMembership(m.id)} className="text-xs text-red-600 hover:underline">
+                              Cancel
+                            </button>
+                          )}
+                          <button onClick={() => startEdit(m)} className="text-xs text-gray-600 hover:underline">
+                            Edit dates
+                          </button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
             </tbody>
