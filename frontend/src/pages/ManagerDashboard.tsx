@@ -18,7 +18,6 @@ export default function ManagerDashboard() {
   const [members, setMembers] = useState<MemberSummary[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [memberships, setMemberships] = useState<MembershipAdmin[]>([])
-  const [showExpired, setShowExpired] = useState(false)
 
   const [planName, setPlanName] = useState('')
   const [planMonths, setPlanMonths] = useState(1)
@@ -204,6 +203,68 @@ export default function ManagerDashboard() {
   }
 
   const maxCount = Math.max(1, ...summary.map((s) => s.count))
+  const PAGE_SIZE = 10
+
+  const [memberPage, setMemberPage] = useState(1)
+  const [paymentPage, setPaymentPage] = useState(1)
+  const [detailMemberId, setDetailMemberId] = useState<string | null>(null)
+  const [modalShowExpired, setModalShowExpired] = useState(false)
+  const [modalPage, setModalPage] = useState(1)
+  const MODAL_PAGE_SIZE = 5
+
+  useEffect(() => {
+    setModalPage(1)
+  }, [detailMemberId, modalShowExpired])
+
+  useEffect(() => {
+    setMemberPage(1)
+  }, [memberSearch, memberStatusFilter, memberSort, selectedBranch])
+
+  useEffect(() => {
+    setPaymentPage(1)
+  }, [selectedBranch])
+
+  // One row per member (not per membership) - a member with several plans (active +
+  // scheduled next, or expired history) is summarized by their single most relevant
+  // status here; the full breakdown with per-plan actions lives in the details modal.
+  type MemberRow = { member: MemberSummary; status: EffectiveStatus | 'NONE' }
+
+  const memberRows: MemberRow[] = members.map((mem): MemberRow => {
+    const relevant = memberships
+      .filter((ms) => ms.memberId === mem.id)
+      .map((ms) => getEffectiveStatus(ms))
+    const status: EffectiveStatus | 'NONE' =
+      relevant.includes('ACTIVE') ? 'ACTIVE' :
+      relevant.includes('SCHEDULED') ? 'SCHEDULED' :
+      relevant.includes('PAUSED') ? 'PAUSED' : 'NONE'
+    return { member: mem, status }
+  })
+
+  const filteredMemberRows = memberRows
+    .filter(({ member }) =>
+      member.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+      member.email.toLowerCase().includes(memberSearch.toLowerCase()))
+    .filter(({ status }) => memberStatusFilter === 'ALL' || status === memberStatusFilter)
+    .sort((a, b) => memberSort === 'NAME'
+      ? a.member.name.localeCompare(b.member.name)
+      : a.status.localeCompare(b.status))
+
+  const memberTotalPages = Math.max(1, Math.ceil(filteredMemberRows.length / PAGE_SIZE))
+  const pagedMemberRows = filteredMemberRows.slice((memberPage - 1) * PAGE_SIZE, memberPage * PAGE_SIZE)
+
+  const detailMember = members.find((m) => m.id === detailMemberId) ?? null
+  const detailMemberships = memberships
+    .filter((ms) => ms.memberId === detailMemberId)
+    .filter((ms) => {
+      const effective = getEffectiveStatus(ms)
+      return modalShowExpired || (effective !== 'EXPIRED' && effective !== 'CANCELLED')
+    })
+    .sort((a, b) => b.startDate.localeCompare(a.startDate))
+  const modalTotalPages = Math.max(1, Math.ceil(detailMemberships.length / MODAL_PAGE_SIZE))
+  const pagedDetailMemberships = detailMemberships.slice((modalPage - 1) * MODAL_PAGE_SIZE, modalPage * MODAL_PAGE_SIZE)
+
+  const paymentTotalPages = Math.max(1, Math.ceil(payments.length / PAGE_SIZE))
+  const pagedPayments = payments.slice((paymentPage - 1) * PAGE_SIZE, paymentPage * PAGE_SIZE)
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -283,7 +344,7 @@ export default function ManagerDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {payments.map((p) => (
+              {pagedPayments.map((p) => (
                 <tr key={p.id}>
                   <td className="py-2 pr-4 text-gray-500">{new Date(p.createdAt).toLocaleString()}</td>
                   <td className="py-2 pr-4">{p.memberName}</td>
@@ -296,100 +357,25 @@ export default function ManagerDashboard() {
             </tbody>
           </table>
           {payments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
+          {payments.length > 0 && (
+            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+              <span>Page {paymentPage} of {paymentTotalPages} ({payments.length} total)</span>
+              <div className="space-x-2">
+                <button disabled={paymentPage === 1} onClick={() => setPaymentPage((p) => p - 1)}
+                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                <button disabled={paymentPage === paymentTotalPages} onClick={() => setPaymentPage((p) => p + 1)}
+                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="font-medium">Manage memberships</h2>
-          <label className="flex items-center gap-1.5 text-xs text-gray-500">
-            <input type="checkbox" checked={showExpired} onChange={(e) => setShowExpired(e.target.checked)} />
-            Show expired
-          </label>
-        </div>
-        <p className="mt-1 text-xs text-gray-500">
-          Pause, resume, cancel, or correct dates. Scheduled = paid for, not started yet.
-        </p>
+        <h2 className="font-medium">Members</h2>
+        <p className="mt-1 text-xs text-gray-500">Click a member to view all their plans and take action.</p>
         {membershipActionMessage && <p className="mt-2 text-sm text-red-600">{membershipActionMessage}</p>}
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-gray-500">
-                <th className="pb-2 pr-4">Member</th>
-                <th className="pb-2 pr-4">Plan</th>
-                <th className="pb-2 pr-4">Start</th>
-                <th className="pb-2 pr-4">End</th>
-                <th className="pb-2 pr-4">Status</th>
-                <th className="pb-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {memberships
-                .map((m) => ({ m, effective: getEffectiveStatus(m) }))
-                .filter(({ effective }) => showExpired || effective !== 'EXPIRED')
-                .map(({ m, effective }) => (
-                  <tr key={m.id}>
-                    <td className="py-2 pr-4">{m.memberName}</td>
-                    <td className="py-2 pr-4">{m.planName}</td>
-                    {editingId === m.id ? (
-                      <>
-                        <td className="py-2 pr-4">
-                          <input type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)}
-                            className="rounded-md border border-gray-300 px-2 py-1 text-xs" />
-                        </td>
-                        <td className="py-2 pr-4">
-                          <input type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)}
-                            className="rounded-md border border-gray-300 px-2 py-1 text-xs" />
-                        </td>
-                        <td className="py-2 pr-4 text-xs text-gray-400">Updates on save</td>
-                        <td className="py-2 space-x-2 whitespace-nowrap">
-                          <button onClick={() => saveEdit(m.id)} className="text-xs text-green-700 hover:underline">
-                            Save
-                          </button>
-                          <button onClick={cancelEdit} className="text-xs text-gray-500 hover:underline">
-                            Cancel
-                          </button>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="py-2 pr-4 text-gray-500">{m.startDate}</td>
-                        <td className="py-2 pr-4 text-gray-500">{m.endDate}</td>
-                        <td className="py-2 pr-4">
-                          <span className={statusColorClass(effective)}>{statusLabel(effective)}</span>
-                        </td>
-                        <td className="py-2 space-x-2 whitespace-nowrap">
-                          {effective === 'ACTIVE' && (
-                            <button onClick={() => pauseMembership(m.id)} className="text-xs text-amber-600 hover:underline">
-                              Pause
-                            </button>
-                          )}
-                          {effective === 'PAUSED' && (
-                            <button onClick={() => resumeMembership(m.id)} className="text-xs text-green-700 hover:underline">
-                              Resume
-                            </button>
-                          )}
-                          {(effective === 'ACTIVE' || effective === 'PAUSED' || effective === 'SCHEDULED') && (
-                            <button onClick={() => cancelMembership(m.id)} className="text-xs text-red-600 hover:underline">
-                              Cancel
-                            </button>
-                          )}
-                          <button onClick={() => startEdit(m)} className="text-xs text-gray-600 hover:underline">
-                            Edit dates
-                          </button>
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-          {memberships.length === 0 && <p className="py-4 text-sm text-gray-400">No memberships recorded yet.</p>}
-        </div>
-      </div>
 
-      <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">All members</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <input placeholder="Search name or email..." value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
             className="flex-1 min-w-[180px] rounded-md border border-gray-300 px-3 py-2 text-sm" />
@@ -407,52 +393,169 @@ export default function ManagerDashboard() {
             <option value="STATUS">Sort: Status</option>
           </select>
         </div>
+
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-gray-500">
-                <th className="pb-2 pr-4">Name</th>
+                <th className="pb-2 pr-4">Member</th>
                 <th className="pb-2 pr-4">Email</th>
                 <th className="pb-2 pr-4">PIN</th>
-                <th className="pb-2">Membership status</th>
+                <th className="pb-2 pr-4">Status</th>
+                <th className="pb-2">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {members
-                .map((mem) => {
-                  const relevant = memberships
-                    .filter((ms) => ms.memberId === mem.id)
-                    .map((ms) => getEffectiveStatus(ms))
-                  const currentStatus: EffectiveStatus | 'NONE' =
-                    relevant.includes('ACTIVE') ? 'ACTIVE' :
-                    relevant.includes('SCHEDULED') ? 'SCHEDULED' :
-                    relevant.includes('PAUSED') ? 'PAUSED' : 'NONE'
-                  return { mem, currentStatus }
-                })
-                .filter(({ mem }) =>
-                  mem.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-                  mem.email.toLowerCase().includes(memberSearch.toLowerCase()))
-                .filter(({ currentStatus }) => memberStatusFilter === 'ALL' || currentStatus === memberStatusFilter)
-                .sort((a, b) => memberSort === 'NAME'
-                  ? a.mem.name.localeCompare(b.mem.name)
-                  : a.currentStatus.localeCompare(b.currentStatus))
-                .map(({ mem, currentStatus }) => (
-                  <tr key={mem.id}>
-                    <td className="py-2 pr-4">{mem.name}</td>
-                    <td className="py-2 pr-4 text-gray-500">{mem.email}</td>
-                    <td className="py-2 pr-4 text-gray-500">{mem.checkinPin ?? '—'}</td>
-                    <td className="py-2">
-                      <span className={currentStatus === 'NONE' ? 'text-gray-400' : statusColorClass(currentStatus)}>
-                        {currentStatus === 'NONE' ? 'No plan' : statusLabel(currentStatus)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+              {pagedMemberRows.map(({ member, status }) => (
+                <tr key={member.id}>
+                  <td className="py-2 pr-4">{member.name}</td>
+                  <td className="py-2 pr-4 text-gray-500">{member.email}</td>
+                  <td className="py-2 pr-4 text-gray-500">{member.checkinPin ?? '—'}</td>
+                  <td className="py-2 pr-4">
+                    <span className={status === 'NONE' ? 'text-gray-400' : statusColorClass(status)}>
+                      {status === 'NONE' ? 'No plan' : statusLabel(status)}
+                    </span>
+                  </td>
+                  <td className="py-2">
+                    <button onClick={() => { setDetailMemberId(member.id); setModalShowExpired(false) }}
+                      className="text-xs text-brand hover:underline">
+                      View details
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
-          {members.length === 0 && <p className="py-4 text-sm text-gray-400">No members at this branch yet.</p>}
+          {filteredMemberRows.length === 0 && <p className="py-4 text-sm text-gray-400">No members match.</p>}
+          {filteredMemberRows.length > 0 && (
+            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+              <span>Page {memberPage} of {memberTotalPages} ({filteredMemberRows.length} total)</span>
+              <div className="space-x-2">
+                <button disabled={memberPage === 1} onClick={() => setMemberPage((p) => p - 1)}
+                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                <button disabled={memberPage === memberTotalPages} onClick={() => setMemberPage((p) => p + 1)}
+                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {detailMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => { setDetailMemberId(null); cancelEdit() }}>
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-medium">{detailMember.name}</h3>
+                <p className="text-xs text-gray-500">{detailMember.email} · PIN {detailMember.checkinPin ?? '—'}</p>
+              </div>
+              <button onClick={() => { setDetailMemberId(null); cancelEdit() }}
+                className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+
+            <label className="mt-4 flex items-center gap-1.5 text-xs text-gray-500">
+              <input type="checkbox" checked={modalShowExpired} onChange={(e) => setModalShowExpired(e.target.checked)} />
+              Show expired / cancelled
+            </label>
+            {membershipActionMessage && <p className="mt-2 text-sm text-red-600">{membershipActionMessage}</p>}
+
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full table-fixed text-left text-sm">
+                <colgroup>
+                  <col className="w-[22%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[22%]" />
+                </colgroup>
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-500">
+                    <th className="pb-2 pr-4">Plan</th>
+                    <th className="pb-2 pr-4">Start</th>
+                    <th className="pb-2 pr-4">End</th>
+                    <th className="pb-2 pr-4">Status</th>
+                    <th className="pb-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {pagedDetailMemberships.map((m) => {
+                    const effective = getEffectiveStatus(m)
+                    const isEditing = editingId === m.id
+                    return (
+                      <tr key={m.id}>
+                        <td className="truncate py-2 pr-4">{m.planName}</td>
+                        {isEditing ? (
+                          <>
+                            <td className="py-2 pr-4">
+                              <input type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)}
+                                className="w-full min-w-0 rounded-md border border-gray-300 px-2 py-1 text-xs" />
+                            </td>
+                            <td className="py-2 pr-4">
+                              <input type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)}
+                                className="w-full min-w-0 rounded-md border border-gray-300 px-2 py-1 text-xs" />
+                            </td>
+                            <td className="truncate py-2 pr-4 text-xs text-gray-400">Updates on save</td>
+                            <td className="py-2 space-x-2 whitespace-nowrap">
+                              <button onClick={() => saveEdit(m.id)} className="text-xs text-green-700 hover:underline">
+                                Save
+                              </button>
+                              <button onClick={cancelEdit} className="text-xs text-gray-500 hover:underline">
+                                Cancel
+                              </button>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="truncate py-2 pr-4 text-gray-500">{m.startDate}</td>
+                            <td className="truncate py-2 pr-4 text-gray-500">{m.endDate}</td>
+                            <td className="truncate py-2 pr-4">
+                              <span className={statusColorClass(effective)}>{statusLabel(effective)}</span>
+                            </td>
+                            <td className="py-2 space-x-2 whitespace-nowrap">
+                              {effective === 'ACTIVE' && (
+                                <button onClick={() => pauseMembership(m.id)} className="text-xs text-amber-600 hover:underline">
+                                  Pause
+                                </button>
+                              )}
+                              {effective === 'PAUSED' && (
+                                <button onClick={() => resumeMembership(m.id)} className="text-xs text-green-700 hover:underline">
+                                  Resume
+                                </button>
+                              )}
+                              {(effective === 'ACTIVE' || effective === 'PAUSED' || effective === 'SCHEDULED') && (
+                                <button onClick={() => cancelMembership(m.id)} className="text-xs text-red-600 hover:underline">
+                                  Cancel
+                                </button>
+                              )}
+                              <button onClick={() => startEdit(m)} className="text-xs text-gray-600 hover:underline">
+                                Edit dates
+                              </button>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              {detailMemberships.length === 0 && <p className="py-4 text-sm text-gray-400">No memberships to show.</p>}
+              {detailMemberships.length > 0 && (
+                <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                  <span>Page {modalPage} of {modalTotalPages} ({detailMemberships.length} total)</span>
+                  <div className="space-x-2">
+                    <button disabled={modalPage === 1} onClick={() => setModalPage((p) => p - 1)}
+                      className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                    <button disabled={modalPage === modalTotalPages} onClick={() => setModalPage((p) => p + 1)}
+                      className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 grid gap-8 sm:grid-cols-2">
         <div className="rounded-lg border border-gray-200 p-6">
