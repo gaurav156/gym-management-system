@@ -462,7 +462,7 @@ export default function ManagerDashboard() {
             {membershipActionMessage && <p className="mt-2 text-sm text-red-600">{membershipActionMessage}</p>}
 
             <div className="mt-3 overflow-x-auto">
-              <table className="w-full table-fixed text-left text-sm">
+              <table className="w-full min-w-[560px] table-fixed text-left text-sm">
                 <colgroup>
                   <col className="w-[22%]" />
                   <col className="w-[20%]" />
