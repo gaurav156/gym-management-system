@@ -10,6 +10,8 @@ public class MemberDtos {
             UUID id,
             String name,
             String email,
+            String phone,
+            String photo,
             String checkinPin
     ) {}
 }

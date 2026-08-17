@@ -60,6 +60,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/branches/**").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers("/api/plans/manage/**").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers("/api/members/**").hasAnyRole("OWNER", "MANAGER")
+                .requestMatchers("/api/trainers/**").hasAnyRole("OWNER", "MANAGER")
 
                 // membership purchase is recorded by front-desk staff against cash payment,
                 // not self-service by the member - see MembershipService.purchase()
@@ -75,15 +76,17 @@ public class SecurityConfig {
                         "/api/memberships/*/resume").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers(HttpMethod.PUT, "/api/memberships/*").hasAnyRole("OWNER", "MANAGER")
 
-                // payment history - branch view for staff, "my payments" for the member
-                // themselves (ownership is checked in PaymentController.mine())
-                .requestMatchers("/api/payments/branch/**").hasAnyRole("OWNER", "MANAGER")
+                // payment history - branch/member views for staff, "my payments" for the
+                // member themselves (ownership is checked in PaymentController.mine())
+                .requestMatchers("/api/payments/branch/**", "/api/payments/member/**").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers("/api/payments/mine").hasRole("MEMBER")
 
-                // attendance check-in can be triggered from a reception kiosk (manager/owner)
-                // as well as by the member's own QR/PIN screen
-                .requestMatchers("/api/attendance/checkin").hasAnyRole("OWNER", "MANAGER", "MEMBER")
+                // attendance check-in can be triggered from a reception kiosk (manager/owner),
+                // a member's own QR/PIN screen, or a trainer's own QR/PIN screen
+                .requestMatchers("/api/attendance/checkin").hasAnyRole("OWNER", "MANAGER", "MEMBER", "TRAINER")
                 .requestMatchers("/api/attendance/summary/**").hasAnyRole("OWNER", "MANAGER")
+                .requestMatchers("/api/attendance/history/**", "/api/attendance/today/**",
+                        "/api/attendance/last-checkin/**").hasAnyRole("OWNER", "MANAGER")
 
                 .anyRequest().authenticated()
             )

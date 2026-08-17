@@ -27,10 +27,17 @@ public class AuthController {
         return authService.login(req);
     }
 
-    // Owner-only: create a manager account for a branch
+    // Owner-only: create a manager account, assigned to one or more branches
     @PostMapping("/owner/create-manager")
     @PreAuthorize("hasRole('OWNER')")
     public AuthResponse createManager(@Valid @RequestBody CreateManagerRequest req) {
         return authService.createManager(req);
+    }
+
+    // Owner-only: create a trainer account, assigned to one or more branches
+    @PostMapping("/owner/create-trainer")
+    @PreAuthorize("hasRole('OWNER')")
+    public AuthResponse createTrainer(@Valid @RequestBody CreateTrainerRequest req) {
+        return authService.createTrainer(req);
     }
 }

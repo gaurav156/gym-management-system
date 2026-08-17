@@ -1,6 +1,6 @@
 package com.gymapp.service;
 
-import com.gymapp.dto.MemberDtos.MemberSummary;
+import com.gymapp.dto.TrainerDtos.TrainerSummary;
 import com.gymapp.entity.BranchAssignment;
 import com.gymapp.entity.Role;
 import com.gymapp.repository.BranchAssignmentRepository;
@@ -10,22 +10,21 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
-// Powers the manager's "who am I recording this purchase/check-in for" lookups.
 @Service
-public class MemberDirectoryService {
+public class TrainerDirectoryService {
 
     private final BranchAssignmentRepository branchAssignmentRepository;
 
-    public MemberDirectoryService(BranchAssignmentRepository branchAssignmentRepository) {
+    public TrainerDirectoryService(BranchAssignmentRepository branchAssignmentRepository) {
         this.branchAssignmentRepository = branchAssignmentRepository;
     }
 
     @Transactional(readOnly = true)
-    public List<MemberSummary> listMembersForBranch(UUID branchId) {
+    public List<TrainerSummary> listTrainersForBranch(UUID branchId) {
         return branchAssignmentRepository.findByBranchId(branchId).stream()
                 .map(BranchAssignment::getUser)
-                .filter(u -> u.getRole() == Role.MEMBER)
-                .map(u -> new MemberSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getPhoto(), u.getCheckinPin()))
+                .filter(u -> u.getRole() == Role.TRAINER)
+                .map(u -> new TrainerSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getCheckinPin()))
                 .toList();
     }
 }

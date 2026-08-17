@@ -17,7 +17,10 @@ export default function LoginPage() {
     try {
       const { data } = await api.post<AuthUser>('/api/auth/login', { email, password })
       setUser(data)
-      const path = data.role === 'OWNER' ? '/owner' : data.role === 'MANAGER' ? '/manager' : '/member'
+      const path = data.role === 'OWNER' ? '/owner'
+        : data.role === 'MANAGER' ? '/manager'
+        : data.role === 'TRAINER' ? '/profile'
+        : '/member'
       navigate(path)
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed')

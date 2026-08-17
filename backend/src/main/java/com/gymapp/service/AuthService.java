@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -23,10 +24,10 @@ public class AuthService {
     private final JwtUtil jwtUtil;
 
     public AuthService(UserRepository userRepository,
-                        BranchRepository branchRepository,
-                        BranchAssignmentRepository branchAssignmentRepository,
-                        PasswordEncoder passwordEncoder,
-                        JwtUtil jwtUtil) {
+                       BranchRepository branchRepository,
+                       BranchAssignmentRepository branchAssignmentRepository,
+                       PasswordEncoder passwordEncoder,
+                       JwtUtil jwtUtil) {
         this.userRepository = userRepository;
         this.branchRepository = branchRepository;
         this.branchAssignmentRepository = branchAssignmentRepository;
@@ -68,8 +69,7 @@ public class AuthService {
         if (userRepository.existsByEmail(req.email())) {
             throw new IllegalArgumentException("An account with this email already exists");
         }
-        Branch branch = branchRepository.findById(req.branchId())
-                .orElseThrow(() -> new IllegalArgumentException("Branch not found"));
+        List<Branch> branches = resolveBranches(req.branchIds());
 
         User manager = User.builder()
                 .name(req.name())
@@ -80,14 +80,53 @@ public class AuthService {
                 .active(true)
                 .build();
         manager = userRepository.save(manager);
-
-        branchAssignmentRepository.save(BranchAssignment.builder()
-                .user(manager)
-                .branch(branch)
-                .build());
+        assignToBranches(manager, branches);
 
         String token = jwtUtil.generateToken(manager.getEmail(), manager.getRole().name(), manager.getId().toString());
         return new AuthResponse(token, manager.getId().toString(), manager.getName(), manager.getEmail(), manager.getRole().name());
+    }
+
+    // Trainers get a checkin PIN/QR token just like members - they're staff, but their
+    // attendance still needs to be logged via the same PIN/QR kiosk flow.
+    @Transactional
+    public AuthResponse createTrainer(CreateTrainerRequest req) {
+        if (userRepository.existsByEmail(req.email())) {
+            throw new IllegalArgumentException("An account with this email already exists");
+        }
+        List<Branch> branches = resolveBranches(req.branchIds());
+
+        User trainer = User.builder()
+                .name(req.name())
+                .email(req.email())
+                .phone(req.phone())
+                .passwordHash(passwordEncoder.encode(req.password()))
+                .role(Role.TRAINER)
+                .checkinPin(generatePin())
+                .qrToken(UUID.randomUUID().toString())
+                .active(true)
+                .build();
+        trainer = userRepository.save(trainer);
+        assignToBranches(trainer, branches);
+
+        String token = jwtUtil.generateToken(trainer.getEmail(), trainer.getRole().name(), trainer.getId().toString());
+        return new AuthResponse(token, trainer.getId().toString(), trainer.getName(), trainer.getEmail(), trainer.getRole().name());
+    }
+
+    private List<Branch> resolveBranches(List<UUID> branchIds) {
+        List<Branch> branches = branchRepository.findAllById(branchIds);
+        if (branches.size() != branchIds.size()) {
+            throw new IllegalArgumentException("One or more branches not found");
+        }
+        return branches;
+    }
+
+    private void assignToBranches(User user, List<Branch> branches) {
+        for (Branch branch : branches) {
+            branchAssignmentRepository.save(BranchAssignment.builder()
+                    .user(user)
+                    .branch(branch)
+                    .build());
+        }
     }
 
     public AuthResponse login(LoginRequest req) {

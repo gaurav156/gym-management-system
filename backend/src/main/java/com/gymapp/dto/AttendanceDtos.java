@@ -29,4 +29,26 @@ public class AttendanceDtos {
             int hour,
             long count
     ) {}
+
+    public record AttendanceLogEntry(
+            UUID id,
+            LocalDateTime checkInTime,
+            LocalDateTime checkOutTime,
+            String method
+    ) {}
+
+    // role is included so the frontend can split one combined feed into Members/Trainers tabs
+    public record TodayAttendanceEntry(
+            UUID personId,
+            String personName,
+            String role,
+            LocalDateTime checkInTime,
+            LocalDateTime checkOutTime,
+            String method
+    ) {}
+
+    public record LastCheckinEntry(
+            UUID personId,
+            LocalDateTime lastCheckIn
+    ) {}
 }

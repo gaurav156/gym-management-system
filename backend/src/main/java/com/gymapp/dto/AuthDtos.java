@@ -2,8 +2,12 @@ package com.gymapp.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+
+import java.util.List;
+import java.util.UUID;
 
 public class AuthDtos {
 
@@ -12,7 +16,7 @@ public class AuthDtos {
             @NotBlank @Email String email,
             String phone,
             @NotBlank @Size(min = 6) String password,
-            @NotNull java.util.UUID branchId
+            @NotNull UUID branchId
     ) {}
 
     public record LoginRequest(
@@ -28,11 +32,21 @@ public class AuthDtos {
             String role
     ) {}
 
+    // Manager/Trainer creation now supports multiple initial branch assignments in one go,
+    // rather than needing separate transfer calls afterward.
     public record CreateManagerRequest(
             @NotBlank String name,
             @NotBlank @Email String email,
             String phone,
             @NotBlank @Size(min = 6) String password,
-            @NotNull java.util.UUID branchId
+            @NotEmpty List<UUID> branchIds
+    ) {}
+
+    public record CreateTrainerRequest(
+            @NotBlank String name,
+            @NotBlank @Email String email,
+            String phone,
+            @NotBlank @Size(min = 6) String password,
+            @NotEmpty List<UUID> branchIds
     ) {}
 }

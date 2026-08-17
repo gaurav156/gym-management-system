@@ -1,4 +1,4 @@
-export type Role = 'OWNER' | 'MANAGER' | 'MEMBER'
+export type Role = 'OWNER' | 'MANAGER' | 'MEMBER' | 'TRAINER'
 
 export interface AuthUser {
   token: string
@@ -50,4 +50,42 @@ export interface Payment {
   type: string
   mode: string
   createdAt: string
+}
+
+export interface Profile {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  photo: string | null
+  role: Role
+}
+
+export interface TrainerSummary {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  checkinPin: string | null
+}
+
+export interface AttendanceLogEntry {
+  id: string
+  checkInTime: string
+  checkOutTime: string | null
+  method: string
+}
+
+export interface TodayAttendanceEntry {
+  personId: string
+  personName: string
+  role: Role
+  checkInTime: string
+  checkOutTime: string | null
+  method: string
+}
+
+export interface LastCheckinEntry {
+  personId: string
+  lastCheckIn: string
 }

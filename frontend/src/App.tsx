@@ -7,6 +7,7 @@ import RegisterPage from './pages/RegisterPage'
 import OwnerDashboard from './pages/OwnerDashboard'
 import ManagerDashboard from './pages/ManagerDashboard'
 import MemberDashboard from './pages/MemberDashboard'
+import ProfilePage from './pages/ProfilePage'
 
 export default function App() {
   return (
@@ -27,6 +28,10 @@ export default function App() {
 
         <Route element={<ProtectedRoute allowedRoles={['MEMBER']} />}>
           <Route path="/member" element={<MemberDashboard />} />
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={['MEMBER', 'TRAINER']} />}>
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Routes>
     </div>

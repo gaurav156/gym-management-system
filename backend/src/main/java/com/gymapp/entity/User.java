@@ -51,6 +51,12 @@ public class User {
     @Builder.Default
     private boolean active = true;
 
+    // Base64 data URI (e.g. "data:image/jpeg;base64,...") - simplest storage that needs no
+    // extra service/API keys. Worth moving to Cloudinary or S3 before this has many users;
+    // storing images in Postgres doesn't scale well.
+    @Column(columnDefinition = "TEXT")
+    private String photo;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
 

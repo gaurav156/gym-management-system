@@ -25,6 +25,13 @@ public class PaymentController {
         return paymentService.listForBranch(branchId);
     }
 
+    // Staff-facing: view a specific member's payment history (for the member details modal)
+    @GetMapping("/member/{memberId}")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public List<PaymentResponse> memberHistory(@PathVariable UUID memberId) {
+        return paymentService.listForMember(memberId);
+    }
+
     // A member can only ever see their own payment history - memberId is checked against
     // the caller's own JWT, not trusted as given, since this is financial data.
     @GetMapping("/mine")
