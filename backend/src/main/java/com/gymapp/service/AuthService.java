@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -103,6 +104,7 @@ public class AuthService {
                 .role(Role.TRAINER)
                 .checkinPin(generatePin())
                 .qrToken(UUID.randomUUID().toString())
+                .joiningDate(LocalDate.now())
                 .active(true)
                 .build();
         trainer = userRepository.save(trainer);

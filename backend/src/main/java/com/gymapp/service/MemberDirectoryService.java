@@ -25,7 +25,8 @@ public class MemberDirectoryService {
         return branchAssignmentRepository.findByBranchId(branchId).stream()
                 .map(BranchAssignment::getUser)
                 .filter(u -> u.getRole() == Role.MEMBER)
-                .map(u -> new MemberSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getPhoto(), u.getCheckinPin()))
+                .map(u -> new MemberSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getPhoto(),
+                        u.getAddress(), u.getCheckinPin(), u.getEnrollmentDate()))
                 .toList();
     }
 }

@@ -9,6 +9,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [address, setAddress] = useState('')
   const [photo, setPhoto] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -18,6 +19,7 @@ export default function ProfilePage() {
       setProfile(res.data)
       setName(res.data.name)
       setPhone(res.data.phone ?? '')
+      setAddress(res.data.address ?? '')
       setPhoto(res.data.photo)
     })
   }
@@ -26,22 +28,25 @@ export default function ProfilePage() {
 
   function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
+    const inputEl = e.target
     if (!file) return
     if (file.size > MAX_PHOTO_BYTES) {
       setError('Photo is too large - please use one under ~1.5MB.')
+      inputEl.value = ''
       return
     }
     setError('')
     const reader = new FileReader()
     reader.onload = () => setPhoto(reader.result as string)
     reader.readAsDataURL(file)
+    inputEl.value = ''
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setMessage(''); setError('')
     try {
-      const { data } = await api.put<Profile>('/api/profile/me', { name, phone, photo })
+      const { data } = await api.put<Profile>('/api/profile/me', { name, phone, address, photo })
       setProfile(data)
       setMessage('Profile updated.')
     } catch (err: any) {
@@ -97,6 +102,26 @@ export default function ProfilePage() {
           <input value={phone} onChange={(e) => setPhone(e.target.value)}
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none" />
         </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Address</label>
+          <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2}
+            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none" />
+        </div>
+
+        {profile.role === 'MEMBER' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Enrollment date</label>
+            <input disabled value={profile.enrollmentDate ?? 'Not enrolled yet - purchase a plan'}
+              className="mt-1 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-gray-500" />
+          </div>
+        )}
+        {profile.role === 'TRAINER' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Joining date</label>
+            <input disabled value={profile.joiningDate ?? '—'}
+              className="mt-1 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-gray-500" />
+          </div>
+        )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
         {message && <p className="text-sm text-green-700">{message}</p>}

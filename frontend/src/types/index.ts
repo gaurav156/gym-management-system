@@ -57,8 +57,11 @@ export interface Profile {
   name: string
   email: string
   phone: string | null
+  address: string | null
   photo: string | null
   role: Role
+  enrollmentDate: string | null
+  joiningDate: string | null
 }
 
 export interface TrainerSummary {
@@ -66,7 +69,10 @@ export interface TrainerSummary {
   name: string
   email: string
   phone: string | null
+  address: string | null
   checkinPin: string | null
+  joiningDate: string | null
+  leftDate: string | null
 }
 
 export interface AttendanceLogEntry {

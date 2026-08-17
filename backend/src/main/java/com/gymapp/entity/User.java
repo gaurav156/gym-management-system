@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -56,6 +57,21 @@ public class User {
     // storing images in Postgres doesn't scale well.
     @Column(columnDefinition = "TEXT")
     private String photo;
+
+    private String address;
+
+    // Members only - set automatically on their first membership purchase
+    // (MembershipService.purchase()), never editable directly. Null until then.
+    private LocalDate enrollmentDate;
+
+    // Trainers only - set automatically when the Owner creates the account
+    // (AuthService.createTrainer()), never editable by the trainer themselves.
+    private LocalDate joiningDate;
+
+    // Trainers only - null while active. Settable only by Owner/Manager (never by the
+    // trainer's own profile edit), and deliberately excluded from the trainer's own
+    // "my profile" response - only staff-facing views can see it.
+    private LocalDate leftDate;
 
     @Column(updatable = false)
     private LocalDateTime createdAt;

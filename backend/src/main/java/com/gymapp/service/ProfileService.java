@@ -23,6 +23,9 @@ public class ProfileService {
         return toResponse(u);
     }
 
+    // Only name/phone/address/photo are settable here - enrollmentDate, joiningDate, and
+    // leftDate are never touched by this method, regardless of what a client sends, because
+    // UpdateProfileRequest simply has no fields for them.
     @Transactional
     public ProfileResponse updateProfile(UUID userId, UpdateProfileRequest req) {
         User u = userRepository.findById(userId)
@@ -30,6 +33,7 @@ public class ProfileService {
 
         if (req.name() != null && !req.name().isBlank()) u.setName(req.name());
         if (req.phone() != null) u.setPhone(req.phone());
+        if (req.address() != null) u.setAddress(req.address().isBlank() ? null : req.address());
         if (req.photo() != null) u.setPhoto(req.photo().isBlank() ? null : req.photo());
 
         u = userRepository.save(u);
@@ -37,6 +41,7 @@ public class ProfileService {
     }
 
     private ProfileResponse toResponse(User u) {
-        return new ProfileResponse(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getPhoto(), u.getRole().name());
+        return new ProfileResponse(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(),
+                u.getPhoto(), u.getRole().name(), u.getEnrollmentDate(), u.getJoiningDate());
     }
 }

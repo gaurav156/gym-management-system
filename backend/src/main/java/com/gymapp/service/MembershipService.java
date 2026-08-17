@@ -102,6 +102,14 @@ public class MembershipService {
                 .build();
         paymentRepository.save(payment);
 
+        // Enrollment date is the date of the member's FIRST purchase ever, set once and
+        // never changed again - not tied to the plan's start date, since that can be
+        // future-dated (they enrolled today even if their access begins later).
+        if (member.getEnrollmentDate() == null) {
+            member.setEnrollmentDate(LocalDate.now());
+            userRepository.save(member);
+        }
+
         return toMembershipResponse(membership);
     }
 

@@ -5,7 +5,7 @@ import { getEffectiveStatus, statusColorClass, statusLabel, type EffectiveStatus
 import type { Branch, Plan, Payment, MembershipAdmin, TrainerSummary, TodayAttendanceEntry, LastCheckinEntry, AttendanceLogEntry } from '../types'
 
 interface HourlyCount { hour: number; count: number }
-interface MemberSummary { id: string; name: string; email: string; phone: string | null; photo: string | null; checkinPin: string | null }
+interface MemberSummary { id: string; name: string; email: string; phone: string | null; photo: string | null; address: string | null; checkinPin: string | null; enrollmentDate: string | null }
 
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
 
@@ -22,6 +22,8 @@ export default function ManagerDashboard() {
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendanceEntry[]>([])
   const [lastCheckins, setLastCheckins] = useState<Record<string, string>>({})
   const [attendanceTab, setAttendanceTab] = useState<'MEMBERS' | 'TRAINERS'>('MEMBERS')
+  const [leftDateEditId, setLeftDateEditId] = useState<string | null>(null)
+  const [leftDateInput, setLeftDateInput] = useState('')
 
   const [planName, setPlanName] = useState('')
   const [planMonths, setPlanMonths] = useState(1)
@@ -207,6 +209,25 @@ export default function ManagerDashboard() {
 
   function cancelEdit() {
     setEditingId(null)
+  }
+
+  async function saveLeftDate(trainerId: string) {
+    try {
+      await api.put(`/api/trainers/${trainerId}/left-date`, { leftDate: leftDateInput || null })
+      setLeftDateEditId(null)
+      api.get<TrainerSummary[]>('/api/trainers', { params: { branchId: selectedBranch } }).then((res) => setTrainers(res.data))
+    } catch (err: any) {
+      setMembershipActionMessage(err.response?.data?.error || 'Failed to update left date')
+    }
+  }
+
+  async function clearLeftDate(trainerId: string) {
+    try {
+      await api.put(`/api/trainers/${trainerId}/left-date`, { leftDate: null })
+      api.get<TrainerSummary[]>('/api/trainers', { params: { branchId: selectedBranch } }).then((res) => setTrainers(res.data))
+    } catch (err: any) {
+      setMembershipActionMessage(err.response?.data?.error || 'Failed to clear left date')
+    }
   }
 
   async function saveEdit(id: string) {
@@ -529,7 +550,9 @@ export default function ManagerDashboard() {
                 <p><span className="text-gray-500">Name:</span> {detailMember.name}</p>
                 <p><span className="text-gray-500">Email:</span> {detailMember.email}</p>
                 <p><span className="text-gray-500">Phone:</span> {detailMember.phone ?? '—'}</p>
+                <p><span className="text-gray-500">Address:</span> {detailMember.address ?? '—'}</p>
                 <p><span className="text-gray-500">Check-in PIN:</span> {detailMember.checkinPin ?? '—'}</p>
+                <p><span className="text-gray-500">Enrollment date:</span> {detailMember.enrollmentDate ?? 'Not enrolled yet'}</p>
                 <p><span className="text-gray-500">Last visit:</span> {
                   lastCheckins[detailMember.id] ? new Date(lastCheckins[detailMember.id]).toLocaleString() : 'Never'
                 }</p>
@@ -745,6 +768,7 @@ export default function ManagerDashboard() {
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">Trainers</h2>
         <p className="mt-1 text-xs text-gray-500">Created by the Owner - visible here for reference and PIN lookup.</p>
+        {membershipActionMessage && <p className="mt-2 text-sm text-red-600">{membershipActionMessage}</p>}
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -752,8 +776,11 @@ export default function ManagerDashboard() {
                 <th className="pb-2 pr-4">Name</th>
                 <th className="pb-2 pr-4">Email</th>
                 <th className="pb-2 pr-4">Phone</th>
+                <th className="pb-2 pr-4">Address</th>
                 <th className="pb-2 pr-4">PIN</th>
-                <th className="pb-2">Last visit</th>
+                <th className="pb-2 pr-4">Joined</th>
+                <th className="pb-2 pr-4">Last visit</th>
+                <th className="pb-2">Left date</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -762,9 +789,31 @@ export default function ManagerDashboard() {
                   <td className="py-2 pr-4">{t.name}</td>
                   <td className="py-2 pr-4 text-gray-500">{t.email}</td>
                   <td className="py-2 pr-4 text-gray-500">{t.phone ?? '—'}</td>
+                  <td className="py-2 pr-4 text-gray-500">{t.address ?? '—'}</td>
                   <td className="py-2 pr-4 text-gray-500">{t.checkinPin ?? '—'}</td>
-                  <td className="py-2 text-gray-500">
+                  <td className="py-2 pr-4 text-gray-500">{t.joiningDate ?? '—'}</td>
+                  <td className="py-2 pr-4 text-gray-500">
                     {lastCheckins[t.id] ? new Date(lastCheckins[t.id]).toLocaleString() : 'Never'}
+                  </td>
+                  <td className="py-2">
+                    {leftDateEditId === t.id ? (
+                      <div className="flex items-center gap-1">
+                        <input type="date" value={leftDateInput} onChange={(e) => setLeftDateInput(e.target.value)}
+                          className="rounded-md border border-gray-300 px-2 py-1 text-xs" />
+                        <button onClick={() => saveLeftDate(t.id)} className="text-xs text-green-700 hover:underline">Save</button>
+                        <button onClick={() => setLeftDateEditId(null)} className="text-xs text-gray-500 hover:underline">Cancel</button>
+                      </div>
+                    ) : t.leftDate ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500">{t.leftDate}</span>
+                        <button onClick={() => clearLeftDate(t.id)} className="text-xs text-brand hover:underline">Clear</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => { setLeftDateEditId(t.id); setLeftDateInput('') }}
+                        className="text-xs text-gray-600 hover:underline">
+                        Mark as left
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
