@@ -285,6 +285,10 @@ export default function ManagerDashboard() {
   const [modalTab, setModalTab] = useState<'INFO' | 'MEMBERSHIPS' | 'PAYMENTS' | 'ATTENDANCE'>('INFO')
   const [detailPayments, setDetailPayments] = useState<Payment[]>([])
   const [detailAttendance, setDetailAttendance] = useState<AttendanceLogEntry[]>([])
+  const [detailPaymentsPage, setDetailPaymentsPage] = useState(1)
+  const [detailAttendancePage, setDetailAttendancePage] = useState(1)
+  const [trainerPage, setTrainerPage] = useState(1)
+  const [todayAttendancePage, setTodayAttendancePage] = useState(1)
   const MODAL_PAGE_SIZE = 5
 
   useEffect(() => {
@@ -294,6 +298,8 @@ export default function ManagerDashboard() {
   useEffect(() => {
     if (!detailMemberId) return
     setModalTab('INFO')
+    setDetailPaymentsPage(1)
+    setDetailAttendancePage(1)
     api.get<Payment[]>(`/api/payments/member/${detailMemberId}`).then((res) => setDetailPayments(res.data))
     api.get<AttendanceLogEntry[]>(`/api/attendance/history/${detailMemberId}`).then((res) => setDetailAttendance(res.data))
   }, [detailMemberId])
@@ -305,6 +311,14 @@ export default function ManagerDashboard() {
   useEffect(() => {
     setPaymentPage(1)
   }, [selectedBranch])
+
+  useEffect(() => {
+    setTrainerPage(1)
+  }, [showAllTrainers, selectedBranch])
+
+  useEffect(() => {
+    setTodayAttendancePage(1)
+  }, [attendanceTab, selectedBranch])
 
   // One row per member (not per membership) - a member with several plans (active +
   // scheduled next, or expired history) is summarized by their single most relevant
@@ -347,6 +361,20 @@ export default function ManagerDashboard() {
 
   const paymentTotalPages = Math.max(1, Math.ceil(payments.length / PAGE_SIZE))
   const pagedPayments = payments.slice((paymentPage - 1) * PAGE_SIZE, paymentPage * PAGE_SIZE)
+
+  const detailPaymentsTotalPages = Math.max(1, Math.ceil(detailPayments.length / MODAL_PAGE_SIZE))
+  const pagedDetailPayments = detailPayments.slice((detailPaymentsPage - 1) * MODAL_PAGE_SIZE, detailPaymentsPage * MODAL_PAGE_SIZE)
+
+  const detailAttendanceTotalPages = Math.max(1, Math.ceil(detailAttendance.length / MODAL_PAGE_SIZE))
+  const pagedDetailAttendance = detailAttendance.slice((detailAttendancePage - 1) * MODAL_PAGE_SIZE, detailAttendancePage * MODAL_PAGE_SIZE)
+
+  const visibleTrainers = trainers.filter((t) => showAllTrainers || !t.leftDate)
+  const trainerTotalPages = Math.max(1, Math.ceil(visibleTrainers.length / PAGE_SIZE))
+  const pagedTrainers = visibleTrainers.slice((trainerPage - 1) * PAGE_SIZE, trainerPage * PAGE_SIZE)
+
+  const filteredTodayAttendance = todayAttendance.filter((a) => (attendanceTab === 'MEMBERS' ? a.role === 'MEMBER' : a.role === 'TRAINER'))
+  const todayAttendanceTotalPages = Math.max(1, Math.ceil(filteredTodayAttendance.length / PAGE_SIZE))
+  const pagedTodayAttendance = filteredTodayAttendance.slice((todayAttendancePage - 1) * PAGE_SIZE, todayAttendancePage * PAGE_SIZE)
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -703,7 +731,7 @@ export default function ManagerDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {detailPayments.map((p) => (
+                    {pagedDetailPayments.map((p) => (
                       <tr key={p.id}>
                         <td className="py-2 pr-4 text-gray-500">{new Date(p.createdAt).toLocaleString()}</td>
                         <td className="py-2 pr-4">{p.planName ?? '—'}</td>
@@ -715,6 +743,17 @@ export default function ManagerDashboard() {
                   </tbody>
                 </table>
                 {detailPayments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
+                {detailPayments.length > 0 && (
+                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                    <span>Page {detailPaymentsPage} of {detailPaymentsTotalPages} ({detailPayments.length} total)</span>
+                    <div className="space-x-2">
+                      <button disabled={detailPaymentsPage === 1} onClick={() => setDetailPaymentsPage((p) => p - 1)}
+                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                      <button disabled={detailPaymentsPage === detailPaymentsTotalPages} onClick={() => setDetailPaymentsPage((p) => p + 1)}
+                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -730,7 +769,7 @@ export default function ManagerDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {detailAttendance.map((a) => (
+                    {pagedDetailAttendance.map((a) => (
                       <tr key={a.id}>
                         <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleString()}</td>
                         <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '—'}</td>
@@ -740,6 +779,17 @@ export default function ManagerDashboard() {
                   </tbody>
                 </table>
                 {detailAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
+                {detailAttendance.length > 0 && (
+                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                    <span>Page {detailAttendancePage} of {detailAttendanceTotalPages} ({detailAttendance.length} total)</span>
+                    <div className="space-x-2">
+                      <button disabled={detailAttendancePage === 1} onClick={() => setDetailAttendancePage((p) => p - 1)}
+                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                      <button disabled={detailAttendancePage === detailAttendanceTotalPages} onClick={() => setDetailAttendancePage((p) => p + 1)}
+                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -816,9 +866,7 @@ export default function ManagerDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {trainers
-                .filter((t) => showAllTrainers || !t.leftDate)
-                .map((t) => (
+              {pagedTrainers.map((t) => (
                 <tr key={t.id}>
                   <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">
@@ -847,10 +895,21 @@ export default function ManagerDashboard() {
               ))}
             </tbody>
           </table>
-          {trainers.filter((t) => showAllTrainers || !t.leftDate).length === 0 && (
+          {visibleTrainers.length === 0 && (
             <p className="py-4 text-sm text-gray-400">
               {trainers.length === 0 ? 'No trainers assigned to this branch yet.' : 'No active trainers - check "Show all" to see trainers who have left.'}
             </p>
+          )}
+          {visibleTrainers.length > 0 && (
+            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+              <span>Page {trainerPage} of {trainerTotalPages} ({visibleTrainers.length} total)</span>
+              <div className="space-x-2">
+                <button disabled={trainerPage === 1} onClick={() => setTrainerPage((p) => p - 1)}
+                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                <button disabled={trainerPage === trainerTotalPages} onClick={() => setTrainerPage((p) => p + 1)}
+                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -1000,9 +1059,7 @@ export default function ManagerDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {todayAttendance
-                .filter((a) => (attendanceTab === 'MEMBERS' ? a.role === 'MEMBER' : a.role === 'TRAINER'))
-                .map((a, i) => (
+              {pagedTodayAttendance.map((a, i) => (
                   <tr key={`${a.personId}-${i}`}>
                     <td className="py-2 pr-4">{a.personName}</td>
                     <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleTimeString()}</td>
@@ -1011,8 +1068,19 @@ export default function ManagerDashboard() {
                 ))}
             </tbody>
           </table>
-          {todayAttendance.filter((a) => (attendanceTab === 'MEMBERS' ? a.role === 'MEMBER' : a.role === 'TRAINER')).length === 0 && (
+          {filteredTodayAttendance.length === 0 && (
             <p className="py-4 text-sm text-gray-400">No check-ins yet today.</p>
+          )}
+          {filteredTodayAttendance.length > 0 && (
+            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+              <span>Page {todayAttendancePage} of {todayAttendanceTotalPages} ({filteredTodayAttendance.length} total)</span>
+              <div className="space-x-2">
+                <button disabled={todayAttendancePage === 1} onClick={() => setTodayAttendancePage((p) => p - 1)}
+                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                <button disabled={todayAttendancePage === todayAttendanceTotalPages} onClick={() => setTodayAttendancePage((p) => p + 1)}
+                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+              </div>
+            </div>
           )}
         </div>
       </div>
