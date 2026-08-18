@@ -70,6 +70,7 @@ export interface TrainerSummary {
   email: string
   phone: string | null
   address: string | null
+  photo: string | null
   checkinPin: string | null
   joiningDate: string | null
   leftDate: string | null

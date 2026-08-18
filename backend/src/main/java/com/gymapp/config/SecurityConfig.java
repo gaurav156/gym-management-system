@@ -60,6 +60,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/branches/**").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers("/api/plans/manage/**").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers("/api/members/**").hasAnyRole("OWNER", "MANAGER")
+                // owner-only: correcting a trainer's joining date, or marking/clearing them
+                // as left - a Manager must not be able to do either (must precede the
+                // broader /api/trainers/** rule below to take effect)
+                .requestMatchers("/api/trainers/*/dates").hasRole("OWNER")
+
                 .requestMatchers("/api/trainers/**").hasAnyRole("OWNER", "MANAGER")
 
                 // membership purchase is recorded by front-desk staff against cash payment,

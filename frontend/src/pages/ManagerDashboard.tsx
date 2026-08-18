@@ -22,8 +22,27 @@ export default function ManagerDashboard() {
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendanceEntry[]>([])
   const [lastCheckins, setLastCheckins] = useState<Record<string, string>>({})
   const [attendanceTab, setAttendanceTab] = useState<'MEMBERS' | 'TRAINERS'>('MEMBERS')
-  const [leftDateEditId, setLeftDateEditId] = useState<string | null>(null)
+  const [detailTrainerId, setDetailTrainerId] = useState<string | null>(null)
+  const [showAllTrainers, setShowAllTrainers] = useState(false)
+  const [trainerModalTab, setTrainerModalTab] = useState<'INFO' | 'ATTENDANCE'>('INFO')
+  const [editingTrainerDates, setEditingTrainerDates] = useState(false)
+  const [joiningDateInput, setJoiningDateInput] = useState('')
   const [leftDateInput, setLeftDateInput] = useState('')
+  const [detailTrainerAttendance, setDetailTrainerAttendance] = useState<AttendanceLogEntry[]>([])
+  const [trainerModalPage, setTrainerModalPage] = useState(1)
+
+  const detailTrainer = trainers.find((t) => t.id === detailTrainerId) ?? null
+
+  useEffect(() => {
+    if (!detailTrainerId) return
+    setTrainerModalTab('INFO')
+    setEditingTrainerDates(false)
+    setTrainerModalPage(1)
+    api.get<AttendanceLogEntry[]>(`/api/attendance/history/${detailTrainerId}`).then((res) => setDetailTrainerAttendance(res.data))
+  }, [detailTrainerId])
+
+  const trainerModalTotalPages = Math.max(1, Math.ceil(detailTrainerAttendance.length / 5))
+  const pagedTrainerAttendance = detailTrainerAttendance.slice((trainerModalPage - 1) * 5, trainerModalPage * 5)
 
   const [planName, setPlanName] = useState('')
   const [planMonths, setPlanMonths] = useState(1)
@@ -211,19 +230,29 @@ export default function ManagerDashboard() {
     setEditingId(null)
   }
 
-  async function saveLeftDate(trainerId: string) {
+  function startEditTrainerDates(t: TrainerSummary) {
+    setEditingTrainerDates(true)
+    setJoiningDateInput(t.joiningDate ?? '')
+    setLeftDateInput(t.leftDate ?? '')
+    setMembershipActionMessage('')
+  }
+
+  async function saveTrainerDates(trainerId: string) {
     try {
-      await api.put(`/api/trainers/${trainerId}/left-date`, { leftDate: leftDateInput || null })
-      setLeftDateEditId(null)
+      await api.put(`/api/trainers/${trainerId}/dates`, {
+        joiningDate: joiningDateInput || null,
+        leftDate: leftDateInput || null,
+      })
+      setEditingTrainerDates(false)
       api.get<TrainerSummary[]>('/api/trainers', { params: { branchId: selectedBranch } }).then((res) => setTrainers(res.data))
     } catch (err: any) {
-      setMembershipActionMessage(err.response?.data?.error || 'Failed to update left date')
+      setMembershipActionMessage(err.response?.data?.error || 'Failed to update trainer dates')
     }
   }
 
-  async function clearLeftDate(trainerId: string) {
+  async function clearLeftDate(trainerId: string, joiningDate: string | null) {
     try {
-      await api.put(`/api/trainers/${trainerId}/left-date`, { leftDate: null })
+      await api.put(`/api/trainers/${trainerId}/dates`, { joiningDate, leftDate: null })
       api.get<TrainerSummary[]>('/api/trainers', { params: { branchId: selectedBranch } }).then((res) => setTrainers(res.data))
     } catch (err: any) {
       setMembershipActionMessage(err.response?.data?.error || 'Failed to clear left date')
@@ -766,9 +795,14 @@ export default function ManagerDashboard() {
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">Trainers</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-medium">Trainers</h2>
+          <label className="flex items-center gap-1.5 text-xs text-gray-500">
+            <input type="checkbox" checked={showAllTrainers} onChange={(e) => setShowAllTrainers(e.target.checked)} />
+            Show all (including left)
+          </label>
+        </div>
         <p className="mt-1 text-xs text-gray-500">Created by the Owner - visible here for reference and PIN lookup.</p>
-        {membershipActionMessage && <p className="mt-2 text-sm text-red-600">{membershipActionMessage}</p>}
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -776,52 +810,173 @@ export default function ManagerDashboard() {
                 <th className="pb-2 pr-4">Name</th>
                 <th className="pb-2 pr-4">Email</th>
                 <th className="pb-2 pr-4">Phone</th>
-                <th className="pb-2 pr-4">Address</th>
                 <th className="pb-2 pr-4">PIN</th>
-                <th className="pb-2 pr-4">Joined</th>
                 <th className="pb-2 pr-4">Last visit</th>
-                <th className="pb-2">Left date</th>
+                <th className="pb-2">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {trainers.map((t) => (
+              {trainers
+                .filter((t) => showAllTrainers || !t.leftDate)
+                .map((t) => (
                 <tr key={t.id}>
-                  <td className="py-2 pr-4">{t.name}</td>
+                  <td className="py-2 pr-4">
+                    <div className="flex items-center gap-2">
+                      {t.photo ? (
+                        <img src={t.photo} alt="" className="h-6 w-6 rounded-full object-cover" />
+                      ) : (
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-[10px] text-gray-500">
+                          {t.name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      {t.name}
+                    </div>
+                  </td>
                   <td className="py-2 pr-4 text-gray-500">{t.email}</td>
                   <td className="py-2 pr-4 text-gray-500">{t.phone ?? '—'}</td>
-                  <td className="py-2 pr-4 text-gray-500">{t.address ?? '—'}</td>
                   <td className="py-2 pr-4 text-gray-500">{t.checkinPin ?? '—'}</td>
-                  <td className="py-2 pr-4 text-gray-500">{t.joiningDate ?? '—'}</td>
                   <td className="py-2 pr-4 text-gray-500">
                     {lastCheckins[t.id] ? new Date(lastCheckins[t.id]).toLocaleString() : 'Never'}
                   </td>
                   <td className="py-2">
-                    {leftDateEditId === t.id ? (
-                      <div className="flex items-center gap-1">
-                        <input type="date" value={leftDateInput} onChange={(e) => setLeftDateInput(e.target.value)}
-                          className="rounded-md border border-gray-300 px-2 py-1 text-xs" />
-                        <button onClick={() => saveLeftDate(t.id)} className="text-xs text-green-700 hover:underline">Save</button>
-                        <button onClick={() => setLeftDateEditId(null)} className="text-xs text-gray-500 hover:underline">Cancel</button>
-                      </div>
-                    ) : t.leftDate ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-500">{t.leftDate}</span>
-                        <button onClick={() => clearLeftDate(t.id)} className="text-xs text-brand hover:underline">Clear</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => { setLeftDateEditId(t.id); setLeftDateInput('') }}
-                        className="text-xs text-gray-600 hover:underline">
-                        Mark as left
-                      </button>
-                    )}
+                    <button onClick={() => setDetailTrainerId(t.id)} className="text-xs text-brand hover:underline">
+                      View details
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {trainers.length === 0 && <p className="py-4 text-sm text-gray-400">No trainers assigned to this branch yet.</p>}
+          {trainers.filter((t) => showAllTrainers || !t.leftDate).length === 0 && (
+            <p className="py-4 text-sm text-gray-400">
+              {trainers.length === 0 ? 'No trainers assigned to this branch yet.' : 'No active trainers - check "Show all" to see trainers who have left.'}
+            </p>
+          )}
         </div>
       </div>
+
+      {detailTrainer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setDetailTrainerId(null)}>
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                {detailTrainer.photo ? (
+                  <img src={detailTrainer.photo} alt="" className="h-12 w-12 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
+                    {detailTrainer.name.charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <div>
+                  <h3 className="text-lg font-medium">{detailTrainer.name}</h3>
+                  <p className="text-xs text-gray-500">{detailTrainer.email} · PIN {detailTrainer.checkinPin ?? '—'}</p>
+                </div>
+              </div>
+              <button onClick={() => setDetailTrainerId(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+
+            <div className="mt-4 flex gap-1 border-b border-gray-200 text-sm">
+              {(['INFO', 'ATTENDANCE'] as const).map((tab) => (
+                <button key={tab} onClick={() => setTrainerModalTab(tab)}
+                  className={`-mb-px border-b-2 px-3 py-2 ${
+                    trainerModalTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}>
+                  {tab === 'INFO' ? 'Info' : 'Attendance'}
+                </button>
+              ))}
+            </div>
+
+            {membershipActionMessage && <p className="mt-3 text-sm text-red-600">{membershipActionMessage}</p>}
+
+            {trainerModalTab === 'INFO' && (
+              <div className="mt-4 space-y-2 text-sm">
+                <p><span className="text-gray-500">Name:</span> {detailTrainer.name}</p>
+                <p><span className="text-gray-500">Email:</span> {detailTrainer.email}</p>
+                <p><span className="text-gray-500">Phone:</span> {detailTrainer.phone ?? '—'}</p>
+                <p><span className="text-gray-500">Address:</span> {detailTrainer.address ?? '—'}</p>
+                <p><span className="text-gray-500">Check-in PIN:</span> {detailTrainer.checkinPin ?? '—'}</p>
+                <p><span className="text-gray-500">Last visit:</span> {
+                  lastCheckins[detailTrainer.id] ? new Date(lastCheckins[detailTrainer.id]).toLocaleString() : 'Never'
+                }</p>
+
+                {editingTrainerDates ? (
+                  <div className="space-y-2 rounded-md border border-gray-200 p-3">
+                    <div>
+                      <label className="text-xs text-gray-500">Joining date</label>
+                      <input type="date" value={joiningDateInput} onChange={(e) => setJoiningDateInput(e.target.value)}
+                        className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Left date (leave blank if still active)</label>
+                      <input type="date" value={leftDateInput} onChange={(e) => setLeftDateInput(e.target.value)}
+                        className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                    </div>
+                    <div className="space-x-2">
+                      <button onClick={() => saveTrainerDates(detailTrainer.id)}
+                        className="text-xs text-green-700 hover:underline">Save</button>
+                      <button onClick={() => setEditingTrainerDates(false)}
+                        className="text-xs text-gray-500 hover:underline">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p><span className="text-gray-500">Joining date:</span> {detailTrainer.joiningDate ?? '—'}</p>
+                    <p><span className="text-gray-500">Left date:</span> {detailTrainer.leftDate ?? '—'}</p>
+                    {user?.role === 'OWNER' && (
+                      <div className="space-x-2">
+                        <button onClick={() => startEditTrainerDates(detailTrainer)}
+                          className="text-xs text-gray-600 hover:underline">Edit dates</button>
+                        {detailTrainer.leftDate && (
+                          <button onClick={() => clearLeftDate(detailTrainer.id, detailTrainer.joiningDate)}
+                            className="text-xs text-brand hover:underline">Clear left date</button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {trainerModalTab === 'ATTENDANCE' && (
+              <div className="mt-4 overflow-x-auto">
+                <p className="mb-2 text-xs text-gray-500">Check-out isn't tracked yet - only check-in times are logged.</p>
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-gray-500">
+                      <th className="pb-2 pr-4">Check-in</th>
+                      <th className="pb-2 pr-4">Check-out</th>
+                      <th className="pb-2">Method</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {pagedTrainerAttendance.map((a) => (
+                      <tr key={a.id}>
+                        <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleString()}</td>
+                        <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '—'}</td>
+                        <td className="py-2">{a.method}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {detailTrainerAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
+                {detailTrainerAttendance.length > 0 && (
+                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                    <span>Page {trainerModalPage} of {trainerModalTotalPages} ({detailTrainerAttendance.length} total)</span>
+                    <div className="space-x-2">
+                      <button disabled={trainerModalPage === 1} onClick={() => setTrainerModalPage((p) => p - 1)}
+                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                      <button disabled={trainerModalPage === trainerModalTotalPages} onClick={() => setTrainerModalPage((p) => p + 1)}
+                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">Today's attendance</h2>

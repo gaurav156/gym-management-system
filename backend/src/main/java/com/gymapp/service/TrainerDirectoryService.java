@@ -1,7 +1,7 @@
 package com.gymapp.service;
 
-import com.gymapp.dto.TrainerDtos.SetLeftDateRequest;
 import com.gymapp.dto.TrainerDtos.TrainerSummary;
+import com.gymapp.dto.TrainerDtos.UpdateTrainerDatesRequest;
 import com.gymapp.entity.BranchAssignment;
 import com.gymapp.entity.Role;
 import com.gymapp.entity.User;
@@ -34,22 +34,24 @@ public class TrainerDirectoryService {
                 .toList();
     }
 
-    // Owner/Manager only (enforced at the controller) - a trainer can never set this on
-    // themselves, and it's excluded entirely from their own profile response.
+    // Owner-only (enforced at the controller/security config, not here) - a Manager can
+    // never call this, and a trainer can never set either date on themselves. leftDate
+    // may be null to clear a previously-set leave date.
     @Transactional
-    public TrainerSummary setLeftDate(UUID trainerId, SetLeftDateRequest req) {
+    public TrainerSummary updateDates(UUID trainerId, UpdateTrainerDatesRequest req) {
         User trainer = userRepository.findById(trainerId)
                 .orElseThrow(() -> new IllegalArgumentException("Trainer not found"));
         if (trainer.getRole() != Role.TRAINER) {
             throw new IllegalArgumentException("This account is not a trainer");
         }
+        if (req.joiningDate() != null) trainer.setJoiningDate(req.joiningDate());
         trainer.setLeftDate(req.leftDate());
         trainer = userRepository.save(trainer);
         return toSummary(trainer);
     }
 
     private TrainerSummary toSummary(User u) {
-        return new TrainerSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(),
+        return new TrainerSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(), u.getPhoto(),
                 u.getCheckinPin(), u.getJoiningDate(), u.getLeftDate());
     }
 }

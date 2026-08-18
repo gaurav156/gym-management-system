@@ -12,13 +12,17 @@ public class TrainerDtos {
             String email,
             String phone,
             String address,
+            String photo,
             String checkinPin,
             LocalDate joiningDate,
             LocalDate leftDate
     ) {}
 
-    // leftDate may be null to clear a previously-set leave date (e.g. the trainer rejoined).
-    public record SetLeftDateRequest(
+    // Owner-only correction tool - joiningDate is otherwise set automatically at account
+    // creation and never editable by anyone else; leftDate can only be set/cleared by the
+    // Owner, never a Manager. leftDate may be null to clear a previously-set leave date.
+    public record UpdateTrainerDatesRequest(
+            LocalDate joiningDate,
             LocalDate leftDate
     ) {}
 }
