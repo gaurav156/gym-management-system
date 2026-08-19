@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import { getEffectiveStatus, statusColorClass, statusLabel, type EffectiveStatus } from '../utils/membership'
@@ -8,6 +8,7 @@ interface HourlyCount { hour: number; count: number }
 interface MemberSummary { id: string; name: string; email: string; phone: string | null; photo: string | null; address: string | null; checkinPin: string | null; enrollmentDate: string | null }
 
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
+const MAX_PHOTO_BYTES = 1_500_000 // ~1.5MB - base64 in a DB column, keep it modest
 
 export default function ManagerDashboard() {
   const user = useAuthStore((s) => s.user)
@@ -97,12 +98,22 @@ export default function ManagerDashboard() {
     api.get<TodayAttendanceEntry[]>(`/api/attendance/today/${selectedBranch}`).then((res) => setTodayAttendance(res.data))
   }
 
+  function loadMembers() {
+    if (!selectedBranch) return
+    api.get<MemberSummary[]>('/api/members', { params: { branchId: selectedBranch } }).then((res) => setMembers(res.data))
+  }
+
+  function loadTrainers() {
+    if (!selectedBranch) return
+    api.get<TrainerSummary[]>('/api/trainers', { params: { branchId: selectedBranch } }).then((res) => setTrainers(res.data))
+  }
+
   useEffect(() => {
     if (!selectedBranch) return
     api.get<Plan[]>('/api/plans', { params: { branchId: selectedBranch } }).then((res) => setPlans(res.data))
     api.get<HourlyCount[]>(`/api/attendance/summary/${selectedBranch}`).then((res) => setSummary(res.data))
-    api.get<MemberSummary[]>('/api/members', { params: { branchId: selectedBranch } }).then((res) => setMembers(res.data))
-    api.get<TrainerSummary[]>('/api/trainers', { params: { branchId: selectedBranch } }).then((res) => setTrainers(res.data))
+    loadMembers()
+    loadTrainers()
     api.get<LastCheckinEntry[]>(`/api/attendance/last-checkin/${selectedBranch}`).then((res) => {
       const map: Record<string, string> = {}
       res.data.forEach((e) => { map[e.personId] = e.lastCheckIn })
@@ -244,16 +255,58 @@ export default function ManagerDashboard() {
         leftDate: leftDateInput || null,
       })
       setEditingTrainerDates(false)
-      api.get<TrainerSummary[]>('/api/trainers', { params: { branchId: selectedBranch } }).then((res) => setTrainers(res.data))
+      loadTrainers()
     } catch (err: any) {
       setMembershipActionMessage(err.response?.data?.error || 'Failed to update trainer dates')
+    }
+  }
+
+  function startEditMemberInfo(m: MemberSummary) {
+    setEditingMemberInfo(true)
+    setMemberEditName(m.name)
+    setMemberEditPhone(m.phone ?? '')
+    setMemberEditAddress(m.address ?? '')
+    setMemberEditPhoto(m.photo)
+    setMembershipActionMessage('')
+  }
+
+  async function saveMemberInfo(memberId: string) {
+    try {
+      await api.put(`/api/members/${memberId}`, {
+        name: memberEditName, phone: memberEditPhone, address: memberEditAddress, photo: memberEditPhoto ?? '',
+      })
+      setEditingMemberInfo(false)
+      loadMembers()
+    } catch (err: any) {
+      setMembershipActionMessage(err.response?.data?.error || 'Failed to update member info')
+    }
+  }
+
+  function startEditTrainerInfo(t: TrainerSummary) {
+    setEditingTrainerInfo(true)
+    setTrainerEditName(t.name)
+    setTrainerEditPhone(t.phone ?? '')
+    setTrainerEditAddress(t.address ?? '')
+    setTrainerEditPhoto(t.photo)
+    setMembershipActionMessage('')
+  }
+
+  async function saveTrainerInfo(trainerId: string) {
+    try {
+      await api.put(`/api/trainers/${trainerId}`, {
+        name: trainerEditName, phone: trainerEditPhone, address: trainerEditAddress, photo: trainerEditPhoto ?? '',
+      })
+      setEditingTrainerInfo(false)
+      loadTrainers()
+    } catch (err: any) {
+      setMembershipActionMessage(err.response?.data?.error || 'Failed to update trainer info')
     }
   }
 
   async function clearLeftDate(trainerId: string, joiningDate: string | null) {
     try {
       await api.put(`/api/trainers/${trainerId}/dates`, { joiningDate, leftDate: null })
-      api.get<TrainerSummary[]>('/api/trainers', { params: { branchId: selectedBranch } }).then((res) => setTrainers(res.data))
+      loadTrainers()
     } catch (err: any) {
       setMembershipActionMessage(err.response?.data?.error || 'Failed to clear left date')
     }
@@ -291,6 +344,33 @@ export default function ManagerDashboard() {
   const [todayAttendancePage, setTodayAttendancePage] = useState(1)
   const MODAL_PAGE_SIZE = 5
 
+  const [editingMemberInfo, setEditingMemberInfo] = useState(false)
+  const [memberEditName, setMemberEditName] = useState('')
+  const [memberEditPhone, setMemberEditPhone] = useState('')
+  const [memberEditAddress, setMemberEditAddress] = useState('')
+  const [memberEditPhoto, setMemberEditPhoto] = useState<string | null>(null)
+
+  const [editingTrainerInfo, setEditingTrainerInfo] = useState(false)
+  const [trainerEditName, setTrainerEditName] = useState('')
+  const [trainerEditPhone, setTrainerEditPhone] = useState('')
+  const [trainerEditAddress, setTrainerEditAddress] = useState('')
+  const [trainerEditPhoto, setTrainerEditPhoto] = useState<string | null>(null)
+
+  function handleEditPhotoChange(e: ChangeEvent<HTMLInputElement>, onLoaded: (dataUrl: string) => void) {
+    const file = e.target.files?.[0]
+    const inputEl = e.target
+    if (!file) return
+    if (file.size > MAX_PHOTO_BYTES) {
+      setMembershipActionMessage('Photo is too large - please use one under ~1.5MB.')
+      inputEl.value = ''
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => onLoaded(reader.result as string)
+    reader.readAsDataURL(file)
+    inputEl.value = ''
+  }
+
   useEffect(() => {
     setModalPage(1)
   }, [detailMemberId, modalShowExpired])
@@ -300,9 +380,14 @@ export default function ManagerDashboard() {
     setModalTab('INFO')
     setDetailPaymentsPage(1)
     setDetailAttendancePage(1)
+    setEditingMemberInfo(false)
     api.get<Payment[]>(`/api/payments/member/${detailMemberId}`).then((res) => setDetailPayments(res.data))
     api.get<AttendanceLogEntry[]>(`/api/attendance/history/${detailMemberId}`).then((res) => setDetailAttendance(res.data))
   }, [detailMemberId])
+
+  useEffect(() => {
+    setEditingTrainerInfo(false)
+  }, [detailTrainerId])
 
   useEffect(() => {
     setMemberPage(1)
@@ -544,7 +629,7 @@ export default function ManagerDashboard() {
                   <td className="py-2">
                     <button onClick={() => { setDetailMemberId(member.id); setModalShowExpired(false) }}
                       className="text-xs text-brand hover:underline">
-                      View details
+                      View/Edit details
                     </button>
                   </td>
                 </tr>
@@ -604,15 +689,62 @@ export default function ManagerDashboard() {
 
             {modalTab === 'INFO' && (
               <div className="mt-4 space-y-2 text-sm">
-                <p><span className="text-gray-500">Name:</span> {detailMember.name}</p>
-                <p><span className="text-gray-500">Email:</span> {detailMember.email}</p>
-                <p><span className="text-gray-500">Phone:</span> {detailMember.phone ?? '—'}</p>
-                <p><span className="text-gray-500">Address:</span> {detailMember.address ?? '—'}</p>
-                <p><span className="text-gray-500">Check-in PIN:</span> {detailMember.checkinPin ?? '—'}</p>
-                <p><span className="text-gray-500">Enrollment date:</span> {detailMember.enrollmentDate ?? 'Not enrolled yet'}</p>
-                <p><span className="text-gray-500">Last visit:</span> {
-                  lastCheckins[detailMember.id] ? new Date(lastCheckins[detailMember.id]).toLocaleString() : 'Never'
-                }</p>
+                {editingMemberInfo ? (
+                  <div className="space-y-3 rounded-md border border-gray-200 p-3">
+                    <div className="flex items-center gap-3">
+                      {memberEditPhoto ? (
+                        <img src={memberEditPhoto} alt="" className="h-14 w-14 rounded-full object-cover" />
+                      ) : (
+                        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
+                          {memberEditName.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      <div>
+                        <input type="file" accept="image/*"
+                          onChange={(e) => handleEditPhotoChange(e, setMemberEditPhoto)} className="text-xs" />
+                        {memberEditPhoto && (
+                          <button type="button" onClick={() => setMemberEditPhoto(null)}
+                            className="block text-xs text-red-600 hover:underline">Remove photo</button>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Name</label>
+                      <input value={memberEditName} onChange={(e) => setMemberEditName(e.target.value)}
+                        className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Phone</label>
+                      <input value={memberEditPhone} onChange={(e) => setMemberEditPhone(e.target.value)}
+                        className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Address</label>
+                      <textarea value={memberEditAddress} onChange={(e) => setMemberEditAddress(e.target.value)} rows={2}
+                        className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                    </div>
+                    <div className="space-x-2">
+                      <button onClick={() => saveMemberInfo(detailMember.id)}
+                        className="text-xs text-green-700 hover:underline">Save</button>
+                      <button onClick={() => setEditingMemberInfo(false)}
+                        className="text-xs text-gray-500 hover:underline">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p><span className="text-gray-500">Name:</span> {detailMember.name}</p>
+                    <p><span className="text-gray-500">Email:</span> {detailMember.email}</p>
+                    <p><span className="text-gray-500">Phone:</span> {detailMember.phone ?? '—'}</p>
+                    <p><span className="text-gray-500">Address:</span> {detailMember.address ?? '—'}</p>
+                    <p><span className="text-gray-500">Check-in PIN:</span> {detailMember.checkinPin ?? '—'}</p>
+                    <p><span className="text-gray-500">Enrollment date:</span> {detailMember.enrollmentDate ?? 'Not enrolled yet'}</p>
+                    <p><span className="text-gray-500">Last visit:</span> {
+                      lastCheckins[detailMember.id] ? new Date(lastCheckins[detailMember.id]).toLocaleString() : 'Never'
+                    }</p>
+                    <button onClick={() => startEditMemberInfo(detailMember)}
+                      className="text-xs text-gray-600 hover:underline">Edit info</button>
+                  </>
+                )}
               </div>
             )}
 
@@ -888,7 +1020,7 @@ export default function ManagerDashboard() {
                   </td>
                   <td className="py-2">
                     <button onClick={() => setDetailTrainerId(t.id)} className="text-xs text-brand hover:underline">
-                      View details
+                      View/Edit details
                     </button>
                   </td>
                 </tr>
@@ -951,14 +1083,61 @@ export default function ManagerDashboard() {
 
             {trainerModalTab === 'INFO' && (
               <div className="mt-4 space-y-2 text-sm">
-                <p><span className="text-gray-500">Name:</span> {detailTrainer.name}</p>
-                <p><span className="text-gray-500">Email:</span> {detailTrainer.email}</p>
-                <p><span className="text-gray-500">Phone:</span> {detailTrainer.phone ?? '—'}</p>
-                <p><span className="text-gray-500">Address:</span> {detailTrainer.address ?? '—'}</p>
-                <p><span className="text-gray-500">Check-in PIN:</span> {detailTrainer.checkinPin ?? '—'}</p>
-                <p><span className="text-gray-500">Last visit:</span> {
-                  lastCheckins[detailTrainer.id] ? new Date(lastCheckins[detailTrainer.id]).toLocaleString() : 'Never'
-                }</p>
+                {editingTrainerInfo ? (
+                  <div className="space-y-3 rounded-md border border-gray-200 p-3">
+                    <div className="flex items-center gap-3">
+                      {trainerEditPhoto ? (
+                        <img src={trainerEditPhoto} alt="" className="h-14 w-14 rounded-full object-cover" />
+                      ) : (
+                        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
+                          {trainerEditName.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      <div>
+                        <input type="file" accept="image/*"
+                          onChange={(e) => handleEditPhotoChange(e, setTrainerEditPhoto)} className="text-xs" />
+                        {trainerEditPhoto && (
+                          <button type="button" onClick={() => setTrainerEditPhoto(null)}
+                            className="block text-xs text-red-600 hover:underline">Remove photo</button>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Name</label>
+                      <input value={trainerEditName} onChange={(e) => setTrainerEditName(e.target.value)}
+                        className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Phone</label>
+                      <input value={trainerEditPhone} onChange={(e) => setTrainerEditPhone(e.target.value)}
+                        className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Address</label>
+                      <textarea value={trainerEditAddress} onChange={(e) => setTrainerEditAddress(e.target.value)} rows={2}
+                        className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                    </div>
+                    <div className="space-x-2">
+                      <button onClick={() => saveTrainerInfo(detailTrainer.id)}
+                        className="text-xs text-green-700 hover:underline">Save</button>
+                      <button onClick={() => setEditingTrainerInfo(false)}
+                        className="text-xs text-gray-500 hover:underline">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p><span className="text-gray-500">Name:</span> {detailTrainer.name}</p>
+                    <p><span className="text-gray-500">Email:</span> {detailTrainer.email}</p>
+                    <p><span className="text-gray-500">Phone:</span> {detailTrainer.phone ?? '—'}</p>
+                    <p><span className="text-gray-500">Address:</span> {detailTrainer.address ?? '—'}</p>
+                    <p><span className="text-gray-500">Check-in PIN:</span> {detailTrainer.checkinPin ?? '—'}</p>
+                    <p><span className="text-gray-500">Last visit:</span> {
+                      lastCheckins[detailTrainer.id] ? new Date(lastCheckins[detailTrainer.id]).toLocaleString() : 'Never'
+                    }</p>
+                    <button onClick={() => startEditTrainerInfo(detailTrainer)}
+                      className="text-xs text-gray-600 hover:underline">Edit info</button>
+                  </>
+                )}
 
                 {editingTrainerDates ? (
                   <div className="space-y-2 rounded-md border border-gray-200 p-3">

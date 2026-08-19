@@ -1,5 +1,6 @@
 package com.gymapp.controller;
 
+import com.gymapp.dto.ProfileDtos.UpdateProfileRequest;
 import com.gymapp.dto.TrainerDtos.TrainerSummary;
 import com.gymapp.dto.TrainerDtos.UpdateTrainerDatesRequest;
 import com.gymapp.service.TrainerDirectoryService;
@@ -22,6 +23,14 @@ public class TrainerController {
     @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
     public List<TrainerSummary> listTrainers(@RequestParam UUID branchId) {
         return trainerDirectoryService.listTrainersForBranch(branchId);
+    }
+
+    // Owner or Manager: basic info edit (name/phone/address/photo). Deliberately a
+    // different path than /dates, which stays Owner-only.
+    @PutMapping("/api/trainers/{id}")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public TrainerSummary updateInfo(@PathVariable UUID id, @RequestBody UpdateProfileRequest req) {
+        return trainerDirectoryService.updateTrainerInfo(id, req);
     }
 
     // Owner-only: joining date correction and marking/clearing a trainer as left - a
