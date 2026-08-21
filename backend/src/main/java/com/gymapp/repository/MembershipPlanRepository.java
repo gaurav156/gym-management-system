@@ -7,5 +7,5 @@ import java.util.List;
 import java.util.UUID;
 
 public interface MembershipPlanRepository extends JpaRepository<MembershipPlan, UUID> {
-    List<MembershipPlan> findByBranchIdAndActiveTrue(UUID branchId);
+    List<MembershipPlan> findByActiveTrue();
 }

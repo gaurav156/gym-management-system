@@ -96,3 +96,10 @@ export interface LastCheckinEntry {
   personId: string
   lastCheckIn: string
 }
+
+export interface PersonSummary {
+  id: string
+  name: string
+  email: string
+  role: Role
+}

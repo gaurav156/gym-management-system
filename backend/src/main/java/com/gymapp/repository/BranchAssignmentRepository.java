@@ -12,4 +12,5 @@ public interface BranchAssignmentRepository extends JpaRepository<BranchAssignme
     List<BranchAssignment> findByBranchId(UUID branchId);
     Optional<BranchAssignment> findByUserIdAndBranchId(UUID userId, UUID branchId);
     void deleteByUserIdAndBranchId(UUID userId, UUID branchId);
+    void deleteByUserId(UUID userId);
 }

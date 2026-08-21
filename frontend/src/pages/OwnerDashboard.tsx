@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
-import type { Branch } from '../types'
+import type { Branch, PersonSummary } from '../types'
 
 function BranchCheckboxes({ branches, selected, onChange }: {
   branches: Branch[]
@@ -41,6 +41,12 @@ export default function OwnerDashboard() {
   const [trainerPassword, setTrainerPassword] = useState('')
   const [trainerBranchIds, setTrainerBranchIds] = useState<string[]>([])
   const [trainerMessage, setTrainerMessage] = useState('')
+
+  const [assignRole, setAssignRole] = useState<'MEMBER' | 'TRAINER' | 'MANAGER'>('MEMBER')
+  const [assignPeople, setAssignPeople] = useState<PersonSummary[]>([])
+  const [assignPersonId, setAssignPersonId] = useState('')
+  const [assignBranchIds, setAssignBranchIds] = useState<string[]>([])
+  const [assignMessage, setAssignMessage] = useState('')
 
   function loadBranches() {
     api.get<Branch[]>('/api/branches').then((res) => setBranches(res.data))
@@ -88,6 +94,44 @@ export default function OwnerDashboard() {
       setTrainerName(''); setTrainerEmail(''); setTrainerPassword(''); setTrainerBranchIds([])
     } catch (err: any) {
       setTrainerMessage(err.response?.data?.error || 'Failed to create trainer')
+    }
+  }
+
+  useEffect(() => {
+    setAssignPersonId('')
+    setAssignBranchIds([])
+    setAssignMessage('')
+    api.get<PersonSummary[]>('/api/branches/people', { params: { role: assignRole } })
+      .then((res) => setAssignPeople(res.data))
+  }, [assignRole])
+
+  function selectAssignPerson(personId: string) {
+    setAssignPersonId(personId)
+    setAssignMessage('')
+    if (!personId) {
+      setAssignBranchIds([])
+      return
+    }
+    api.get<Branch[]>('/api/branches/mine', { params: { userId: personId } })
+      .then((res) => setAssignBranchIds(res.data.map((b) => b.id)))
+  }
+
+  async function saveAssignments(e: FormEvent) {
+    e.preventDefault()
+    setAssignMessage('')
+    if (!assignPersonId) {
+      setAssignMessage('Select a person first.')
+      return
+    }
+    if (assignBranchIds.length === 0) {
+      setAssignMessage('Select at least one branch.')
+      return
+    }
+    try {
+      await api.put(`/api/branches/assignments/${assignPersonId}`, { branchIds: assignBranchIds })
+      setAssignMessage('Branch assignments updated.')
+    } catch (err: any) {
+      setAssignMessage(err.response?.data?.error || 'Failed to update branch assignments')
     }
   }
 
@@ -148,6 +192,36 @@ export default function OwnerDashboard() {
             {trainerMessage && <p className="text-sm text-gray-600">{trainerMessage}</p>}
           </form>
         </div>
+      </div>
+
+      <div className="mt-8 rounded-lg border border-gray-200 p-6">
+        <h2 className="font-medium">Branch assignments</h2>
+        <p className="mt-1 text-xs text-gray-500">
+          Move or add branches for any Member, Trainer, or Manager. Since membership plans are
+          chain-wide, a member keeps full access at every branch they're assigned to.
+        </p>
+        <form onSubmit={saveAssignments} className="mt-4 space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <select value={assignRole} onChange={(e) => setAssignRole(e.target.value as any)}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm">
+              <option value="MEMBER">Member</option>
+              <option value="TRAINER">Trainer</option>
+              <option value="MANAGER">Manager</option>
+            </select>
+            <select value={assignPersonId} onChange={(e) => selectAssignPerson(e.target.value)}
+              className="flex-1 min-w-[200px] rounded-md border border-gray-300 px-3 py-2 text-sm">
+              <option value="">Select a person</option>
+              {assignPeople.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.email})</option>)}
+            </select>
+          </div>
+          {assignPersonId && (
+            <BranchCheckboxes branches={branches} selected={assignBranchIds} onChange={setAssignBranchIds} />
+          )}
+          <button disabled={!assignPersonId} className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-40">
+            Save branch assignments
+          </button>
+          {assignMessage && <p className="text-sm text-gray-600">{assignMessage}</p>}
+        </form>
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">

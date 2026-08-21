@@ -3,13 +3,12 @@ import { QRCodeSVG } from 'qrcode.react'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import { getEffectiveStatus } from '../utils/membership'
-import type { Membership, Plan, Branch, Payment } from '../types'
+import type { Membership, Plan, Payment } from '../types'
 
 export default function MemberDashboard() {
   const user = useAuthStore((s) => s.user)
   const [memberships, setMemberships] = useState<Membership[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
-  const [branches, setBranches] = useState<Branch[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [message, setMessage] = useState('')
   const [loadError, setLoadError] = useState('')
@@ -34,18 +33,10 @@ export default function MemberDashboard() {
     function onFocus() { loadMembershipData() }
     window.addEventListener('focus', onFocus)
 
-    // Use the member's own branch assignment(s) - not an arbitrary/first branch overall -
-    // so plans shown here always match where this member actually signed up.
-    api.get<Branch[]>('/api/branches/mine', { params: { userId: user.userId } })
-      .then(async (res) => {
-        setBranches(res.data)
-        if (res.data.length === 0) return
-        const perBranch = await Promise.all(
-          res.data.map((b) => api.get<Plan[]>('/api/plans', { params: { branchId: b.id } }))
-        )
-        setPlans(perBranch.flatMap((r) => r.data))
-      })
-      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load plans for your branch'))
+    // Plans are chain-wide now, not tied to the member's branch(es) - a single call covers it.
+    api.get<Plan[]>('/api/plans')
+      .then((res) => setPlans(res.data))
+      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load plans'))
 
     return () => window.removeEventListener('focus', onFocus)
   }, [user])

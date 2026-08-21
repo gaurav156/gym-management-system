@@ -109,8 +109,11 @@ export default function ManagerDashboard() {
   }
 
   useEffect(() => {
+    api.get<Plan[]>('/api/plans').then((res) => setPlans(res.data))
+  }, [])
+
+  useEffect(() => {
     if (!selectedBranch) return
-    api.get<Plan[]>('/api/plans', { params: { branchId: selectedBranch } }).then((res) => setPlans(res.data))
     api.get<HourlyCount[]>(`/api/attendance/summary/${selectedBranch}`).then((res) => setSummary(res.data))
     loadMembers()
     loadTrainers()
@@ -128,10 +131,6 @@ export default function ManagerDashboard() {
     e.preventDefault()
     setPlanError('')
 
-    if (!selectedBranch) {
-      setPlanError('No branch is selected yet - make sure your manager account is assigned to a branch.')
-      return
-    }
     if (!planPrice || Number.isNaN(Number(planPrice))) {
       setPlanError('Enter a valid price.')
       return
@@ -139,10 +138,10 @@ export default function ManagerDashboard() {
 
     try {
       await api.post('/api/plans/manage', {
-        branchId: selectedBranch, name: planName, durationMonths: planMonths, price: Number(planPrice),
+        name: planName, durationMonths: planMonths, price: Number(planPrice),
       })
       setPlanName(''); setPlanPrice('')
-      const res = await api.get<Plan[]>('/api/plans', { params: { branchId: selectedBranch } })
+      const res = await api.get<Plan[]>('/api/plans')
       setPlans(res.data)
     } catch (err: any) {
       setPlanError(err.response?.data?.error || JSON.stringify(err.response?.data) || 'Failed to create plan')
@@ -176,12 +175,17 @@ export default function ManagerDashboard() {
       setPurchaseMessage('Select a member and a plan.')
       return
     }
+    if (!selectedBranch) {
+      setPurchaseMessage('No branch selected.')
+      return
+    }
     try {
       const { data } = await api.post(
         '/api/memberships/purchase',
         {
           planId: purchasePlanId,
           mode: purchaseMode,
+          branchId: selectedBranch,
           startDate: purchaseStartDate || null,
         },
         { params: { memberId: purchaseMemberId } }
@@ -930,21 +934,26 @@ export default function ManagerDashboard() {
 
       <div className="mt-8 grid gap-8 sm:grid-cols-2">
         <div className="rounded-lg border border-gray-200 p-6">
-          <h2 className="font-medium">Add a membership plan</h2>
-          <form onSubmit={createPlan} className="mt-4 space-y-3">
-            <input placeholder="Plan name (e.g. 3 Month)" required value={planName} onChange={(e) => setPlanName(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <input type="number" min={1} placeholder="Duration (months)" required value={planMonths}
-              onChange={(e) => setPlanMonths(Number(e.target.value))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <input type="number" min={0} placeholder="Price" required value={planPrice}
-              onChange={(e) => setPlanPrice(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <button className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
-              Add plan
-            </button>
-            {planError && <p className="text-sm text-red-600">{planError}</p>}
-          </form>
+          <h2 className="font-medium">Membership plans</h2>
+          <p className="mt-1 text-xs text-gray-500">Chain-wide - the same plans apply at every branch.</p>
+          {user?.role === 'OWNER' ? (
+            <form onSubmit={createPlan} className="mt-4 space-y-3">
+              <input placeholder="Plan name (e.g. 3 Month)" required value={planName} onChange={(e) => setPlanName(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+              <input type="number" min={1} placeholder="Duration (months)" required value={planMonths}
+                onChange={(e) => setPlanMonths(Number(e.target.value))}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+              <input type="number" min={0} placeholder="Price" required value={planPrice}
+                onChange={(e) => setPlanPrice(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+              <button className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
+                Add plan
+              </button>
+              {planError && <p className="text-sm text-red-600">{planError}</p>}
+            </form>
+          ) : (
+            <p className="mt-3 text-xs text-gray-400">Only the Owner can add or change plans.</p>
+          )}
           <ul className="mt-4 divide-y divide-gray-100 text-sm">
             {plans.map((p) => (
               <li key={p.id} className="flex justify-between py-2">

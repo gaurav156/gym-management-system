@@ -56,9 +56,14 @@ public class SecurityConfig {
                 // this specific rule must come before the broader /api/branches/** rule below
                 .requestMatchers("/api/branches/mine").hasAnyRole("OWNER", "MANAGER", "MEMBER")
 
+                // owner-only: picking anyone by role and setting their branch assignments -
+                // must precede the broader /api/branches/** rule below to take effect
+                .requestMatchers("/api/branches/people").hasRole("OWNER")
+                .requestMatchers("/api/branches/assignments/**").hasRole("OWNER")
+
                 // manager + owner endpoints
                 .requestMatchers("/api/branches/**").hasAnyRole("OWNER", "MANAGER")
-                .requestMatchers("/api/plans/manage/**").hasAnyRole("OWNER", "MANAGER")
+                .requestMatchers("/api/plans/manage/**").hasRole("OWNER")
                 .requestMatchers("/api/members/**").hasAnyRole("OWNER", "MANAGER")
                 // owner-only: correcting a trainer's joining date, or marking/clearing them
                 // as left - a Manager must not be able to do either (must precede the

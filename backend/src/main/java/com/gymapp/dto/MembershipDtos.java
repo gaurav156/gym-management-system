@@ -11,8 +11,10 @@ import java.util.UUID;
 
 public class MembershipDtos {
 
+    // No longer branch-scoped - a plan created here is purchasable and valid at every
+    // branch, which is what makes cross-branch access work correctly for a transferred
+    // or multi-branch member.
     public record CreatePlanRequest(
-            @NotNull UUID branchId,
             @NotBlank String name,
             @Positive Integer durationMonths,
             @NotNull BigDecimal price
@@ -28,6 +30,10 @@ public class MembershipDtos {
     public record PurchaseRequest(
             @NotNull UUID planId,
             @NotNull PaymentMode mode,
+            // Which branch processed this sale - used for the Payment/Membership record,
+            // not as an access restriction (plans are chain-wide, so this is purely
+            // "where did the cash change hands" bookkeeping).
+            @NotNull UUID branchId,
             // Only used when the member has no current unexpired ACTIVE membership - if
             // they do, the new plan always starts the day after the current one ends and
             // this is ignored, regardless of what's supplied here.

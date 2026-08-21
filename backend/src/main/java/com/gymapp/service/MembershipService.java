@@ -37,10 +37,7 @@ public class MembershipService {
     }
 
     public PlanResponse createPlan(CreatePlanRequest req) {
-        Branch branch = branchRepository.findById(req.branchId())
-                .orElseThrow(() -> new IllegalArgumentException("Branch not found"));
         MembershipPlan plan = MembershipPlan.builder()
-                .branch(branch)
                 .name(req.name())
                 .durationMonths(req.durationMonths())
                 .price(req.price())
@@ -50,8 +47,8 @@ public class MembershipService {
         return toPlanResponse(plan);
     }
 
-    public List<PlanResponse> listPlans(UUID branchId) {
-        return planRepository.findByBranchIdAndActiveTrue(branchId).stream()
+    public List<PlanResponse> listPlans() {
+        return planRepository.findByActiveTrue().stream()
                 .map(this::toPlanResponse).toList();
     }
 
@@ -72,6 +69,8 @@ public class MembershipService {
                 .orElseThrow(() -> new IllegalArgumentException("Plan not found"));
         User recordedBy = userRepository.findById(recordedByUserId)
                 .orElseThrow(() -> new IllegalArgumentException("Recording user not found"));
+        Branch branch = branchRepository.findById(req.branchId())
+                .orElseThrow(() -> new IllegalArgumentException("Branch not found"));
 
         LocalDate today = LocalDate.now();
         LocalDate latestQueuedEnd = membershipRepository.findLatestQueuedEndDate(memberId, today);
@@ -84,7 +83,7 @@ public class MembershipService {
         Membership membership = Membership.builder()
                 .member(member)
                 .plan(plan)
-                .branch(plan.getBranch())
+                .branch(branch)
                 .startDate(start)
                 .endDate(end)
                 .status(MembershipStatus.ACTIVE)
@@ -93,7 +92,7 @@ public class MembershipService {
 
         Payment payment = Payment.builder()
                 .member(member)
-                .branch(plan.getBranch())
+                .branch(branch)
                 .recordedBy(recordedBy)
                 .membership(membership)
                 .amount(plan.getPrice())

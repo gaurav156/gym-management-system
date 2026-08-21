@@ -20,15 +20,17 @@ public class MembershipController {
         this.membershipService = membershipService;
     }
 
+    // Plans are chain-wide now, so creating one affects every branch - Owner-only,
+    // no longer Manager-creatable.
     @PostMapping("/plans/manage")
-    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    @PreAuthorize("hasRole('OWNER')")
     public PlanResponse createPlan(@Valid @RequestBody CreatePlanRequest req) {
         return membershipService.createPlan(req);
     }
 
     @GetMapping("/plans")
-    public List<PlanResponse> listPlans(@RequestParam UUID branchId) {
-        return membershipService.listPlans(branchId);
+    public List<PlanResponse> listPlans() {
+        return membershipService.listPlans();
     }
 
     @PostMapping("/memberships/purchase")

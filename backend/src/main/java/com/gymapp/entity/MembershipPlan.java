@@ -23,10 +23,6 @@ public class MembershipPlan {
     @GeneratedValue
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "branch_id", nullable = false)
-    private Branch branch;
-
     @Column(nullable = false)
     private String name;               // e.g. "1 Month", "3 Month", "Annual"
 
