@@ -14,7 +14,16 @@ import java.util.UUID;
 public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     List<Membership> findByMemberId(UUID memberId);
     List<Membership> findByStatus(MembershipStatus status);
-    List<Membership> findByBranchIdOrderByEndDateDesc(UUID branchId);
+
+    // Scoped by branch ASSIGNMENT, not by which branch happened to process the purchase -
+    // a manager viewing branch X needs to see the full membership picture (including
+    // ACTIVE status) for everyone assigned to X, even if their plan was purchased
+    // elsewhere. This is what the Members table's status column and the membership admin
+    // table both rely on.
+    @Query("SELECT m FROM Membership m WHERE m.member.id IN "
+            + "(SELECT ba.user.id FROM BranchAssignment ba WHERE ba.branch.id = :branchId) "
+            + "ORDER BY m.endDate DESC")
+    List<Membership> findByMemberAssignedToBranch(@Param("branchId") UUID branchId);
 
     // The membership that's actually usable RIGHT NOW - status=ACTIVE and today falls
     // within its date range. This is what gym access (check-in) and the "your current

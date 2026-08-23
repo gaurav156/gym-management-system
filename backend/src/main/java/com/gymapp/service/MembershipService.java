@@ -194,7 +194,7 @@ public class MembershipService {
 
     @Transactional(readOnly = true)
     public List<MembershipAdminResponse> listForBranch(UUID branchId) {
-        return membershipRepository.findByBranchIdOrderByEndDateDesc(branchId).stream()
+        return membershipRepository.findByMemberAssignedToBranch(branchId).stream()
                 .map(this::toAdminResponse).toList();
     }
 
