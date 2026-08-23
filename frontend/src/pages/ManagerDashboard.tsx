@@ -199,12 +199,22 @@ export default function ManagerDashboard() {
     }
   }
 
+  // Refreshes both the branch-scoped table and the currently-open member modal's own
+  // fetch - the modal no longer derives from the branch list (that was the cross-branch
+  // visibility bug), so an action taken inside it needs its own explicit refresh too.
+  function refreshMembershipViews() {
+    loadMemberships()
+    if (detailMemberId) {
+      api.get<MembershipAdmin[]>(`/api/memberships/member/${detailMemberId}`).then((res) => setDetailMembershipsFetched(res.data))
+    }
+  }
+
   async function cancelMembership(id: string) {
     if (!confirm('Cancel this membership? The member will lose gym access immediately.')) return
     setMembershipActionMessage('')
     try {
       await api.post(`/api/memberships/${id}/cancel`)
-      loadMemberships()
+      refreshMembershipViews()
     } catch (err: any) {
       setMembershipActionMessage(err.response?.data?.error || 'Failed to cancel')
     }
@@ -214,7 +224,7 @@ export default function ManagerDashboard() {
     setMembershipActionMessage('')
     try {
       await api.post(`/api/memberships/${id}/pause`)
-      loadMemberships()
+      refreshMembershipViews()
     } catch (err: any) {
       setMembershipActionMessage(err.response?.data?.error || 'Failed to pause')
     }
@@ -224,7 +234,7 @@ export default function ManagerDashboard() {
     setMembershipActionMessage('')
     try {
       await api.post(`/api/memberships/${id}/resume`)
-      loadMemberships()
+      refreshMembershipViews()
     } catch (err: any) {
       setMembershipActionMessage(err.response?.data?.error || 'Failed to resume')
     }
@@ -325,7 +335,7 @@ export default function ManagerDashboard() {
     try {
       await api.put(`/api/memberships/${id}`, { startDate: editStartDate, endDate: editEndDate })
       setEditingId(null)
-      loadMemberships()
+      refreshMembershipViews()
     } catch (err: any) {
       setMembershipActionMessage(err.response?.data?.error || 'Failed to update')
     }
@@ -342,6 +352,7 @@ export default function ManagerDashboard() {
   const [modalTab, setModalTab] = useState<'INFO' | 'MEMBERSHIPS' | 'PAYMENTS' | 'ATTENDANCE' | 'BRANCHES'>('INFO')
   const [detailPayments, setDetailPayments] = useState<Payment[]>([])
   const [detailAttendance, setDetailAttendance] = useState<AttendanceLogEntry[]>([])
+  const [detailMembershipsFetched, setDetailMembershipsFetched] = useState<MembershipAdmin[]>([])
   const [detailPaymentsPage, setDetailPaymentsPage] = useState(1)
   const [detailAttendancePage, setDetailAttendancePage] = useState(1)
   const [trainerPage, setTrainerPage] = useState(1)
@@ -445,6 +456,7 @@ export default function ManagerDashboard() {
     setEditingMemberBranches(false)
     api.get<Payment[]>(`/api/payments/member/${detailMemberId}`).then((res) => setDetailPayments(res.data))
     api.get<AttendanceLogEntry[]>(`/api/attendance/history/${detailMemberId}`).then((res) => setDetailAttendance(res.data))
+    api.get<MembershipAdmin[]>(`/api/memberships/member/${detailMemberId}`).then((res) => setDetailMembershipsFetched(res.data))
     loadDetailMemberBranches(detailMemberId)
   }, [detailMemberId])
 
@@ -499,8 +511,7 @@ export default function ManagerDashboard() {
   const pagedMemberRows = filteredMemberRows.slice((memberPage - 1) * PAGE_SIZE, memberPage * PAGE_SIZE)
 
   const detailMember = members.find((m) => m.id === detailMemberId) ?? null
-  const detailMemberships = memberships
-    .filter((ms) => ms.memberId === detailMemberId)
+  const detailMemberships = detailMembershipsFetched
     .filter((ms) => {
       const effective = getEffectiveStatus(ms)
       return modalShowExpired || (effective !== 'EXPIRED' && effective !== 'CANCELLED')

@@ -53,6 +53,14 @@ public class MembershipController {
         return membershipService.listForBranch(branchId);
     }
 
+    // Staff-facing: view a specific member's full membership history, regardless of which
+    // branch each plan was purchased at - used by the member details modal.
+    @GetMapping("/memberships/member/{memberId}")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public List<MembershipAdminResponse> listForMemberAdmin(@PathVariable UUID memberId) {
+        return membershipService.listAdminForMember(memberId);
+    }
+
     @PostMapping("/memberships/{id}/cancel")
     @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
     public MembershipAdminResponse cancel(@PathVariable UUID id) {

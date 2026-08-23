@@ -182,6 +182,16 @@ public class MembershipService {
                 .map(this::toMembershipResponse).toList();
     }
 
+    // Staff-facing version of listForMember - same underlying rows, admin-shaped response
+    // (includes memberId/memberName so this can reuse the same rendering as the branch-wide
+    // list). Deliberately NOT branch-scoped: a member's plans are visible from any branch
+    // they're assigned to, not just the one where the purchase happened to be recorded.
+    @Transactional(readOnly = true)
+    public List<MembershipAdminResponse> listAdminForMember(UUID memberId) {
+        return membershipRepository.findByMemberId(memberId).stream()
+                .map(this::toAdminResponse).toList();
+    }
+
     @Transactional(readOnly = true)
     public List<MembershipAdminResponse> listForBranch(UUID branchId) {
         return membershipRepository.findByBranchIdOrderByEndDateDesc(branchId).stream()

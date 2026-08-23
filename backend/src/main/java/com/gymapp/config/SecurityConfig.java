@@ -81,7 +81,7 @@ public class SecurityConfig {
                 // PUT /api/memberships/{id} are both a single path segment, so without
                 // pinning this to PUT it would also (wrongly) restrict the member's own
                 // GET /mine endpoint.
-                .requestMatchers("/api/memberships/branch/**").hasAnyRole("OWNER", "MANAGER")
+                .requestMatchers("/api/memberships/branch/**", "/api/memberships/member/**").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers("/api/memberships/*/cancel", "/api/memberships/*/pause",
                         "/api/memberships/*/resume").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers(HttpMethod.PUT, "/api/memberships/*").hasAnyRole("OWNER", "MANAGER")
