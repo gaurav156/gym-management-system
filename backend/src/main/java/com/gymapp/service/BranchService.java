@@ -11,7 +11,9 @@ import com.gymapp.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -55,6 +57,11 @@ public class BranchService {
     // Managers alike, since they all use the same branch_assignments table. Because
     // membership plans are chain-wide now, a member keeps valid access at every branch
     // they're assigned to without anything else needing to change.
+    //
+    // Deliberately diffs against the existing rows rather than delete-all-then-reinsert:
+    // Hibernate flushes inserts before deletes by default, so re-inserting a branch that's
+    // already assigned (e.g. keeping an existing checkbox checked) would violate the
+    // (user_id, branch_id) unique constraint before the stale delete actually lands.
     @Transactional
     public List<BranchResponse> updateAssignments(UUID userId, UpdateAssignmentsRequest req) {
         User user = userRepository.findById(userId)
@@ -65,12 +72,26 @@ public class BranchService {
             throw new IllegalArgumentException("One or more branches not found");
         }
 
-        branchAssignmentRepository.deleteByUserId(userId);
+        List<BranchAssignment> existing = branchAssignmentRepository.findByUserId(userId);
+        Set<UUID> existingBranchIds = new HashSet<>();
+        for (BranchAssignment a : existing) {
+            existingBranchIds.add(a.getBranch().getId());
+        }
+        Set<UUID> desiredBranchIds = new HashSet<>(req.branchIds());
+
+        for (BranchAssignment a : existing) {
+            if (!desiredBranchIds.contains(a.getBranch().getId())) {
+                branchAssignmentRepository.delete(a);
+            }
+        }
+
         for (Branch branch : branches) {
-            branchAssignmentRepository.save(BranchAssignment.builder()
-                    .user(user)
-                    .branch(branch)
-                    .build());
+            if (!existingBranchIds.contains(branch.getId())) {
+                branchAssignmentRepository.save(BranchAssignment.builder()
+                        .user(user)
+                        .branch(branch)
+                        .build());
+            }
         }
 
         return branches.stream().map(this::toResponse).toList();

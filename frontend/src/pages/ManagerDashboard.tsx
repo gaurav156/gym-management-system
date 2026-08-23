@@ -25,7 +25,7 @@ export default function ManagerDashboard() {
   const [attendanceTab, setAttendanceTab] = useState<'MEMBERS' | 'TRAINERS'>('MEMBERS')
   const [detailTrainerId, setDetailTrainerId] = useState<string | null>(null)
   const [showAllTrainers, setShowAllTrainers] = useState(false)
-  const [trainerModalTab, setTrainerModalTab] = useState<'INFO' | 'ATTENDANCE'>('INFO')
+  const [trainerModalTab, setTrainerModalTab] = useState<'INFO' | 'ATTENDANCE' | 'BRANCHES'>('INFO')
   const [editingTrainerDates, setEditingTrainerDates] = useState(false)
   const [joiningDateInput, setJoiningDateInput] = useState('')
   const [leftDateInput, setLeftDateInput] = useState('')
@@ -339,7 +339,7 @@ export default function ManagerDashboard() {
   const [detailMemberId, setDetailMemberId] = useState<string | null>(null)
   const [modalShowExpired, setModalShowExpired] = useState(false)
   const [modalPage, setModalPage] = useState(1)
-  const [modalTab, setModalTab] = useState<'INFO' | 'MEMBERSHIPS' | 'PAYMENTS' | 'ATTENDANCE'>('INFO')
+  const [modalTab, setModalTab] = useState<'INFO' | 'MEMBERSHIPS' | 'PAYMENTS' | 'ATTENDANCE' | 'BRANCHES'>('INFO')
   const [detailPayments, setDetailPayments] = useState<Payment[]>([])
   const [detailAttendance, setDetailAttendance] = useState<AttendanceLogEntry[]>([])
   const [detailPaymentsPage, setDetailPaymentsPage] = useState(1)
@@ -360,6 +360,53 @@ export default function ManagerDashboard() {
   const [trainerEditAddress, setTrainerEditAddress] = useState('')
   const [trainerEditPhoto, setTrainerEditPhoto] = useState<string | null>(null)
 
+  const [detailMemberBranches, setDetailMemberBranches] = useState<Branch[]>([])
+  const [editingMemberBranches, setEditingMemberBranches] = useState(false)
+  const [memberBranchEditIds, setMemberBranchEditIds] = useState<string[]>([])
+  const [allBranches, setAllBranches] = useState<Branch[]>([])
+
+  const [detailTrainerBranches, setDetailTrainerBranches] = useState<Branch[]>([])
+  const [editingTrainerBranches, setEditingTrainerBranches] = useState(false)
+  const [trainerBranchEditIds, setTrainerBranchEditIds] = useState<string[]>([])
+
+  function loadDetailMemberBranches(memberId: string) {
+    api.get<Branch[]>('/api/branches/mine', { params: { userId: memberId } }).then((res) => setDetailMemberBranches(res.data))
+  }
+
+  function loadDetailTrainerBranches(trainerId: string) {
+    api.get<Branch[]>('/api/branches/mine', { params: { userId: trainerId } }).then((res) => setDetailTrainerBranches(res.data))
+  }
+
+  async function saveMemberBranches(memberId: string) {
+    if (memberBranchEditIds.length === 0) {
+      setMembershipActionMessage('Select at least one branch.')
+      return
+    }
+    try {
+      await api.put(`/api/branches/assignments/${memberId}`, { branchIds: memberBranchEditIds })
+      setEditingMemberBranches(false)
+      loadDetailMemberBranches(memberId)
+      loadMembers()
+    } catch (err: any) {
+      setMembershipActionMessage(err.response?.data?.error || 'Failed to update branch assignments')
+    }
+  }
+
+  async function saveTrainerBranches(trainerId: string) {
+    if (trainerBranchEditIds.length === 0) {
+      setMembershipActionMessage('Select at least one branch.')
+      return
+    }
+    try {
+      await api.put(`/api/branches/assignments/${trainerId}`, { branchIds: trainerBranchEditIds })
+      setEditingTrainerBranches(false)
+      loadDetailTrainerBranches(trainerId)
+      loadTrainers()
+    } catch (err: any) {
+      setMembershipActionMessage(err.response?.data?.error || 'Failed to update branch assignments')
+    }
+  }
+
   function handleEditPhotoChange(e: ChangeEvent<HTMLInputElement>, onLoaded: (dataUrl: string) => void) {
     const file = e.target.files?.[0]
     const inputEl = e.target
@@ -375,6 +422,16 @@ export default function ManagerDashboard() {
     inputEl.value = ''
   }
 
+  // Owner needs the full branch list to offer as checkboxes when editing someone's
+  // assignments - a Manager only ever has their own assigned branches in `branches`.
+  useEffect(() => {
+    if (user?.role === 'OWNER') {
+      setAllBranches(branches)
+    } else {
+      api.get<Branch[]>('/api/branches').then((res) => setAllBranches(res.data)).catch(() => {})
+    }
+  }, [user, branches])
+
   useEffect(() => {
     setModalPage(1)
   }, [detailMemberId, modalShowExpired])
@@ -385,12 +442,16 @@ export default function ManagerDashboard() {
     setDetailPaymentsPage(1)
     setDetailAttendancePage(1)
     setEditingMemberInfo(false)
+    setEditingMemberBranches(false)
     api.get<Payment[]>(`/api/payments/member/${detailMemberId}`).then((res) => setDetailPayments(res.data))
     api.get<AttendanceLogEntry[]>(`/api/attendance/history/${detailMemberId}`).then((res) => setDetailAttendance(res.data))
+    loadDetailMemberBranches(detailMemberId)
   }, [detailMemberId])
 
   useEffect(() => {
     setEditingTrainerInfo(false)
+    setEditingTrainerBranches(false)
+    if (detailTrainerId) loadDetailTrainerBranches(detailTrainerId)
   }, [detailTrainerId])
 
   useEffect(() => {
@@ -679,12 +740,12 @@ export default function ManagerDashboard() {
             </div>
 
             <div className="mt-4 flex gap-1 border-b border-gray-200 text-sm">
-              {(['INFO', 'MEMBERSHIPS', 'PAYMENTS', 'ATTENDANCE'] as const).map((tab) => (
+              {(['INFO', 'MEMBERSHIPS', 'PAYMENTS', 'ATTENDANCE', 'BRANCHES'] as const).map((tab) => (
                 <button key={tab} onClick={() => setModalTab(tab)}
                   className={`-mb-px border-b-2 px-3 py-2 ${
                     modalTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}>
-                  {tab === 'INFO' ? 'Info' : tab === 'MEMBERSHIPS' ? 'Membership plans' : tab === 'PAYMENTS' ? 'Payment history' : 'Attendance'}
+                  {tab === 'INFO' ? 'Info' : tab === 'MEMBERSHIPS' ? 'Membership plans' : tab === 'PAYMENTS' ? 'Payment history' : tab === 'ATTENDANCE' ? 'Attendance' : 'Branches'}
                 </button>
               ))}
             </div>
@@ -928,6 +989,44 @@ export default function ManagerDashboard() {
                 )}
               </div>
             )}
+
+            {modalTab === 'BRANCHES' && (
+              <div className="mt-4 text-sm">
+                {editingMemberBranches ? (
+                  <div className="space-y-3">
+                    <div className="rounded-md border border-gray-300 p-2">
+                      {allBranches.map((b) => (
+                        <label key={b.id} className="flex items-center gap-2 py-1">
+                          <input type="checkbox" checked={memberBranchEditIds.includes(b.id)}
+                            onChange={() => setMemberBranchEditIds((ids) =>
+                              ids.includes(b.id) ? ids.filter((x) => x !== b.id) : [...ids, b.id])} />
+                          {b.name}
+                        </label>
+                      ))}
+                    </div>
+                    <div className="space-x-2">
+                      <button onClick={() => saveMemberBranches(detailMember.id)}
+                        className="text-xs text-green-700 hover:underline">Save</button>
+                      <button onClick={() => setEditingMemberBranches(false)}
+                        className="text-xs text-gray-500 hover:underline">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <ul className="space-y-1">
+                      {detailMemberBranches.map((b) => <li key={b.id}>{b.name}</li>)}
+                      {detailMemberBranches.length === 0 && <li className="text-gray-400">No branches assigned.</li>}
+                    </ul>
+                    {user?.role === 'OWNER' && (
+                      <button onClick={() => { setEditingMemberBranches(true); setMemberBranchEditIds(detailMemberBranches.map((b) => b.id)) }}
+                        className="mt-3 text-xs text-gray-600 hover:underline">
+                        Edit branches
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1078,12 +1177,12 @@ export default function ManagerDashboard() {
             </div>
 
             <div className="mt-4 flex gap-1 border-b border-gray-200 text-sm">
-              {(['INFO', 'ATTENDANCE'] as const).map((tab) => (
+              {(['INFO', 'ATTENDANCE', 'BRANCHES'] as const).map((tab) => (
                 <button key={tab} onClick={() => setTrainerModalTab(tab)}
                   className={`-mb-px border-b-2 px-3 py-2 ${
                     trainerModalTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}>
-                  {tab === 'INFO' ? 'Info' : 'Attendance'}
+                  {tab === 'INFO' ? 'Info' : tab === 'ATTENDANCE' ? 'Attendance' : 'Branches'}
                 </button>
               ))}
             </div>
@@ -1218,6 +1317,44 @@ export default function ManagerDashboard() {
                         className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
                     </div>
                   </div>
+                )}
+              </div>
+            )}
+
+            {trainerModalTab === 'BRANCHES' && (
+              <div className="mt-4 text-sm">
+                {editingTrainerBranches ? (
+                  <div className="space-y-3">
+                    <div className="rounded-md border border-gray-300 p-2">
+                      {allBranches.map((b) => (
+                        <label key={b.id} className="flex items-center gap-2 py-1">
+                          <input type="checkbox" checked={trainerBranchEditIds.includes(b.id)}
+                            onChange={() => setTrainerBranchEditIds((ids) =>
+                              ids.includes(b.id) ? ids.filter((x) => x !== b.id) : [...ids, b.id])} />
+                          {b.name}
+                        </label>
+                      ))}
+                    </div>
+                    <div className="space-x-2">
+                      <button onClick={() => saveTrainerBranches(detailTrainer.id)}
+                        className="text-xs text-green-700 hover:underline">Save</button>
+                      <button onClick={() => setEditingTrainerBranches(false)}
+                        className="text-xs text-gray-500 hover:underline">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <ul className="space-y-1">
+                      {detailTrainerBranches.map((b) => <li key={b.id}>{b.name}</li>)}
+                      {detailTrainerBranches.length === 0 && <li className="text-gray-400">No branches assigned.</li>}
+                    </ul>
+                    {user?.role === 'OWNER' && (
+                      <button onClick={() => { setEditingTrainerBranches(true); setTrainerBranchEditIds(detailTrainerBranches.map((b) => b.id)) }}
+                        className="mt-3 text-xs text-gray-600 hover:underline">
+                        Edit branches
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             )}

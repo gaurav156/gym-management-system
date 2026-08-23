@@ -42,7 +42,6 @@ export default function OwnerDashboard() {
   const [trainerBranchIds, setTrainerBranchIds] = useState<string[]>([])
   const [trainerMessage, setTrainerMessage] = useState('')
 
-  const [assignRole, setAssignRole] = useState<'MEMBER' | 'TRAINER' | 'MANAGER'>('MEMBER')
   const [assignPeople, setAssignPeople] = useState<PersonSummary[]>([])
   const [assignPersonId, setAssignPersonId] = useState('')
   const [assignBranchIds, setAssignBranchIds] = useState<string[]>([])
@@ -98,12 +97,9 @@ export default function OwnerDashboard() {
   }
 
   useEffect(() => {
-    setAssignPersonId('')
-    setAssignBranchIds([])
-    setAssignMessage('')
-    api.get<PersonSummary[]>('/api/branches/people', { params: { role: assignRole } })
+    api.get<PersonSummary[]>('/api/branches/people', { params: { role: 'MANAGER' } })
       .then((res) => setAssignPeople(res.data))
-  }, [assignRole])
+  }, [])
 
   function selectAssignPerson(personId: string) {
     setAssignPersonId(personId)
@@ -195,25 +191,17 @@ export default function OwnerDashboard() {
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">Branch assignments</h2>
+        <h2 className="font-medium">Manager branch assignments</h2>
         <p className="mt-1 text-xs text-gray-500">
-          Move or add branches for any Member, Trainer, or Manager. Since membership plans are
-          chain-wide, a member keeps full access at every branch they're assigned to.
+          For Members and Trainers, use "View/Edit details" on their row in Branch
+          operations instead - it's easier to find someone in a long list there.
         </p>
         <form onSubmit={saveAssignments} className="mt-4 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <select value={assignRole} onChange={(e) => setAssignRole(e.target.value as any)}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm">
-              <option value="MEMBER">Member</option>
-              <option value="TRAINER">Trainer</option>
-              <option value="MANAGER">Manager</option>
-            </select>
-            <select value={assignPersonId} onChange={(e) => selectAssignPerson(e.target.value)}
-              className="flex-1 min-w-[200px] rounded-md border border-gray-300 px-3 py-2 text-sm">
-              <option value="">Select a person</option>
-              {assignPeople.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.email})</option>)}
-            </select>
-          </div>
+          <select value={assignPersonId} onChange={(e) => selectAssignPerson(e.target.value)}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+            <option value="">Select a manager</option>
+            {assignPeople.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.email})</option>)}
+          </select>
           {assignPersonId && (
             <BranchCheckboxes branches={branches} selected={assignBranchIds} onChange={setAssignBranchIds} />
           )}
