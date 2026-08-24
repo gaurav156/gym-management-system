@@ -59,7 +59,8 @@ export default function ManagerDashboard() {
   const [purchaseMode, setPurchaseMode] = useState('CASH')
   const [purchaseStartDate, setPurchaseStartDate] = useState('')
   const [purchaseMessage, setPurchaseMessage] = useState('')
-  const [membershipActionMessage, setMembershipActionMessage] = useState('')
+  const [memberModalMessage, setMemberModalMessage] = useState('')
+  const [trainerModalMessage, setTrainerModalMessage] = useState('')
 
   const [memberSearch, setMemberSearch] = useState('')
   const [memberStatusFilter, setMemberStatusFilter] = useState<'ALL' | EffectiveStatus | 'NONE'>('ALL')
@@ -211,32 +212,32 @@ export default function ManagerDashboard() {
 
   async function cancelMembership(id: string) {
     if (!confirm('Cancel this membership? The member will lose gym access immediately.')) return
-    setMembershipActionMessage('')
+    setMemberModalMessage('')
     try {
       await api.post(`/api/memberships/${id}/cancel`)
       refreshMembershipViews()
     } catch (err: any) {
-      setMembershipActionMessage(err.response?.data?.error || 'Failed to cancel')
+      setMemberModalMessage(err.response?.data?.error || 'Failed to cancel')
     }
   }
 
   async function pauseMembership(id: string) {
-    setMembershipActionMessage('')
+    setMemberModalMessage('')
     try {
       await api.post(`/api/memberships/${id}/pause`)
       refreshMembershipViews()
     } catch (err: any) {
-      setMembershipActionMessage(err.response?.data?.error || 'Failed to pause')
+      setMemberModalMessage(err.response?.data?.error || 'Failed to pause')
     }
   }
 
   async function resumeMembership(id: string) {
-    setMembershipActionMessage('')
+    setMemberModalMessage('')
     try {
       await api.post(`/api/memberships/${id}/resume`)
       refreshMembershipViews()
     } catch (err: any) {
-      setMembershipActionMessage(err.response?.data?.error || 'Failed to resume')
+      setMemberModalMessage(err.response?.data?.error || 'Failed to resume')
     }
   }
 
@@ -248,7 +249,7 @@ export default function ManagerDashboard() {
     setEditingId(m.id)
     setEditStartDate(m.startDate)
     setEditEndDate(m.endDate)
-    setMembershipActionMessage('')
+    setMemberModalMessage('')
   }
 
   function cancelEdit() {
@@ -259,7 +260,7 @@ export default function ManagerDashboard() {
     setEditingTrainerDates(true)
     setJoiningDateInput(t.joiningDate ?? '')
     setLeftDateInput(t.leftDate ?? '')
-    setMembershipActionMessage('')
+    setTrainerModalMessage('')
   }
 
   async function saveTrainerDates(trainerId: string) {
@@ -271,7 +272,7 @@ export default function ManagerDashboard() {
       setEditingTrainerDates(false)
       loadTrainers()
     } catch (err: any) {
-      setMembershipActionMessage(err.response?.data?.error || 'Failed to update trainer dates')
+      setTrainerModalMessage(err.response?.data?.error || 'Failed to update trainer dates')
     }
   }
 
@@ -281,7 +282,7 @@ export default function ManagerDashboard() {
     setMemberEditPhone(m.phone ?? '')
     setMemberEditAddress(m.address ?? '')
     setMemberEditPhoto(m.photo)
-    setMembershipActionMessage('')
+    setMemberModalMessage('')
   }
 
   async function saveMemberInfo(memberId: string) {
@@ -292,7 +293,7 @@ export default function ManagerDashboard() {
       setEditingMemberInfo(false)
       loadMembers()
     } catch (err: any) {
-      setMembershipActionMessage(err.response?.data?.error || 'Failed to update member info')
+      setMemberModalMessage(err.response?.data?.error || 'Failed to update member info')
     }
   }
 
@@ -302,7 +303,7 @@ export default function ManagerDashboard() {
     setTrainerEditPhone(t.phone ?? '')
     setTrainerEditAddress(t.address ?? '')
     setTrainerEditPhoto(t.photo)
-    setMembershipActionMessage('')
+    setTrainerModalMessage('')
   }
 
   async function saveTrainerInfo(trainerId: string) {
@@ -313,7 +314,7 @@ export default function ManagerDashboard() {
       setEditingTrainerInfo(false)
       loadTrainers()
     } catch (err: any) {
-      setMembershipActionMessage(err.response?.data?.error || 'Failed to update trainer info')
+      setTrainerModalMessage(err.response?.data?.error || 'Failed to update trainer info')
     }
   }
 
@@ -322,22 +323,22 @@ export default function ManagerDashboard() {
       await api.put(`/api/trainers/${trainerId}/dates`, { joiningDate, leftDate: null })
       loadTrainers()
     } catch (err: any) {
-      setMembershipActionMessage(err.response?.data?.error || 'Failed to clear left date')
+      setTrainerModalMessage(err.response?.data?.error || 'Failed to clear left date')
     }
   }
 
   async function saveEdit(id: string) {
     if (editEndDate < editStartDate) {
-      setMembershipActionMessage('End date cannot be before start date.')
+      setMemberModalMessage('End date cannot be before start date.')
       return
     }
-    setMembershipActionMessage('')
+    setMemberModalMessage('')
     try {
       await api.put(`/api/memberships/${id}`, { startDate: editStartDate, endDate: editEndDate })
       setEditingId(null)
       refreshMembershipViews()
     } catch (err: any) {
-      setMembershipActionMessage(err.response?.data?.error || 'Failed to update')
+      setMemberModalMessage(err.response?.data?.error || 'Failed to update')
     }
   }
 
@@ -390,7 +391,7 @@ export default function ManagerDashboard() {
 
   async function saveMemberBranches(memberId: string) {
     if (memberBranchEditIds.length === 0) {
-      setMembershipActionMessage('Select at least one branch.')
+      setMemberModalMessage('Select at least one branch.')
       return
     }
     try {
@@ -399,13 +400,13 @@ export default function ManagerDashboard() {
       loadDetailMemberBranches(memberId)
       loadMembers()
     } catch (err: any) {
-      setMembershipActionMessage(err.response?.data?.error || 'Failed to update branch assignments')
+      setMemberModalMessage(err.response?.data?.error || 'Failed to update branch assignments')
     }
   }
 
   async function saveTrainerBranches(trainerId: string) {
     if (trainerBranchEditIds.length === 0) {
-      setMembershipActionMessage('Select at least one branch.')
+      setTrainerModalMessage('Select at least one branch.')
       return
     }
     try {
@@ -414,16 +415,18 @@ export default function ManagerDashboard() {
       loadDetailTrainerBranches(trainerId)
       loadTrainers()
     } catch (err: any) {
-      setMembershipActionMessage(err.response?.data?.error || 'Failed to update branch assignments')
+      setTrainerModalMessage(err.response?.data?.error || 'Failed to update branch assignments')
     }
   }
 
-  function handleEditPhotoChange(e: ChangeEvent<HTMLInputElement>, onLoaded: (dataUrl: string) => void) {
+  // onError lets each caller report into whichever modal's own message it's operating in,
+  // rather than this shared helper guessing or reaching into unrelated state.
+  function handleEditPhotoChange(e: ChangeEvent<HTMLInputElement>, onLoaded: (dataUrl: string) => void, onError: (msg: string) => void) {
     const file = e.target.files?.[0]
     const inputEl = e.target
     if (!file) return
     if (file.size > MAX_PHOTO_BYTES) {
-      setMembershipActionMessage('Photo is too large - please use one under ~1.5MB.')
+      onError('Photo is too large - please use one under ~1.5MB.')
       inputEl.value = ''
       return
     }
@@ -448,6 +451,7 @@ export default function ManagerDashboard() {
   }, [detailMemberId, modalShowExpired])
 
   useEffect(() => {
+    setMemberModalMessage('')
     if (!detailMemberId) return
     setModalTab('INFO')
     setDetailPaymentsPage(1)
@@ -461,10 +465,19 @@ export default function ManagerDashboard() {
   }, [detailMemberId])
 
   useEffect(() => {
+    setTrainerModalMessage('')
     setEditingTrainerInfo(false)
     setEditingTrainerBranches(false)
     if (detailTrainerId) loadDetailTrainerBranches(detailTrainerId)
   }, [detailTrainerId])
+
+  useEffect(() => {
+    setMemberModalMessage('')
+  }, [modalTab])
+
+  useEffect(() => {
+    setTrainerModalMessage('')
+  }, [trainerModalTab])
 
   useEffect(() => {
     setMemberPage(1)
@@ -645,7 +658,6 @@ export default function ManagerDashboard() {
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">Members</h2>
         <p className="mt-1 text-xs text-gray-500">Click a member to view all their plans and take action.</p>
-        {membershipActionMessage && <p className="mt-2 text-sm text-red-600">{membershipActionMessage}</p>}
 
         <div className="mt-3 flex flex-wrap gap-2">
           <input placeholder="Search name or email..." value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
@@ -761,7 +773,7 @@ export default function ManagerDashboard() {
               ))}
             </div>
 
-            {membershipActionMessage && <p className="mt-3 text-sm text-red-600">{membershipActionMessage}</p>}
+            {memberModalMessage && <p className="mt-3 text-sm text-red-600">{memberModalMessage}</p>}
 
             {modalTab === 'INFO' && (
               <div className="mt-4 space-y-2 text-sm">
@@ -777,7 +789,7 @@ export default function ManagerDashboard() {
                       )}
                       <div>
                         <input type="file" accept="image/*"
-                          onChange={(e) => handleEditPhotoChange(e, setMemberEditPhoto)} className="text-xs" />
+                          onChange={(e) => handleEditPhotoChange(e, setMemberEditPhoto, setMemberModalMessage)} className="text-xs" />
                         {memberEditPhoto && (
                           <button type="button" onClick={() => setMemberEditPhoto(null)}
                             className="block text-xs text-red-600 hover:underline">Remove photo</button>
@@ -1198,7 +1210,7 @@ export default function ManagerDashboard() {
               ))}
             </div>
 
-            {membershipActionMessage && <p className="mt-3 text-sm text-red-600">{membershipActionMessage}</p>}
+            {trainerModalMessage && <p className="mt-3 text-sm text-red-600">{trainerModalMessage}</p>}
 
             {trainerModalTab === 'INFO' && (
               <div className="mt-4 space-y-2 text-sm">
@@ -1214,7 +1226,7 @@ export default function ManagerDashboard() {
                       )}
                       <div>
                         <input type="file" accept="image/*"
-                          onChange={(e) => handleEditPhotoChange(e, setTrainerEditPhoto)} className="text-xs" />
+                          onChange={(e) => handleEditPhotoChange(e, setTrainerEditPhoto, setTrainerModalMessage)} className="text-xs" />
                         {trainerEditPhoto && (
                           <button type="button" onClick={() => setTrainerEditPhoto(null)}
                             className="block text-xs text-red-600 hover:underline">Remove photo</button>
