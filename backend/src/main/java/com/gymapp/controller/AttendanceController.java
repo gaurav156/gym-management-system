@@ -4,6 +4,7 @@ import com.gymapp.dto.AttendanceDtos.*;
 import com.gymapp.service.AttendanceService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -29,6 +30,15 @@ public class AttendanceController {
     @GetMapping("/summary/{branchId}")
     public List<HourlyCount> hourlySummary(@PathVariable UUID branchId) {
         return attendanceService.hourlySummary(branchId);
+    }
+
+    // Self-service: a Member or Trainer viewing their own attendance log. Identity comes
+    // from the caller's own JWT, never a path/query param, so there's no way to view
+    // anyone else's history through this endpoint.
+    @GetMapping("/mine")
+    public List<AttendanceLogEntry> mine(Authentication authentication) {
+        UUID callerId = UUID.fromString((String) authentication.getDetails());
+        return attendanceService.historyFor(callerId);
     }
 
     @GetMapping("/history/{personId}")

@@ -19,7 +19,7 @@ export default function LoginPage() {
       setUser(data)
       const path = data.role === 'OWNER' ? '/owner'
         : data.role === 'MANAGER' ? '/manager'
-        : data.role === 'TRAINER' ? '/profile'
+        : data.role === 'TRAINER' ? '/trainer'
         : '/member'
       navigate(path)
     } catch (err: any) {

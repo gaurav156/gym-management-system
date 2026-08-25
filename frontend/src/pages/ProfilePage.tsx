@@ -1,5 +1,4 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
 import { api } from '../api/client'
 import type { Profile } from '../types'
 
@@ -59,16 +58,6 @@ export default function ProfilePage() {
   return (
     <div className="mx-auto max-w-md px-4 py-10">
       <h1 className="text-2xl font-semibold">Your profile</h1>
-
-      {profile.role === 'TRAINER' && (
-        <div className="mt-6 rounded-lg border border-gray-200 p-6 text-center">
-          <h2 className="font-medium">Your check-in code</h2>
-          <p className="mt-1 text-xs text-gray-500">Scan this at the gym, or give reception your PIN.</p>
-          <div className="mt-4 flex justify-center">
-            <QRCodeSVG value={profile.id} size={140} />
-          </div>
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div className="flex flex-col items-center gap-3">

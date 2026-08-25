@@ -9,18 +9,18 @@ export default function Navbar() {
   const dashboardPath =
     user?.role === 'OWNER' ? '/owner'
     : user?.role === 'MANAGER' ? '/manager'
-    : user?.role === 'TRAINER' ? '/profile'
+    : user?.role === 'TRAINER' ? '/trainer'
     : '/member'
 
   return (
     <nav className="border-b border-gray-200 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-        <Link to="/" className="text-xl font-semibold text-brand">{import.meta.env.VITE_GYM_NAME}</Link>
+        <Link to="/" className="text-xl font-semibold text-brand">FitZone Gym</Link>
         <div className="flex items-center gap-4 text-sm">
           {user ? (
             <>
               <Link to={dashboardPath} className="text-gray-700 hover:text-brand">Dashboard</Link>
-              {user.role === 'MEMBER' && (
+              {(user.role === 'MEMBER' || user.role === 'TRAINER') && (
                 <Link to="/profile" className="text-gray-700 hover:text-brand">Profile</Link>
               )}
               <span className="text-gray-400">{user.name}</span>

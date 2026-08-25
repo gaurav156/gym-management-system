@@ -54,7 +54,7 @@ public class SecurityConfig {
 
                 // a member needs to see their own assigned branch (e.g. to load plans) -
                 // this specific rule must come before the broader /api/branches/** rule below
-                .requestMatchers("/api/branches/mine").hasAnyRole("OWNER", "MANAGER", "MEMBER")
+                .requestMatchers("/api/branches/mine").hasAnyRole("OWNER", "MANAGER", "MEMBER", "TRAINER")
 
                 // owner-only: picking anyone by role and setting their branch assignments -
                 // must precede the broader /api/branches/** rule below to take effect
@@ -94,7 +94,10 @@ public class SecurityConfig {
                 // attendance check-in can be triggered from a reception kiosk (manager/owner),
                 // a member's own QR/PIN screen, or a trainer's own QR/PIN screen
                 .requestMatchers("/api/attendance/checkin").hasAnyRole("OWNER", "MANAGER", "MEMBER", "TRAINER")
-                .requestMatchers("/api/attendance/summary/**").hasAnyRole("OWNER", "MANAGER")
+                // members/trainers can see their own branch's crowd-by-hour, and their own
+                // attendance history (ownership for /mine is checked in the controller)
+                .requestMatchers("/api/attendance/summary/**").hasAnyRole("OWNER", "MANAGER", "MEMBER", "TRAINER")
+                .requestMatchers("/api/attendance/mine").hasAnyRole("MEMBER", "TRAINER")
                 .requestMatchers("/api/attendance/history/**", "/api/attendance/today/**",
                         "/api/attendance/last-checkin/**").hasAnyRole("OWNER", "MANAGER")
 
