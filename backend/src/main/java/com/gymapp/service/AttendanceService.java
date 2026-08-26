@@ -126,7 +126,8 @@ public class AttendanceService {
     @Transactional(readOnly = true)
     public List<AttendanceLogEntry> historyFor(UUID personId) {
         return attendanceRepository.findByMemberIdOrderByCheckInTimeDesc(personId).stream()
-                .map(a -> new AttendanceLogEntry(a.getId(), a.getCheckInTime(), a.getCheckOutTime(), a.getMethod().name()))
+                .map(a -> new AttendanceLogEntry(a.getId(), a.getCheckInTime(), a.getCheckOutTime(),
+                        a.getMethod().name(), a.getBranch().getName()))
                 .toList();
     }
 

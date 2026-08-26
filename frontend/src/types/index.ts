@@ -81,6 +81,7 @@ export interface AttendanceLogEntry {
   checkInTime: string
   checkOutTime: string | null
   method: string
+  branchName: string
 }
 
 export interface TodayAttendanceEntry {

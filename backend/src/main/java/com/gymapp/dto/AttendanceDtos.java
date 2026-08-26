@@ -34,7 +34,8 @@ public class AttendanceDtos {
             UUID id,
             LocalDateTime checkInTime,
             LocalDateTime checkOutTime,
-            String method
+            String method,
+            String branchName
     ) {}
 
     // role is included so the frontend can split one combined feed into Members/Trainers tabs

@@ -191,9 +191,12 @@ export default function MemberDashboard() {
         <p className="mt-1 text-xs text-gray-500">Check-out isn't tracked yet - only check-in times are logged.</p>
         <ul className="mt-4 divide-y divide-gray-100 text-sm">
           {pagedAttendance.map((a) => (
-            <li key={a.id} className="flex justify-between py-2">
+            <li key={a.id} className="flex items-center justify-between py-2">
               <span>{new Date(a.checkInTime).toLocaleString()}</span>
-              <span className="text-gray-500">{a.method}</span>
+              <span className="text-right text-gray-500">
+                {a.branchName}
+                <span className="ml-2 text-xs text-gray-400">{a.method}</span>
+              </span>
             </li>
           ))}
           {attendance.length === 0 && <li className="py-2 text-gray-400">No visits logged yet.</li>}

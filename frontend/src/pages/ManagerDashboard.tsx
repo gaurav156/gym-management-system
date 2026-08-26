@@ -985,7 +985,8 @@ export default function ManagerDashboard() {
                     <tr className="border-b border-gray-200 text-gray-500">
                       <th className="pb-2 pr-4">Check-in</th>
                       <th className="pb-2 pr-4">Check-out</th>
-                      <th className="pb-2">Method</th>
+                      <th className="pb-2 pr-4">Method</th>
+                      <th className="pb-2">Branch</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -993,7 +994,8 @@ export default function ManagerDashboard() {
                       <tr key={a.id}>
                         <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleString()}</td>
                         <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '—'}</td>
-                        <td className="py-2">{a.method}</td>
+                        <td className="py-2 pr-4">{a.method}</td>
+                        <td className="py-2 text-gray-500">{a.branchName}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1316,7 +1318,8 @@ export default function ManagerDashboard() {
                     <tr className="border-b border-gray-200 text-gray-500">
                       <th className="pb-2 pr-4">Check-in</th>
                       <th className="pb-2 pr-4">Check-out</th>
-                      <th className="pb-2">Method</th>
+                      <th className="pb-2 pr-4">Method</th>
+                      <th className="pb-2">Branch</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -1324,7 +1327,8 @@ export default function ManagerDashboard() {
                       <tr key={a.id}>
                         <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleString()}</td>
                         <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '—'}</td>
-                        <td className="py-2">{a.method}</td>
+                        <td className="py-2 pr-4">{a.method}</td>
+                        <td className="py-2 text-gray-500">{a.branchName}</td>
                       </tr>
                     ))}
                   </tbody>
