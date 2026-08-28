@@ -17,4 +17,13 @@ public interface AttendanceRepository extends JpaRepository<Attendance, UUID> {
     // it doesn't require fetching every attendance row per member on the frontend.
     @Query("SELECT a.member.id, MAX(a.checkInTime) FROM Attendance a WHERE a.branch.id = :branchId GROUP BY a.member.id")
     List<Object[]> findLastCheckInPerMember(@Param("branchId") UUID branchId);
+
+    // Today's existing record (if any) for this person at this specific branch - used to
+    // decide whether a scan is a fresh check-in or a check-out against an existing one.
+    // Scoped by branch as well as day: scanning at a different branch the same day starts
+    // a separate record there, it doesn't check them out of the first branch.
+    @Query("SELECT a FROM Attendance a WHERE a.member.id = :personId AND a.branch.id = :branchId "
+            + "AND a.checkInTime >= :startOfDay AND a.checkInTime < :endOfDay ORDER BY a.checkInTime DESC")
+    List<Attendance> findTodayRecordsForPersonAndBranch(@Param("personId") UUID personId, @Param("branchId") UUID branchId,
+                                                        @Param("startOfDay") LocalDateTime startOfDay, @Param("endOfDay") LocalDateTime endOfDay);
 }

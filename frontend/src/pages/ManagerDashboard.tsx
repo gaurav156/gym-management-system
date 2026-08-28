@@ -979,7 +979,7 @@ export default function ManagerDashboard() {
 
             {modalTab === 'ATTENDANCE' && (
               <div className="mt-4 overflow-x-auto">
-                <p className="mb-2 text-xs text-gray-500">Check-out isn't tracked yet - only check-in times are logged.</p>
+                <p className="mb-2 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 text-gray-500">
@@ -1312,7 +1312,7 @@ export default function ManagerDashboard() {
 
             {trainerModalTab === 'ATTENDANCE' && (
               <div className="mt-4 overflow-x-auto">
-                <p className="mb-2 text-xs text-gray-500">Check-out isn't tracked yet - only check-in times are logged.</p>
+                <p className="mb-2 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 text-gray-500">
@@ -1407,6 +1407,7 @@ export default function ManagerDashboard() {
               <tr className="border-b border-gray-200 text-gray-500">
                 <th className="pb-2 pr-4">Name</th>
                 <th className="pb-2 pr-4">Check-in</th>
+                <th className="pb-2 pr-4">Check-out</th>
                 <th className="pb-2">Method</th>
               </tr>
             </thead>
@@ -1415,6 +1416,7 @@ export default function ManagerDashboard() {
                   <tr key={`${a.personId}-${i}`}>
                     <td className="py-2 pr-4">{a.personName}</td>
                     <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleTimeString()}</td>
+                    <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleTimeString() : '—'}</td>
                     <td className="py-2">{a.method}</td>
                   </tr>
                 ))}

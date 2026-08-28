@@ -3,6 +3,7 @@ package com.gymapp.service;
 import com.gymapp.dto.AttendanceDtos.*;
 import com.gymapp.entity.*;
 import com.gymapp.repository.AttendanceRepository;
+import com.gymapp.repository.BranchAssignmentRepository;
 import com.gymapp.repository.BranchRepository;
 import com.gymapp.repository.MembershipRepository;
 import com.gymapp.repository.UserRepository;
@@ -24,15 +25,18 @@ public class AttendanceService {
     private final UserRepository userRepository;
     private final BranchRepository branchRepository;
     private final MembershipRepository membershipRepository;
+    private final BranchAssignmentRepository branchAssignmentRepository;
 
     public AttendanceService(AttendanceRepository attendanceRepository,
                              UserRepository userRepository,
                              BranchRepository branchRepository,
-                             MembershipRepository membershipRepository) {
+                             MembershipRepository membershipRepository,
+                             BranchAssignmentRepository branchAssignmentRepository) {
         this.attendanceRepository = attendanceRepository;
         this.userRepository = userRepository;
         this.branchRepository = branchRepository;
         this.membershipRepository = membershipRepository;
+        this.branchAssignmentRepository = branchAssignmentRepository;
     }
 
     @Transactional
@@ -58,20 +62,24 @@ public class AttendanceService {
             throw new IllegalArgumentException("This account is inactive");
         }
 
-        Branch branch;
+        if (req.branchId() == null) {
+            throw new IllegalArgumentException("branchId is required");
+        }
+        Branch branch = branchRepository.findById(req.branchId())
+                .orElseThrow(() -> new IllegalArgumentException("Branch not found"));
 
-        if (person.getRole() == Role.TRAINER) {
-            // Trainers are staff - just log attendance for monitoring, no membership to check.
-            branch = req.branchId() != null
-                    ? branchRepository.findById(req.branchId()).orElseThrow(() -> new IllegalArgumentException("Branch not found"))
-                    : null;
-            if (branch == null) {
-                throw new IllegalArgumentException("branchId is required for staff check-in");
-            }
-        } else {
+        // Applies to members and trainers alike - you can only check in at a branch
+        // you're actually assigned to, regardless of membership status or role.
+        boolean assignedToBranch = branchAssignmentRepository
+                .findByUserIdAndBranchId(person.getId(), branch.getId())
+                .isPresent();
+        if (!assignedToBranch) {
+            throw new IllegalArgumentException(person.getName() + " is not assigned to " + branch.getName());
+        }
+
+        if (person.getRole() != Role.TRAINER) {
             LocalDate today = LocalDate.now();
-            Membership usableMembership = membershipRepository
-                    .findCurrentlyUsable(person.getId(), today)
+            membershipRepository.findCurrentlyUsable(person.getId(), today)
                     .orElseGet(() -> {
                         var upcoming = membershipRepository.findFirstByMemberIdAndStatusAndStartDateAfterOrderByStartDateAsc(
                                 person.getId(), MembershipStatus.ACTIVE, today);
@@ -81,21 +89,42 @@ public class AttendanceService {
                         }
                         throw new IllegalArgumentException("No active membership - access denied");
                     });
-            branch = req.branchId() != null
-                    ? branchRepository.findById(req.branchId()).orElseThrow(() -> new IllegalArgumentException("Branch not found"))
-                    : usableMembership.getBranch();
         }
 
-        Attendance attendance = Attendance.builder()
-                .member(person)
-                .branch(branch)
-                .checkInTime(LocalDateTime.now())
-                .method(req.method())
-                .build();
+        // First scan of the day at this branch = check-in (new record). Any subsequent
+        // scan that same day at the same branch updates checkOutTime on that SAME record
+        // (overwritten each time), so what's stored is always first-check-in/last-checkout
+        // for that person, branch, and day - not a new row per scan.
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1);
+
+        List<Attendance> todayRecords = attendanceRepository
+                .findTodayRecordsForPersonAndBranch(person.getId(), branch.getId(), startOfDay, endOfDay);
+
+        Attendance attendance;
+        String action;
+        String message;
+
+        if (todayRecords.isEmpty()) {
+            attendance = Attendance.builder()
+                    .member(person)
+                    .branch(branch)
+                    .checkInTime(now)
+                    .method(req.method())
+                    .build();
+            action = "CHECK_IN";
+            message = "Welcome, " + person.getName() + "!";
+        } else {
+            attendance = todayRecords.get(0);
+            attendance.setCheckOutTime(now);
+            action = "CHECK_OUT";
+            message = "Goodbye, " + person.getName() + " - see you next time!";
+        }
         attendance = attendanceRepository.save(attendance);
 
         return new CheckinResponse(attendance.getId(), person.getName(), attendance.getCheckInTime(),
-                "Welcome, " + person.getName() + "!");
+                attendance.getCheckOutTime(), action, message);
     }
 
     // Powers the "which slot is crowded" view for MEMBERS only - staff check-ins shouldn't
@@ -121,8 +150,8 @@ public class AttendanceService {
     }
 
     // Full check-in history for one person (member or trainer) - powers the modal's
-    // Attendance tab. checkOutTime will always be null for now - there's no check-out
-    // action implemented yet.
+    // Attendance tab. checkOutTime is populated when they scanned again the same day at
+    // the same branch; otherwise it's null (they haven't checked out yet).
     @Transactional(readOnly = true)
     public List<AttendanceLogEntry> historyFor(UUID personId) {
         return attendanceRepository.findByMemberIdOrderByCheckInTimeDesc(personId).stream()

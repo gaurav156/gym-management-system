@@ -188,15 +188,22 @@ export default function MemberDashboard() {
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">Your attendance log</h2>
-        <p className="mt-1 text-xs text-gray-500">Check-out isn't tracked yet - only check-in times are logged.</p>
+        <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
         <ul className="mt-4 divide-y divide-gray-100 text-sm">
           {pagedAttendance.map((a) => (
-            <li key={a.id} className="flex items-center justify-between py-2">
-              <span>{new Date(a.checkInTime).toLocaleString()}</span>
-              <span className="text-right text-gray-500">
-                {a.branchName}
-                <span className="ml-2 text-xs text-gray-400">{a.method}</span>
-              </span>
+            <li key={a.id} className="py-2">
+              <div className="flex items-center justify-between">
+                <span>Check-in: {new Date(a.checkInTime).toLocaleString()}</span>
+                <span className="text-right text-gray-500">
+                  {a.branchName}
+                  <span className="ml-2 text-xs text-gray-400">{a.method}</span>
+                </span>
+              </div>
+              <div className="mt-0.5 text-xs text-gray-400">
+                {a.checkOutTime
+                  ? `Check-out: ${new Date(a.checkOutTime).toLocaleString()}`
+                  : 'Not checked out yet'}
+              </div>
             </li>
           ))}
           {attendance.length === 0 && <li className="py-2 text-gray-400">No visits logged yet.</li>}

@@ -11,6 +11,8 @@ public class AttendanceDtos {
     // Either pin+branchId (PIN check-in from a reception kiosk) or qrToken (member scans
     // their own QR) is supplied. This single endpoint shape is also what a future
     // biometric device adapter will call - it just sends method=BIOMETRIC instead.
+    // branchId is now always required (not optional/defaulted) - it's what gets validated
+    // against the person's branch assignments.
     public record CheckinRequest(
             String pin,
             String qrToken,
@@ -22,6 +24,8 @@ public class AttendanceDtos {
             UUID attendanceId,
             String memberName,
             LocalDateTime checkInTime,
+            LocalDateTime checkOutTime,
+            String action,   // "CHECK_IN" or "CHECK_OUT"
             String message
     ) {}
 
