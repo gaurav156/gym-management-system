@@ -15,7 +15,7 @@ export default function Navbar() {
   return (
     <nav className="border-b border-gray-200 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-        <Link to="/" className="text-xl font-semibold text-brand">FitZone Gym</Link>
+        <Link to="/" className="text-xl font-semibold text-brand">{import.meta.env.VITE_GYM_NAME}</Link>
         <div className="flex items-center gap-4 text-sm">
           {user ? (
             <>
