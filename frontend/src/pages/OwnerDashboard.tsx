@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
-import type { Branch, PersonSummary } from '../types'
+import type { Branch, PersonSummary, Plan } from '../types'
 
 function BranchCheckboxes({ branches, selected, onChange }: {
   branches: Branch[]
@@ -46,6 +46,12 @@ export default function OwnerDashboard() {
   const [assignPersonId, setAssignPersonId] = useState('')
   const [assignBranchIds, setAssignBranchIds] = useState<string[]>([])
   const [assignMessage, setAssignMessage] = useState('')
+
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [planName, setPlanName] = useState('')
+  const [planMonths, setPlanMonths] = useState(1)
+  const [planPrice, setPlanPrice] = useState('')
+  const [planError, setPlanError] = useState('')
 
   function loadBranches() {
     api.get<Branch[]>('/api/branches').then((res) => setBranches(res.data))
@@ -100,6 +106,30 @@ export default function OwnerDashboard() {
     api.get<PersonSummary[]>('/api/branches/people', { params: { role: 'MANAGER' } })
       .then((res) => setAssignPeople(res.data))
   }, [])
+
+  function loadPlans() {
+    api.get<Plan[]>('/api/plans').then((res) => setPlans(res.data))
+  }
+
+  useEffect(() => { loadPlans() }, [])
+
+  async function createPlan(e: FormEvent) {
+    e.preventDefault()
+    setPlanError('')
+    if (!planPrice || Number.isNaN(Number(planPrice))) {
+      setPlanError('Enter a valid price.')
+      return
+    }
+    try {
+      await api.post('/api/plans/manage', {
+        name: planName, durationMonths: planMonths, price: Number(planPrice),
+      })
+      setPlanName(''); setPlanPrice('')
+      loadPlans()
+    } catch (err: any) {
+      setPlanError(err.response?.data?.error || 'Failed to create plan')
+    }
+  }
 
   function selectAssignPerson(personId: string) {
     setAssignPersonId(personId)
@@ -188,6 +218,34 @@ export default function OwnerDashboard() {
             {trainerMessage && <p className="text-sm text-gray-600">{trainerMessage}</p>}
           </form>
         </div>
+      </div>
+
+      <div className="mt-8 rounded-lg border border-gray-200 p-6">
+        <h2 className="font-medium">Membership plans</h2>
+        <p className="mt-1 text-xs text-gray-500">Chain-wide - the same plans apply at every branch.</p>
+        <form onSubmit={createPlan} className="mt-4 flex flex-wrap items-end gap-2">
+          <input placeholder="Plan name (e.g. 3 Month)" required value={planName} onChange={(e) => setPlanName(e.target.value)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          <input type="number" min={1} placeholder="Duration (months)" required value={planMonths}
+            onChange={(e) => setPlanMonths(Number(e.target.value))}
+            className="w-36 rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          <input type="number" min={0} placeholder="Price" required value={planPrice}
+            onChange={(e) => setPlanPrice(e.target.value)}
+            className="w-32 rounded-md border border-gray-300 px-3 py-2 text-sm" />
+          <button className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
+            Add plan
+          </button>
+        </form>
+        {planError && <p className="mt-2 text-sm text-red-600">{planError}</p>}
+        <ul className="mt-4 divide-y divide-gray-100 text-sm">
+          {plans.map((p) => (
+            <li key={p.id} className="flex justify-between py-2">
+              <span>{p.name} <span className="text-xs text-gray-400">({p.durationMonths} month{p.durationMonths > 1 ? 's' : ''})</span></span>
+              <span className="text-gray-500">₹{p.price}</span>
+            </li>
+          ))}
+          {plans.length === 0 && <li className="py-2 text-gray-400">No plans yet - add one above.</li>}
+        </ul>
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">

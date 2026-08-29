@@ -104,3 +104,19 @@ export interface PersonSummary {
   email: string
   role: Role
 }
+
+export interface MemberSummary {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  photo: string | null
+  address: string | null
+  checkinPin: string | null
+  enrollmentDate: string | null
+}
+
+export interface HourlyCount {
+  hour: number
+  count: number
+}
