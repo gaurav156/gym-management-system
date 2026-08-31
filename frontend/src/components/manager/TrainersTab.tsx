@@ -238,15 +238,17 @@ export default function TrainersTab({ selectedBranch, allBranches, lastCheckins,
               <button onClick={() => setDetailTrainerId(null)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
 
-            <div className="mt-4 flex gap-1 border-b border-gray-200 text-sm">
-              {(['INFO', 'ATTENDANCE', 'BRANCHES'] as const).map((tab) => (
-                <button key={tab} onClick={() => setTrainerModalTab(tab)}
-                  className={`-mb-px border-b-2 px-3 py-2 ${
-                    trainerModalTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}>
-                  {tab === 'INFO' ? 'Info' : tab === 'ATTENDANCE' ? 'Attendance' : 'Branches'}
-                </button>
-              ))}
+            <div className="mt-4 overflow-x-auto border-b border-gray-200">
+              <div className="flex min-w-max gap-1">
+                {(['INFO', 'ATTENDANCE', 'BRANCHES'] as const).map((tab) => (
+                  <button key={tab} onClick={() => setTrainerModalTab(tab)}
+                    className={`-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm ${
+                      trainerModalTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}>
+                    {tab === 'INFO' ? 'Info' : tab === 'ATTENDANCE' ? 'Attendance' : 'Branches'}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {trainerModalMessage && <p className="mt-3 text-sm text-red-600">{trainerModalMessage}</p>}

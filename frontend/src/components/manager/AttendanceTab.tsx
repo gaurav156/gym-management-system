@@ -97,15 +97,17 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">Today's attendance</h2>
-        <div className="mt-3 flex gap-1 border-b border-gray-200 text-sm">
-          {(['MEMBERS', 'TRAINERS'] as const).map((tab) => (
-            <button key={tab} onClick={() => setAttendanceTab(tab)}
-              className={`-mb-px border-b-2 px-3 py-2 ${
-                attendanceTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}>
-              {tab === 'MEMBERS' ? 'Members' : 'Trainers'}
-            </button>
-          ))}
+        <div className="mt-3 overflow-x-auto border-b border-gray-200">
+          <div className="flex min-w-max gap-1">
+            {(['MEMBERS', 'TRAINERS'] as const).map((tab) => (
+              <button key={tab} onClick={() => setAttendanceTab(tab)}
+                className={`-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm ${
+                  attendanceTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}>
+                {tab === 'MEMBERS' ? 'Members' : 'Trainers'}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">

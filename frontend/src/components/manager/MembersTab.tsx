@@ -346,15 +346,17 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins }
                 className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
 
-            <div className="mt-4 flex gap-1 border-b border-gray-200 text-sm">
-              {(['INFO', 'MEMBERSHIPS', 'PAYMENTS', 'ATTENDANCE', 'BRANCHES'] as const).map((tab) => (
-                <button key={tab} onClick={() => setModalTab(tab)}
-                  className={`-mb-px border-b-2 px-3 py-2 ${
-                    modalTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}>
-                  {tab === 'INFO' ? 'Info' : tab === 'MEMBERSHIPS' ? 'Membership plans' : tab === 'PAYMENTS' ? 'Payment history' : tab === 'ATTENDANCE' ? 'Attendance' : 'Branches'}
-                </button>
-              ))}
+            <div className="mt-4 overflow-x-auto border-b border-gray-200">
+              <div className="flex min-w-max gap-1">
+                {(['INFO', 'MEMBERSHIPS', 'PAYMENTS', 'ATTENDANCE', 'BRANCHES'] as const).map((tab) => (
+                  <button key={tab} onClick={() => setModalTab(tab)}
+                    className={`-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm ${
+                      modalTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}>
+                    {tab === 'INFO' ? 'Info' : tab === 'MEMBERSHIPS' ? 'Membership plans' : tab === 'PAYMENTS' ? 'Payment history' : tab === 'ATTENDANCE' ? 'Attendance' : 'Branches'}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {memberModalMessage && <p className="mt-3 text-sm text-red-600">{memberModalMessage}</p>}
