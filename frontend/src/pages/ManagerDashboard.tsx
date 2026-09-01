@@ -80,7 +80,7 @@ export default function ManagerDashboard() {
         </select>
       )}
 
-      <div className="mt-6 overflow-x-auto scrollbar-hide border-b border-gray-200">
+      <div className="mt-6 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
         <div className="flex min-w-max gap-1">
           {TABS.map((tab) => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}

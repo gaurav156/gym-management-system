@@ -97,7 +97,7 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">Today's attendance</h2>
-        <div className="mt-3 overflow-x-auto scrollbar-hide border-b border-gray-200">
+        <div className="mt-3 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
           <div className="flex min-w-max gap-1">
             {(['MEMBERS', 'TRAINERS'] as const).map((tab) => (
               <button key={tab} onClick={() => setAttendanceTab(tab)}
