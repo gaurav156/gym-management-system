@@ -238,7 +238,7 @@ export default function TrainersTab({ selectedBranch, allBranches, lastCheckins,
               <button onClick={() => setDetailTrainerId(null)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
 
-            <div className="mt-4 overflow-x-auto border-b border-gray-200">
+            <div className="mt-4 overflow-x-auto scrollbar-hide border-b border-gray-200">
               <div className="flex min-w-max gap-1">
                 {(['INFO', 'ATTENDANCE', 'BRANCHES'] as const).map((tab) => (
                   <button key={tab} onClick={() => setTrainerModalTab(tab)}

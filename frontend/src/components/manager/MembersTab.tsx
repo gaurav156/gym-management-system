@@ -346,7 +346,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins }
                 className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
 
-            <div className="mt-4 overflow-x-auto border-b border-gray-200">
+            <div className="mt-4 overflow-x-auto scrollbar-hide border-b border-gray-200">
               <div className="flex min-w-max gap-1">
                 {(['INFO', 'MEMBERSHIPS', 'PAYMENTS', 'ATTENDANCE', 'BRANCHES'] as const).map((tab) => (
                   <button key={tab} onClick={() => setModalTab(tab)}

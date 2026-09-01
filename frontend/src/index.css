@@ -1,3 +1,14 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Hides the scrollbar on horizontally-scrollable tab bars while keeping scroll/swipe
+   working - a visible scrollbar on a short tab strip looks like a layout glitch rather
+   than an intentional control, especially on mobile. */
+.scrollbar-hide {
+  -ms-overflow-style: none;   /* legacy Edge/IE */
+  scrollbar-width: none;      /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;              /* Chrome, Safari, newer Edge */
+}
