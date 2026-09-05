@@ -3,14 +3,22 @@ import type { InvoiceResponse } from '../types'
 
 const GYM_NAME = import.meta.env.VITE_GYM_NAME || 'Gym Invoice'
 const GYM_LOGO_URL = import.meta.env.VITE_GYM_LOGO_URL || ''
-const DIRECTOR_NAME = import.meta.env.VITE_DIRECTOR_NAME || ''
+const DIRECTOR_NAME = (import.meta.env.VITE_DIRECTOR_NAME || '').trim()
 
-const TERMS_LINES = [
-  '1. Fees must be paid before 10th of every months.',
-  '2. The membership will be cancelled if the dues are not paid by the member for two months.',
-  "3. Regarding all members the Director's decision will be final.",
-  '4. Fees once paid will not be refund, not transferable & not extendable.',
+const DEFAULT_TERMS = [
+  'Fees must be paid before 10th of every months.',
+  'The membership will be cancelled if the dues are not paid by the member for two months.',
+  "Regarding all members the Director's decision will be final.",
+  'Fees once paid will not be refund, not transferable & not extendable.',
 ]
+
+// Env value is "|"-delimited (a .env value can't hold real newlines). Each segment
+// becomes one numbered term. Falls back to DEFAULT_TERMS if unset or blank.
+function getTermsLines(): string[] {
+  const raw = import.meta.env.VITE_INVOICE_TERMS
+  if (!raw || !raw.trim()) return DEFAULT_TERMS
+  return raw.split('|').map((t) => t.trim()).filter(Boolean)
+}
 
 let logoDataUrlCache: string | null | undefined // undefined = not yet attempted
 
@@ -77,6 +85,12 @@ async function buildInvoiceDoc(inv: InvoiceResponse): Promise<jsPDF> {
     try { doc.addImage(logo, dataUrlFormat(logo), margin, y - 26, 36, 36) } catch { /* skip if malformed */ }
   }
 
+  // Reserve a right-hand column for invoice#/date so the left column (branch name,
+  // wrapped address, phone) never collides with it, no matter how many lines the
+  // address wraps to.
+  const rightColWidth = 170
+  const leftColMaxWidth = pageWidth - margin - headerTextX - rightColWidth - 10
+
   doc.setFontSize(18)
   doc.setFont('helvetica', 'bold')
   doc.text(GYM_NAME, headerTextX, y)
@@ -84,18 +98,30 @@ async function buildInvoiceDoc(inv: InvoiceResponse): Promise<jsPDF> {
   doc.setFont('helvetica', 'normal')
   doc.text('INVOICE', pageWidth - margin, y, { align: 'right' })
 
-  y += 16
-  doc.text(inv.branchName, headerTextX, y)
-  doc.text(`Invoice #: ${inv.invoiceNumber}`, pageWidth - margin, y, { align: 'right' })
+  let leftY = y + 16
+  let rightY = y + 16
 
-  y += 14
-  if (inv.branchAddress) doc.text(inv.branchAddress, headerTextX, y)
-  doc.text(`Date: ${new Date(inv.invoiceDate).toLocaleDateString()}`, pageWidth - margin, y, { align: 'right' })
+  doc.text(inv.branchName, headerTextX, leftY)
+  doc.text(`Invoice #: ${inv.invoiceNumber}`, pageWidth - margin, rightY, { align: 'right' })
+  leftY += 14
+  rightY += 14
 
-  y += 14
-  if (inv.branchPhone) doc.text(`Ph: ${inv.branchPhone}`, headerTextX, y)
+  doc.text(`Date: ${new Date(inv.invoiceDate).toLocaleDateString()}`, pageWidth - margin, rightY, { align: 'right' })
+  rightY += 14
 
-  y += 24
+  if (inv.branchAddress) {
+    const wrapped = doc.splitTextToSize(inv.branchAddress, leftColMaxWidth)
+    doc.text(wrapped, headerTextX, leftY)
+    leftY += 14 * wrapped.length
+  }
+
+  if (inv.branchPhone) {
+    doc.text(`Ph: ${inv.branchPhone}`, headerTextX, leftY)
+    leftY += 14
+  }
+
+  y = Math.max(leftY, rightY) + 10
+
   doc.setDrawColor(200)
   doc.line(margin, y, pageWidth - margin, y)
   y += 24
@@ -109,7 +135,11 @@ async function buildInvoiceDoc(inv: InvoiceResponse): Promise<jsPDF> {
   if (inv.memberPhone) { doc.text(inv.memberPhone, margin, y); y += 14 }
   doc.text(inv.memberEmail, margin, y)
   y += 14
-  if (inv.memberAddress) { doc.text(inv.memberAddress, margin, y); y += 14 }
+  if (inv.memberAddress) {
+    const wrapped = doc.splitTextToSize(inv.memberAddress, pageWidth - margin * 2)
+    doc.text(wrapped, margin, y)
+    y += 14 * wrapped.length
+  }
 
   y += 16
   doc.line(margin, y, pageWidth - margin, y)
@@ -144,13 +174,11 @@ async function buildInvoiceDoc(inv: InvoiceResponse): Promise<jsPDF> {
   doc.text(`Rs. ${inv.amount.toFixed(2)}`, col4, y, { align: 'right' })
   y += 36
 
-  // Note
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(9)
   doc.text('Note: Fees once paid will not be refund, not transferable & not extendable.', margin, y)
   y += 30
 
-  // Signature block, right-aligned above "Recorded by"
   const sigX = pageWidth - margin - 120
   if (inv.recordedBySignature) {
     try { doc.addImage(inv.recordedBySignature, dataUrlFormat(inv.recordedBySignature), sigX, y - 34, 120, 40) } catch { /* skip */ }
@@ -166,9 +194,18 @@ async function buildInvoiceDoc(inv: InvoiceResponse): Promise<jsPDF> {
   doc.text(inv.recordedByName, sigX, y)
   y += 30
 
-  // Page-overflow guard before the terms block
+  const termsLines = getTermsLines()
+  const numberedTerms = termsLines.map((t, i) => `${i + 1}. ${t}`)
+
+  // Rough height estimate for the overflow check, accounting for word-wrap
+  const estimatedTermsHeight = numberedTerms.reduce((sum, line) => {
+    const wrapped = doc.splitTextToSize(line, pageWidth - margin * 2)
+    return sum + 13 * wrapped.length
+  }, 0)
+  const directorBlockHeight = DIRECTOR_NAME ? 30 : 16
+
   const pageHeight = doc.internal.pageSize.getHeight()
-  if (y + 30 + TERMS_LINES.length * 13 + 40 > pageHeight - margin) {
+  if (y + 40 + estimatedTermsHeight + directorBlockHeight > pageHeight - margin) {
     doc.addPage()
     y = 50
   }
@@ -184,16 +221,18 @@ async function buildInvoiceDoc(inv: InvoiceResponse): Promise<jsPDF> {
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  for (const line of TERMS_LINES) {
+  for (const line of numberedTerms) {
     const wrapped = doc.splitTextToSize(line, pageWidth - margin * 2)
     doc.text(wrapped, margin, y)
     y += 13 * wrapped.length
   }
 
-  y += 16
-  doc.setFont('helvetica', 'bold')
-  doc.text('Director', margin, y)
+  // Director line only appears if configured - omitted entirely otherwise, rather than
+  // showing an empty "Director" heading with no name under it.
   if (DIRECTOR_NAME) {
+    y += 16
+    doc.setFont('helvetica', 'bold')
+    doc.text('Director', margin, y)
     y += 14
     doc.text(DIRECTOR_NAME, margin, y)
   }
