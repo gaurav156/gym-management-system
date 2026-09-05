@@ -2,7 +2,8 @@ import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { getEffectiveStatus, statusColorClass, statusLabel, type EffectiveStatus } from '../../utils/membership'
 import { handleEditPhotoChange } from '../../utils/photo'
-import type { Branch, MembershipAdmin, Payment, AttendanceLogEntry, MemberSummary } from '../../types'
+import type { Branch, MembershipAdmin, Payment, AttendanceLogEntry, MemberSummary, InvoiceResponse } from '../../types'
+import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -100,6 +101,18 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins }
     loadMemberships()
     if (detailMemberId) {
       api.get<MembershipAdmin[]>(`/api/memberships/member/${detailMemberId}`).then((res) => setDetailMembershipsFetched(res.data))
+    }
+  }
+
+  async function handleInvoiceAction(paymentId: string, action: 'view' | 'print' | 'download') {
+    setMemberModalMessage('')
+    try {
+      const { data } = await api.get<InvoiceResponse>(`/api/payments/${paymentId}/invoice`)
+      if (action === 'view') await viewInvoice(data)
+      else if (action === 'print') await printInvoice(data)
+      else await downloadInvoice(data)
+    } catch (err: any) {
+      setMemberModalMessage(err.response?.data?.error || 'Failed to load invoice')
     }
   }
 
@@ -533,7 +546,8 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins }
                       <th className="pb-2 pr-4">Plan</th>
                       <th className="pb-2 pr-4">Amount</th>
                       <th className="pb-2 pr-4">Mode</th>
-                      <th className="pb-2">Recorded by</th>
+                      <th className="pb-2 pr-4">Recorded by</th>
+                      <th className="pb-2">Invoice</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -543,7 +557,12 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins }
                         <td className="py-2 pr-4">{p.planName ?? '—'}</td>
                         <td className="py-2 pr-4">₹{p.amount}</td>
                         <td className="py-2 pr-4">{p.mode}</td>
-                        <td className="py-2">{p.recordedByName}</td>
+                        <td className="py-2 pr-4">{p.recordedByName}</td>
+                        <td className="py-2 space-x-2 whitespace-nowrap">
+                          <button onClick={() => handleInvoiceAction(p.id, 'view')} className="text-xs text-brand hover:underline">View</button>
+                          <button onClick={() => handleInvoiceAction(p.id, 'print')} className="text-xs text-brand hover:underline">Print</button>
+                          <button onClick={() => handleInvoiceAction(p.id, 'download')} className="text-xs text-brand hover:underline">Download</button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
