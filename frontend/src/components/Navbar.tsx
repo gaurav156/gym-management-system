@@ -90,7 +90,7 @@ export default function Navbar() {
           {user ? (
             <>
               <Link to={dashboardPath} className="text-gray-700 hover:text-brand">Dashboard</Link>
-              {(user.role === 'MEMBER' || user.role === 'TRAINER') && (
+              {(user.role === 'MEMBER' || user.role === 'TRAINER' || user.role === 'OWNER' || user.role === 'MANAGER') && (
                 <Link to="/profile" className="text-gray-700 hover:text-brand">Profile</Link>
               )}
               <span className="text-gray-400">{user.name}</span>
@@ -141,7 +141,7 @@ export default function Navbar() {
                     className="flex items-center gap-3 rounded-md px-2 py-2.5 text-gray-700 hover:bg-gray-100">
                     <DashboardIcon /> Dashboard
                   </Link>
-                  {(user.role === 'MEMBER' || user.role === 'TRAINER') && (
+                  {(user.role === 'MEMBER' || user.role === 'TRAINER' || user.role === 'OWNER' || user.role === 'MANAGER') && (
                     <Link to="/profile" onClick={closeMenu}
                       className="flex items-center gap-3 rounded-md px-2 py-2.5 text-gray-700 hover:bg-gray-100">
                       <UserIcon /> Profile

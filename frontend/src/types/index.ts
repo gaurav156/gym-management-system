@@ -70,6 +70,7 @@ export interface InvoiceResponse {
   amount: number
   mode: string
   recordedByName: string
+  recordedBySignature: string | null
 }
 
 export interface Profile {
@@ -79,6 +80,7 @@ export interface Profile {
   phone: string | null
   address: string | null
   photo: string | null
+  signature: string | null
   role: Role
   enrollmentDate: string | null
   joiningDate: string | null

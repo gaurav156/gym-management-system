@@ -8,7 +8,7 @@ import OwnerDashboard from './pages/OwnerDashboard'
 import ManagerDashboard from './pages/ManagerDashboard'
 import MemberDashboard from './pages/MemberDashboard'
 import TrainerDashboard from './pages/TrainerDashboard'
-import ProfilePage from './pages/ProfilePage'
+import ProfileRouter from './pages/ProfileRouter'
 
 export default function App() {
   return (
@@ -35,8 +35,8 @@ export default function App() {
           <Route path="/trainer" element={<TrainerDashboard />} />
         </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={['MEMBER', 'TRAINER']} />}>
-          <Route path="/profile" element={<ProfilePage />} />
+        <Route element={<ProtectedRoute allowedRoles={['MEMBER', 'TRAINER', 'OWNER', 'MANAGER']} />}>
+          <Route path="/profile" element={<ProfileRouter />} />
         </Route>
       </Routes>
     </div>

@@ -38,6 +38,7 @@ public class PaymentDtos {
             LocalDate membershipEndDate,
             BigDecimal amount,
             String mode,
-            String recordedByName
+            String recordedByName,
+            String recordedBySignature
     ) {}
 }

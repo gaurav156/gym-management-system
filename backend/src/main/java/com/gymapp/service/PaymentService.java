@@ -59,7 +59,8 @@ public class PaymentService {
                 m != null ? m.getEndDate() : null,
                 p.getAmount(),
                 p.getMode().name(),
-                p.getRecordedBy().getName()
+                p.getRecordedBy().getName(),
+                p.getRecordedBy().getSignature()
         );
     }
 

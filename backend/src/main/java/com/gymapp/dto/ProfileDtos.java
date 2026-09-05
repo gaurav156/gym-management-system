@@ -14,6 +14,7 @@ public class ProfileDtos {
             String phone,
             String address,
             String photo,
+            String signature,
             String role,
             LocalDate enrollmentDate,
             LocalDate joiningDate
@@ -25,6 +26,7 @@ public class ProfileDtos {
             String name,
             String phone,
             String address,
-            String photo
+            String photo,
+            String signature
     ) {}
 }

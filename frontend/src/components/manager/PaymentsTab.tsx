@@ -91,11 +91,11 @@ export default function PaymentsTab({ selectedBranch }: Props) {
     setInvoiceError('')
     try {
       const { data } = await api.get<InvoiceResponse>(`/api/payments/${paymentId}/invoice`)
-      if (action === 'view') viewInvoice(data)
-      else if (action === 'print') printInvoice(data)
-      else downloadInvoice(data)
+      if (action === 'view') await viewInvoice(data)
+      else if (action === 'print') await printInvoice(data)
+      else await downloadInvoice(data)
     } catch (err: any) {
-      setInvoiceError(err.response?.data?.error || 'Failed to load invoice')
+      setInvoiceError(err.response?.data?.error || 'Failed to load invoice') // or setLoadError in MemberDashboard
     }
   }
 

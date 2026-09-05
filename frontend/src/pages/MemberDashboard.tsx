@@ -42,11 +42,12 @@ export default function MemberDashboard() {
   }
 
   async function handleInvoiceAction(paymentId: string, action: 'view' | 'print' | 'download') {
+    setLoadError('')
     try {
       const { data } = await api.get<InvoiceResponse>(`/api/payments/${paymentId}/invoice`)
-      if (action === 'view') viewInvoice(data)
-      else if (action === 'print') printInvoice(data)
-      else downloadInvoice(data)
+      if (action === 'view') await viewInvoice(data)
+      else if (action === 'print') await printInvoice(data)
+      else await downloadInvoice(data)
     } catch (err: any) {
       setLoadError(err.response?.data?.error || 'Failed to load invoice')
     }

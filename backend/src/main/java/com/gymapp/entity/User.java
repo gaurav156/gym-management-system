@@ -58,6 +58,12 @@ public class User {
     @Column(columnDefinition = "TEXT")
     private String photo;
 
+    // Base64 data URI, same pattern as photo. OWNER/MANAGER only - captured once in their
+    // profile and stamped onto every invoice for payments they record, so it isn't
+    // re-uploaded per transaction.
+    @Column(columnDefinition = "TEXT")
+    private String signature;
+
     private String address;
 
     // Members only - set automatically on their first membership purchase
