@@ -13,4 +13,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByQrToken(String qrToken);
     boolean existsByEmail(String email);
     List<User> findByRole(Role role);
+
+    // Used by the SMS/WhatsApp OTP channels once they're wired to a real provider - phone
+    // isn't unique the way email is, so this is "first match" rather than "the" match.
+    Optional<User> findFirstByPhone(String phone);
 }

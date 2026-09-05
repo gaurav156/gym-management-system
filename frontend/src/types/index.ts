@@ -1,4 +1,5 @@
 export type Role = 'OWNER' | 'MANAGER' | 'MEMBER' | 'TRAINER'
+export type OtpChannel = 'EMAIL' | 'SMS' | 'WHATSAPP'
 
 export interface AuthUser {
   token: string
