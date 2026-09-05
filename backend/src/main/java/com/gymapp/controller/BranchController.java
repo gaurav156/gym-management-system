@@ -26,6 +26,12 @@ public class BranchController {
         return branchService.create(req);
     }
 
+    @PutMapping("/{branchId}")
+    @PreAuthorize("hasRole('OWNER')")
+    public BranchResponse update(@PathVariable UUID branchId, @Valid @RequestBody UpdateBranchRequest req) {
+        return branchService.update(branchId, req);
+    }
+
     // Owner sees every branch; a manager should call /mine instead
     @GetMapping
     @PreAuthorize("hasRole('OWNER')")

@@ -29,6 +29,13 @@ export default function OwnerDashboard() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [branchName, setBranchName] = useState('')
   const [branchAddress, setBranchAddress] = useState('')
+  const [branchPhone, setBranchPhone] = useState('')
+
+  const [editingBranchId, setEditingBranchId] = useState<string | null>(null)
+  const [editBranchName, setEditBranchName] = useState('')
+  const [editBranchAddress, setEditBranchAddress] = useState('')
+  const [editBranchPhone, setEditBranchPhone] = useState('')
+  const [branchEditMessage, setBranchEditMessage] = useState('')
 
   const [managerName, setManagerName] = useState('')
   const [managerEmail, setManagerEmail] = useState('')
@@ -61,9 +68,36 @@ export default function OwnerDashboard() {
 
   async function createBranch(e: FormEvent) {
     e.preventDefault()
-    await api.post('/api/branches', { name: branchName, address: branchAddress })
-    setBranchName(''); setBranchAddress('')
+    await api.post('/api/branches', { name: branchName, address: branchAddress, phone: branchPhone || null })
+    setBranchName(''); setBranchAddress(''); setBranchPhone('')
     loadBranches()
+  }
+
+  function startEditBranch(b: Branch) {
+    setEditingBranchId(b.id)
+    setEditBranchName(b.name)
+    setEditBranchAddress(b.address)
+    setEditBranchPhone(b.phone ?? '')
+    setBranchEditMessage('')
+  }
+
+  function cancelEditBranch() {
+    setEditingBranchId(null)
+  }
+
+  async function saveEditBranch(id: string) {
+    setBranchEditMessage('')
+    try {
+      await api.put(`/api/branches/${id}`, {
+        name: editBranchName,
+        address: editBranchAddress,
+        phone: editBranchPhone || null,
+      })
+      setEditingBranchId(null)
+      loadBranches()
+    } catch (err: any) {
+      setBranchEditMessage(err.response?.data?.error || 'Failed to update branch')
+    }
   }
 
   async function createManager(e: FormEvent) {
@@ -177,6 +211,8 @@ export default function OwnerDashboard() {
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
             <input placeholder="Address" value={branchAddress} onChange={(e) => setBranchAddress(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            <input placeholder="Phone" value={branchPhone} onChange={(e) => setBranchPhone(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
             <button className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
               Add branch
             </button>
@@ -218,34 +254,34 @@ export default function OwnerDashboard() {
             {trainerMessage && <p className="text-sm text-gray-600">{trainerMessage}</p>}
           </form>
         </div>
-      </div>
 
-      <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">Membership plans</h2>
-        <p className="mt-1 text-xs text-gray-500">Chain-wide - the same plans apply at every branch.</p>
-        <form onSubmit={createPlan} className="mt-4 flex flex-wrap items-end gap-2">
-          <input placeholder="Plan name (e.g. 3 Month)" required value={planName} onChange={(e) => setPlanName(e.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm" />
-          <input type="number" min={1} placeholder="Duration (months)" required value={planMonths}
-            onChange={(e) => setPlanMonths(Number(e.target.value))}
-            className="w-36 rounded-md border border-gray-300 px-3 py-2 text-sm" />
-          <input type="number" min={0} placeholder="Price" required value={planPrice}
-            onChange={(e) => setPlanPrice(e.target.value)}
-            className="w-32 rounded-md border border-gray-300 px-3 py-2 text-sm" />
-          <button className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
-            Add plan
-          </button>
-        </form>
-        {planError && <p className="mt-2 text-sm text-red-600">{planError}</p>}
-        <ul className="mt-4 divide-y divide-gray-100 text-sm">
-          {plans.map((p) => (
-            <li key={p.id} className="flex justify-between py-2">
-              <span>{p.name} <span className="text-xs text-gray-400">({p.durationMonths} month{p.durationMonths > 1 ? 's' : ''})</span></span>
-              <span className="text-gray-500">₹{p.price}</span>
-            </li>
-          ))}
-          {plans.length === 0 && <li className="py-2 text-gray-400">No plans yet - add one above.</li>}
-        </ul>
+        <div className="rounded-lg border border-gray-200 p-6">
+          <h2 className="font-medium">Membership plans</h2>
+          <p className="mt-1 text-xs text-gray-500">Chain-wide - the same plans apply at every branch.</p>
+          <form onSubmit={createPlan} className="mt-4 space-y-3">
+            <input placeholder="Plan name (e.g. 3 Month)" required value={planName} onChange={(e) => setPlanName(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            <input type="number" min={1} placeholder="Duration (months)" required value={planMonths}
+              onChange={(e) => setPlanMonths(Number(e.target.value))}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            <input type="number" min={0} placeholder="Price" required value={planPrice}
+              onChange={(e) => setPlanPrice(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            <button className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
+              Add plan
+            </button>
+          </form>
+          {planError && <p className="text-sm text-red-600">{planError}</p>}
+          <ul className="mt-4 divide-y divide-gray-100 text-sm">
+            {plans.map((p) => (
+              <li key={p.id} className="flex justify-between py-2">
+                <span>{p.name} <span className="text-xs text-gray-400">({p.durationMonths} month{p.durationMonths > 1 ? 's' : ''})</span></span>
+                <span className="text-gray-500">₹{p.price}</span>
+              </li>
+            ))}
+            {plans.length === 0 && <li className="py-2 text-gray-400">No plans yet - add one above.</li>}
+          </ul>
+        </div>
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
@@ -272,11 +308,38 @@ export default function OwnerDashboard() {
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">All branches</h2>
+        {branchEditMessage && <p className="mt-2 text-sm text-red-600">{branchEditMessage}</p>}
         <ul className="mt-3 divide-y divide-gray-100 text-sm">
           {branches.map((b) => (
-            <li key={b.id} className="flex justify-between py-2">
-              <span>{b.name}</span>
-              <span className="text-gray-500">{b.address}</span>
+            <li key={b.id} className="py-2">
+              {editingBranchId === b.id ? (
+                <div className="space-y-2">
+                  <input value={editBranchName} onChange={(e) => setEditBranchName(e.target.value)}
+                    placeholder="Branch name"
+                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+                  <input value={editBranchAddress} onChange={(e) => setEditBranchAddress(e.target.value)}
+                    placeholder="Address"
+                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+                  <input value={editBranchPhone} onChange={(e) => setEditBranchPhone(e.target.value)}
+                    placeholder="Phone"
+                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+                  <div className="space-x-2">
+                    <button onClick={() => saveEditBranch(b.id)} className="text-xs text-green-700 hover:underline">Save</button>
+                    <button onClick={cancelEditBranch} className="text-xs text-gray-500 hover:underline">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p>{b.name}</p>
+                    <p className="text-xs text-gray-500">{b.address}</p>
+                    <p className="text-xs text-gray-400">{b.phone || 'No phone on file'}</p>
+                  </div>
+                  <button onClick={() => startEditBranch(b)} className="text-xs text-gray-600 hover:underline">
+                    Edit
+                  </button>
+                </div>
+              )}
             </li>
           ))}
           {branches.length === 0 && <li className="py-2 text-gray-400">No branches yet - add one above.</li>}

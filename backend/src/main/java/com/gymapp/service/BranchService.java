@@ -32,7 +32,22 @@ public class BranchService {
     }
 
     public BranchResponse create(CreateBranchRequest req) {
-        Branch branch = Branch.builder().name(req.name()).address(req.address()).build();
+        Branch branch = Branch.builder().name(req.name()).address(req.address()).phone(req.phone()).build();
+        branch = branchRepository.save(branch);
+        return toResponse(branch);
+    }
+
+    // Owner-only (enforced at the controller). Blank strings clear the field to null,
+    // consistent with how ProfileService treats blank address/photo submissions.
+    @Transactional
+    public BranchResponse update(UUID branchId, UpdateBranchRequest req) {
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new IllegalArgumentException("Branch not found"));
+
+        if (req.name() != null && !req.name().isBlank()) branch.setName(req.name());
+        if (req.address() != null) branch.setAddress(req.address().isBlank() ? null : req.address());
+        if (req.phone() != null) branch.setPhone(req.phone().isBlank() ? null : req.phone());
+
         branch = branchRepository.save(branch);
         return toResponse(branch);
     }
@@ -107,6 +122,6 @@ public class BranchService {
     }
 
     private BranchResponse toResponse(Branch b) {
-        return new BranchResponse(b.getId(), b.getName(), b.getAddress());
+        return new BranchResponse(b.getId(), b.getName(), b.getAddress(), b.getPhone());
     }
 }

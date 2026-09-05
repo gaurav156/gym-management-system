@@ -11,13 +11,24 @@ public class BranchDtos {
 
     public record CreateBranchRequest(
             @NotBlank String name,
-            String address
+            String address,
+            String phone
     ) {}
 
     public record BranchResponse(
             UUID id,
             String name,
-            String address
+            String address,
+            String phone
+    ) {}
+
+    // Owner-only: edits an existing branch's details. All fields optional/nullable so a
+    // client can send just the field(s) changing - null means "leave as is", matching the
+    // pattern already used by UpdateProfileRequest.
+    public record UpdateBranchRequest(
+            String name,
+            String address,
+            String phone
     ) {}
 
     // Replaces the old single from/to transfer - sets a person's branch assignments to
