@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useState, useRef } from 'react'
 import { api } from '../../api/client'
 import type { Plan, Payment, MemberSummary } from '../../types'
 
@@ -21,6 +21,10 @@ export default function PaymentsTab({ selectedBranch }: Props) {
   const [purchaseStartDate, setPurchaseStartDate] = useState('')
   const [purchaseMessage, setPurchaseMessage] = useState('')
 
+  const [memberSearchQuery, setMemberSearchQuery] = useState('')
+  const [memberDropdownOpen, setMemberDropdownOpen] = useState(false)
+  const memberDropdownRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     api.get<Plan[]>('/api/plans').then((res) => setPlans(res.data))
   }, [])
@@ -36,6 +40,16 @@ export default function PaymentsTab({ selectedBranch }: Props) {
     loadPayments()
     setPaymentPage(1)
   }, [selectedBranch])
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (memberDropdownRef.current && !memberDropdownRef.current.contains(e.target as Node)) {
+        setMemberDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   async function recordPurchase(e: FormEvent) {
     e.preventDefault()
@@ -77,13 +91,69 @@ export default function PaymentsTab({ selectedBranch }: Props) {
           <h2 className="font-medium">Record a membership purchase</h2>
           <p className="mt-1 text-xs text-gray-500">Cash collected at the front desk - members can't self-purchase.</p>
           <form onSubmit={recordPurchase} className="mt-4 space-y-3">
-            <select required value={purchaseMemberId} onChange={(e) => setPurchaseMemberId(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
-              <option value="">Select member</option>
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>{m.name} ({m.email}) - PIN {m.checkinPin ?? '—'}</option>
-              ))}
-            </select>
+            <div className="relative w-full" ref={memberDropdownRef}>
+              <input
+                type="text"
+                required={!purchaseMemberId}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Search member by name or email..."
+                value={
+                  memberDropdownOpen
+                    ? memberSearchQuery
+                    : members.find((m) => m.id === purchaseMemberId)?.name ?? ''
+                }
+                onFocus={() => {
+                  setMemberDropdownOpen(true)
+                  setMemberSearchQuery('')
+                }}
+                onChange={(e) => setMemberSearchQuery(e.target.value)}
+              />
+
+              {memberDropdownOpen && (
+                <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-gray-300 rounded-md shadow-lg">
+                  {members
+                    .filter((m) => {
+                      const q = memberSearchQuery.trim().toLowerCase()
+                      if (!q) return true
+                      return (
+                        m.name.toLowerCase().includes(q) ||
+                        m.email?.toLowerCase().includes(q) ||
+                        String(m.checkinPin ?? '').toLowerCase().includes(q)
+                      )
+                    })
+                    .map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 ${
+                          m.id === purchaseMemberId ? 'bg-blue-100 font-medium' : ''
+                        }`}
+                        onClick={() => {
+                          setPurchaseMemberId(m.id)
+                          setMemberDropdownOpen(false)
+                          setMemberSearchQuery('')
+                        }}
+                      >
+                        <div>{m.name}</div>
+                        <div className="text-xs text-gray-500">
+                          {m.email} - PIN {m.checkinPin ?? '—'}
+                        </div>
+                      </button>
+                    ))}
+                  {members.filter((m) => {
+                    const q = memberSearchQuery.trim().toLowerCase()
+                    if (!q) return true
+                    return (
+                      m.name.toLowerCase().includes(q) ||
+                      m.email?.toLowerCase().includes(q) ||
+                      String(m.checkinPin ?? '').toLowerCase().includes(q)
+                    )
+                  }).length === 0 && (
+                    <div className="px-3 py-2 text-sm text-gray-500">No members found</div>
+                  )}
+                </div>
+              )}
+            </div>
             <select required value={purchasePlanId} onChange={(e) => setPurchasePlanId(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
               <option value="">Select plan</option>
