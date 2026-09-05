@@ -51,5 +51,7 @@ app:
     owner-name: ${OWNER_NAME:Gym Owner}
   mail:
     from: ${MAIL_FROM:no-reply@mygym.com}
+    gym-name: ${GYM_NAME:FitZone Gym}
+    logo-url: ${GYM_LOGO_URL:}
   otp:
     expiry-minutes: ${OTP_EXPIRY_MINUTES:10}
