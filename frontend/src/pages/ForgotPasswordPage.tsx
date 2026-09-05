@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import Spinner from '../components/Spinner'
 import type { OtpChannel } from '../types'
 
 export default function ForgotPasswordPage() {
@@ -9,17 +10,21 @@ export default function ForgotPasswordPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [sending, setSending] = useState(false)
   const navigate = useNavigate()
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    setError(''); setMessage('')
+    if (sending) return
+    setError(''); setMessage(''); setSending(true)
     try {
       const { data } = await api.post('/api/auth/password-reset/request-otp', { identifier, channel })
       setMessage(data.message)
       setSubmitted(true)
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to send code')
+    } finally {
+      setSending(false)
     }
   }
 
@@ -32,8 +37,8 @@ export default function ForgotPasswordPage() {
         <div>
           <label className="block text-sm font-medium text-gray-700">Send code via</label>
           <div className="mt-1 flex gap-2 text-sm">
-            <button type="button" onClick={() => setChannel('EMAIL')}
-              className={`rounded-md border px-3 py-1.5 ${channel === 'EMAIL' ? 'border-brand bg-brand/10 text-brand' : 'border-gray-300 text-gray-600'}`}>
+            <button type="button" onClick={() => setChannel('EMAIL')} disabled={sending}
+              className={`rounded-md border px-3 py-1.5 disabled:opacity-60 ${channel === 'EMAIL' ? 'border-brand bg-brand/10 text-brand' : 'border-gray-300 text-gray-600'}`}>
               Email
             </button>
             <button type="button" disabled title="Coming soon"
@@ -51,16 +56,18 @@ export default function ForgotPasswordPage() {
           <label className="block text-sm font-medium text-gray-700">
             {channel === 'EMAIL' ? 'Email address' : 'Phone number'}
           </label>
-          <input required value={identifier} onChange={(e) => setIdentifier(e.target.value)}
+          <input required disabled={sending} value={identifier} onChange={(e) => setIdentifier(e.target.value)}
             type={channel === 'EMAIL' ? 'email' : 'tel'}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none" />
+            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none disabled:bg-gray-50" />
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
         {message && <p className="text-sm text-green-700">{message}</p>}
 
-        <button type="submit" className="w-full rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
-          Send code
+        <button type="submit" disabled={sending}
+          className="flex w-full items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
+          {sending && <Spinner />}
+          {sending ? 'Sending code...' : 'Send code'}
         </button>
       </form>
 
