@@ -1,5 +1,6 @@
 package com.gymapp.controller;
 
+import com.gymapp.dto.PaymentDtos.InvoiceResponse;
 import com.gymapp.dto.PaymentDtos.PaymentResponse;
 import com.gymapp.service.PaymentService;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,6 +31,17 @@ public class PaymentController {
     @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
     public List<PaymentResponse> memberHistory(@PathVariable UUID memberId) {
         return paymentService.listForMember(memberId);
+    }
+
+    // Any of the three roles can call this - the service itself enforces that a MEMBER
+    // may only fetch their own invoice, so a stolen payment id can't leak someone else's.
+    @GetMapping("/{paymentId}/invoice")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','MEMBER')")
+    public InvoiceResponse invoice(@PathVariable UUID paymentId, Authentication authentication) {
+        UUID requesterId = UUID.fromString((String) authentication.getDetails());
+        boolean isStaff = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_OWNER") || a.getAuthority().equals("ROLE_MANAGER"));
+        return paymentService.getInvoice(paymentId, requesterId, isStaff);
     }
 
     // A member can only ever see their own payment history - memberId is checked against

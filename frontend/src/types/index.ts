@@ -43,6 +43,7 @@ export interface MembershipAdmin {
 
 export interface Payment {
   id: string
+  invoiceNumber: string
   memberName: string
   recordedByName: string
   planName: string | null
@@ -50,6 +51,25 @@ export interface Payment {
   type: string
   mode: string
   createdAt: string
+}
+
+export interface InvoiceResponse {
+  paymentId: string
+  invoiceNumber: string
+  invoiceDate: string
+  branchName: string
+  branchAddress: string | null
+  branchPhone: string | null
+  memberName: string
+  memberEmail: string
+  memberPhone: string | null
+  memberAddress: string | null
+  planName: string | null
+  membershipStartDate: string | null
+  membershipEndDate: string | null
+  amount: number
+  mode: string
+  recordedByName: string
 }
 
 export interface Profile {

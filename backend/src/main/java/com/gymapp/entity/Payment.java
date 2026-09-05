@@ -6,6 +6,8 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import org.hibernate.annotations.Generated;
+import org.hibernate.annotations.GenerationTime;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -57,6 +59,14 @@ public class Payment {
 
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    // DB-assigned via the invoice_seq sequence (see V6 migration). insertable/updatable
+    // false means we never write this from Java - Postgres fills it on INSERT via the
+    // column default, and Hibernate reads it back on any fresh SELECT (which is all we
+    // need, since the invoice number is only rendered later on-demand, not right after
+    // the purchase transaction).
+    @Column(name = "invoice_seq", insertable = false, updatable = false)
+    private Long invoiceSeq;
 
     @PrePersist
     protected void onCreate() {

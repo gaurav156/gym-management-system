@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState, useRef } from 'react'
 import { api } from '../../api/client'
-import type { Plan, Payment, MemberSummary } from '../../types'
+import type { Plan, Payment, MemberSummary, InvoiceResponse } from '../../types'
+import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
 
 const PAGE_SIZE = 10
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
@@ -24,6 +25,8 @@ export default function PaymentsTab({ selectedBranch }: Props) {
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [memberDropdownOpen, setMemberDropdownOpen] = useState(false)
   const memberDropdownRef = useRef<HTMLDivElement>(null)
+
+  const [invoiceError, setInvoiceError] = useState('')
 
   useEffect(() => {
     api.get<Plan[]>('/api/plans').then((res) => setPlans(res.data))
@@ -83,6 +86,18 @@ export default function PaymentsTab({ selectedBranch }: Props) {
 
   const paymentTotalPages = Math.max(1, Math.ceil(payments.length / PAGE_SIZE))
   const pagedPayments = payments.slice((paymentPage - 1) * PAGE_SIZE, paymentPage * PAGE_SIZE)
+
+  async function handleInvoiceAction(paymentId: string, action: 'view' | 'print' | 'download') {
+    setInvoiceError('')
+    try {
+      const { data } = await api.get<InvoiceResponse>(`/api/payments/${paymentId}/invoice`)
+      if (action === 'view') viewInvoice(data)
+      else if (action === 'print') printInvoice(data)
+      else downloadInvoice(data)
+    } catch (err: any) {
+      setInvoiceError(err.response?.data?.error || 'Failed to load invoice')
+    }
+  }
 
   return (
     <div>
@@ -202,7 +217,8 @@ export default function PaymentsTab({ selectedBranch }: Props) {
                 <th className="pb-2 pr-4">Plan</th>
                 <th className="pb-2 pr-4">Amount</th>
                 <th className="pb-2 pr-4">Mode</th>
-                <th className="pb-2">Recorded by</th>
+                <th className="pb-2 pr-4">Recorded by</th>
+                <th className="pb-2">Invoice</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -213,11 +229,17 @@ export default function PaymentsTab({ selectedBranch }: Props) {
                   <td className="py-2 pr-4">{p.planName ?? '—'}</td>
                   <td className="py-2 pr-4">₹{p.amount}</td>
                   <td className="py-2 pr-4">{p.mode}</td>
-                  <td className="py-2">{p.recordedByName}</td>
+                  <td className="py-2 pr-4">{p.recordedByName}</td>
+                  <td className="py-2 space-x-2 whitespace-nowrap">
+                    <button onClick={() => handleInvoiceAction(p.id, 'view')} className="text-xs text-brand hover:underline">View</button>
+                    <button onClick={() => handleInvoiceAction(p.id, 'print')} className="text-xs text-brand hover:underline">Print</button>
+                    <button onClick={() => handleInvoiceAction(p.id, 'download')} className="text-xs text-brand hover:underline">Download</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {invoiceError && <p className="mt-2 text-sm text-red-600">{invoiceError}</p>}
           {payments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
           {payments.length > 0 && (
             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">

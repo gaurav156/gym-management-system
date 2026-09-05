@@ -28,6 +28,8 @@ public class Branch {
 
     private String address;
 
+    private String phone;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
 

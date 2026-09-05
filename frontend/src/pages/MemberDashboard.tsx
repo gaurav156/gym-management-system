@@ -4,6 +4,8 @@ import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import { getEffectiveStatus } from '../utils/membership'
 import type { Membership, Plan, Payment, Branch, AttendanceLogEntry } from '../types'
+import { viewInvoice, printInvoice, downloadInvoice } from '../utils/invoice'
+import type { InvoiceResponse } from '../types'
 
 interface HourlyCount { hour: number; count: number }
 
@@ -37,6 +39,17 @@ export default function MemberDashboard() {
     api.get<AttendanceLogEntry[]>('/api/attendance/mine')
       .then((res) => setAttendance(res.data))
       .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your attendance log'))
+  }
+
+  async function handleInvoiceAction(paymentId: string, action: 'view' | 'print' | 'download') {
+    try {
+      const { data } = await api.get<InvoiceResponse>(`/api/payments/${paymentId}/invoice`)
+      if (action === 'view') viewInvoice(data)
+      else if (action === 'print') printInvoice(data)
+      else downloadInvoice(data)
+    } catch (err: any) {
+      setLoadError(err.response?.data?.error || 'Failed to load invoice')
+    }
   }
 
   useEffect(() => {
@@ -225,9 +238,16 @@ export default function MemberDashboard() {
         <h2 className="font-medium">Your payment history</h2>
         <ul className="mt-4 divide-y divide-gray-100 text-sm">
           {pagedPayments.map((p) => (
-            <li key={p.id} className="flex justify-between py-2">
-              <span>{p.planName ?? 'Payment'} - {new Date(p.createdAt).toLocaleDateString()}</span>
-              <span className="text-gray-500">₹{p.amount} ({p.mode})</span>
+            <li key={p.id} className="py-2">
+              <div className="flex justify-between">
+                <span>{p.planName ?? 'Payment'} - {new Date(p.createdAt).toLocaleDateString()}</span>
+                <span className="text-gray-500">₹{p.amount} ({p.mode})</span>
+              </div>
+              <div className="mt-1 space-x-2 text-xs">
+                <button onClick={() => handleInvoiceAction(p.id, 'view')} className="text-brand hover:underline">View</button>
+                <button onClick={() => handleInvoiceAction(p.id, 'print')} className="text-brand hover:underline">Print</button>
+                <button onClick={() => handleInvoiceAction(p.id, 'download')} className="text-brand hover:underline">Download</button>
+              </div>
             </li>
           ))}
           {payments.length === 0 && <li className="py-2 text-gray-400">No payments recorded yet.</li>}
