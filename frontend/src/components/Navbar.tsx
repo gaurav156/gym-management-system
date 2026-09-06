@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 
 const GYM_NAME = import.meta.env.VITE_GYM_NAME || 'FitZone Gym'
+const GYM_LOGO_URL = import.meta.env.VITE_GYM_LOGO_URL || '/logo.svg'
 
 function MenuIcon() {
   return (
@@ -81,7 +82,7 @@ export default function Navbar() {
     <nav className="border-b border-gray-200 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
         <Link to="/" className="flex min-w-0 items-center gap-2 text-xl font-semibold text-brand">
-          <img src="/logo.svg" alt="" className="h-7 w-7 flex-shrink-0" />
+          <img src={GYM_LOGO_URL} alt="" className="h-7 w-7 flex-shrink-0" />
           <span className="truncate">{GYM_NAME}</span>
         </Link>
 
@@ -125,7 +126,7 @@ export default function Navbar() {
           <div className="absolute right-0 top-0 flex h-full w-72 max-w-[85vw] flex-col bg-white p-4 shadow-lg">
             <div className="flex items-center justify-between">
               <div className="flex min-w-0 items-center gap-2">
-                <img src="/logo.svg" alt="" className="h-6 w-6 flex-shrink-0" />
+                <img src={GYM_LOGO_URL} alt="" className="h-6 w-6 flex-shrink-0" />
                 <span className="truncate font-semibold text-brand">{GYM_NAME}</span>
               </div>
               <button onClick={closeMenu} aria-label="Close menu" className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100">
