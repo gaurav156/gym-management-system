@@ -2,7 +2,7 @@ import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { getEffectiveStatus, statusColorClass, statusLabel, type EffectiveStatus } from '../../utils/membership'
 import { handleEditPhotoChange } from '../../utils/photo'
-import type { Branch, MembershipAdmin, Payment, AttendanceLogEntry, MemberSummary, InvoiceResponse } from '../../types'
+import type { Branch, MembershipAdmin, Payment, AttendanceLogEntry, MemberSummary, InvoiceResponse, AuthUser } from '../../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
 
 const PAGE_SIZE = 10
@@ -12,9 +12,10 @@ interface Props {
   selectedBranch: string
   allBranches: Branch[]
   lastCheckins: Record<string, string>
+  user: AuthUser | null
 }
 
-export default function MembersTab({ selectedBranch, allBranches, lastCheckins }: Props) {
+export default function MembersTab({ selectedBranch, allBranches, lastCheckins, user }: Props) {
   const [members, setMembers] = useState<MemberSummary[]>([])
   const [memberships, setMemberships] = useState<MembershipAdmin[]>([])
 
@@ -191,6 +192,21 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins }
       loadMembers()
     } catch (err: any) {
       setMemberModalMessage(err.response?.data?.error || 'Failed to update member info')
+    }
+  }
+
+  async function deleteMember(memberId: string, name: string) {
+    if (!confirm(
+      `Permanently delete ${name}'s account? This removes their membership history, ` +
+      `payment records, and attendance log, and cannot be undone.`
+    )) return
+    try {
+      await api.delete(`/api/owner/users/${memberId}`)
+      setDetailMemberId(null)
+      loadMembers()
+      loadMemberships()
+    } catch (err: any) {
+      setMemberModalMessage(err.response?.data?.error || 'Failed to delete account')
     }
   }
 
@@ -430,6 +446,12 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins }
                     }</p>
                     <button onClick={() => startEditMemberInfo(detailMember)}
                       className="text-xs text-gray-600 hover:underline">Edit info</button>
+                    {user?.role === 'OWNER' && (
+                      <button onClick={() => deleteMember(detailMember.id, detailMember.name)}
+                        className="ml-3 text-xs text-red-600 hover:underline">
+                        Delete account
+                      </button>
+                    )}  
                   </>
                 )}
               </div>

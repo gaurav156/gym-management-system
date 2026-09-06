@@ -136,6 +136,19 @@ export default function TrainersTab({ selectedBranch, allBranches, lastCheckins,
     }
   }
 
+    async function deleteTrainer(trainerId: string, name: string) {
+      if (!confirm(
+        `Permanently delete ${name}'s account? This removes their attendance log and cannot be undone.`
+      )) return
+      try {
+        await api.delete(`/api/owner/users/${trainerId}`)
+        setDetailTrainerId(null)
+        loadTrainers()
+      } catch (err: any) {
+        setTrainerModalMessage(err.response?.data?.error || 'Failed to delete account')
+      }
+    }
+
   const visibleTrainers = trainers.filter((t) => showAllTrainers || !t.leftDate)
   const trainerTotalPages = Math.max(1, Math.ceil(visibleTrainers.length / PAGE_SIZE))
   const pagedTrainers = visibleTrainers.slice((trainerPage - 1) * PAGE_SIZE, trainerPage * PAGE_SIZE)
@@ -308,6 +321,12 @@ export default function TrainersTab({ selectedBranch, allBranches, lastCheckins,
                     }</p>
                     <button onClick={() => startEditTrainerInfo(detailTrainer)}
                       className="text-xs text-gray-600 hover:underline">Edit info</button>
+                    {user?.role === 'OWNER' && (
+                      <button onClick={() => deleteTrainer(detailTrainer.id, detailTrainer.name)}
+                        className="ml-3 text-xs text-red-600 hover:underline">
+                        Delete account
+                      </button>
+                    )}
                   </>
                 )}
 

@@ -60,6 +60,8 @@ export default function OwnerDashboard() {
   const [planPrice, setPlanPrice] = useState('')
   const [planError, setPlanError] = useState('')
 
+  const [managerDeleteMessage, setManagerDeleteMessage] = useState('')
+
   function loadBranches() {
     api.get<Branch[]>('/api/branches').then((res) => setBranches(res.data))
   }
@@ -195,6 +197,21 @@ export default function OwnerDashboard() {
     }
   }
 
+  async function deleteManager(personId: string, name: string) {
+    if (!confirm(`Permanently delete ${name}'s manager account? This cannot be undone.`)) return
+    setManagerDeleteMessage('')
+    try {
+      await api.delete(`/api/owner/users/${personId}`)
+      setAssignPeople((prev) => prev.filter((p) => p.id !== personId))
+      if (assignPersonId === personId) {
+        setAssignPersonId('')
+        setAssignBranchIds([])
+      }
+    } catch (err: any) {
+      setManagerDeleteMessage(err.response?.data?.error || 'Failed to delete manager account')
+    }
+  }
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-2xl font-semibold">Owner dashboard</h1>
@@ -304,6 +321,29 @@ export default function OwnerDashboard() {
           </button>
           {assignMessage && <p className="text-sm text-gray-600">{assignMessage}</p>}
         </form>
+      </div>
+
+      <div className="mt-8 rounded-lg border border-gray-200 p-6">
+        <h2 className="font-medium">Manager accounts</h2>
+        <p className="mt-1 text-xs text-gray-500">
+          Permanently removes the account. If a manager has recorded payments for other
+          members, deletion is blocked to protect their invoice history.
+        </p>
+        {managerDeleteMessage && <p className="mt-2 text-sm text-red-600">{managerDeleteMessage}</p>}
+        <ul className="mt-3 divide-y divide-gray-100 text-sm">
+          {assignPeople.map((p) => (
+            <li key={p.id} className="flex items-center justify-between py-2">
+              <div>
+                <p>{p.name}</p>
+                <p className="text-xs text-gray-500">{p.email}</p>
+              </div>
+              <button onClick={() => deleteManager(p.id, p.name)} className="text-xs text-red-600 hover:underline">
+                Delete account
+              </button>
+            </li>
+          ))}
+          {assignPeople.length === 0 && <li className="py-2 text-gray-400">No manager accounts yet.</li>}
+        </ul>
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">

@@ -101,7 +101,7 @@ export default function ManagerDashboard() {
           <PaymentsTab selectedBranch={selectedBranch} />
         )}
         {activeTab === 'MEMBERS' && (
-          <MembersTab selectedBranch={selectedBranch} allBranches={allBranches} lastCheckins={lastCheckins} />
+          <MembersTab selectedBranch={selectedBranch} allBranches={allBranches} lastCheckins={lastCheckins} user={user} />
         )}
         {activeTab === 'TRAINERS' && (
           <TrainersTab selectedBranch={selectedBranch} allBranches={allBranches} lastCheckins={lastCheckins} user={user} />
