@@ -2,6 +2,7 @@ package com.gymapp.controller;
 
 import com.gymapp.dto.ProfileDtos.*;
 import com.gymapp.service.ProfileService;
+import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,6 +28,11 @@ public class ProfileController {
     @PutMapping("/me")
     public ProfileResponse updateMe(@RequestBody UpdateProfileRequest req, Authentication authentication) {
         return profileService.updateProfile(callerId(authentication), req);
+    }
+
+    @PutMapping("/me/password")
+    public ChangePasswordResponse changePassword(@Valid @RequestBody ChangePasswordRequest req, Authentication authentication) {
+        return profileService.changePassword(callerId(authentication), req);
     }
 
     private UUID callerId(Authentication authentication) {

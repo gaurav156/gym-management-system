@@ -1,5 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { api } from '../api/client'
+import ChangePasswordSection from '../components/ChangePasswordSection'
 import type { Profile } from '../types'
 
 const MAX_PHOTO_BYTES = 1_500_000 // ~1.5MB - base64 in a DB column, keep it modest
@@ -119,6 +120,8 @@ export default function ProfilePage() {
           Save changes
         </button>
       </form>
+
+      <ChangePasswordSection />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { handleEditPhotoChange } from '../utils/photo'
+import ChangePasswordSection from '../components/ChangePasswordSection'
 import type { Profile } from '../types'
 
 export default function StaffProfilePage() {
@@ -119,6 +120,8 @@ export default function StaffProfilePage() {
                     Save changes
                 </button>
             </form>
+
+            <ChangePasswordSection />
         </div>
     )
 }

@@ -1,5 +1,8 @@
 package com.gymapp.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -28,5 +31,19 @@ public class ProfileDtos {
             String address,
             String photo,
             String signature
+    ) {}
+
+    // Self-service password change - requires proving knowledge of the current password
+    // rather than trusting the caller's JWT alone, since a JWT can be valid but the
+    // person at the keyboard right now may not be the account owner (shared/unlocked
+    // device, session left open, etc.). This is separate from the OTP-based reset flow,
+    // which is for when the person can't log in at all.
+    public record ChangePasswordRequest(
+            @NotBlank String currentPassword,
+            @NotBlank @Size(min = 6) String newPassword
+    ) {}
+
+    public record ChangePasswordResponse(
+            String message
     ) {}
 }
