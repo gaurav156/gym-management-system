@@ -11,17 +11,23 @@ import java.util.UUID;
 
 public class AuthDtos {
 
+    // captchaToken is optional/nullable - only required when FailedAttemptTracker says
+    // this IP has too many recent failures (see AuthController.requireCaptchaIfNeeded).
+    // A normal, first-time registration never needs to supply it.
     public record RegisterMemberRequest(
             @NotBlank String name,
             @NotBlank @Email String email,
             String phone,
             @NotBlank @Size(min = 6) String password,
-            @NotNull UUID branchId
+            @NotNull UUID branchId,
+            String captchaToken
     ) {}
 
+    // Same optional-captchaToken pattern as RegisterMemberRequest.
     public record LoginRequest(
             @NotBlank @Email String email,
-            @NotBlank String password
+            @NotBlank String password,
+            String captchaToken
     ) {}
 
     public record AuthResponse(

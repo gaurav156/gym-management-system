@@ -55,3 +55,9 @@ app:
     logo-url: ${GYM_LOGO_URL:}
   otp:
     expiry-minutes: ${OTP_EXPIRY_MINUTES:10}
+  captcha:
+    enabled: ${CAPTCHA_ENABLED:true}
+    max-attempts: ${CAPTCHA_MAX_ATTEMPTS:3}
+    window-minutes: ${CAPTCHA_WINDOW_MINUTES:15}
+    turnstile:
+      secret-key: ${TURNSTILE_SECRET_KEY:1x0000000000000000000000000000000AA}

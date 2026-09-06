@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import Spinner from '../components/Spinner'
+import Turnstile from '../components/Turnstile'
 import type { OtpChannel } from '../types'
 
 export default function ForgotPasswordPage() {
@@ -11,6 +12,9 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [sending, setSending] = useState(false)
+  const [captchaRequired, setCaptchaRequired] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaKey, setCaptchaKey] = useState(0)
   const navigate = useNavigate()
 
   async function handleSubmit(e: FormEvent) {
@@ -18,11 +22,19 @@ export default function ForgotPasswordPage() {
     if (sending) return
     setError(''); setMessage(''); setSending(true)
     try {
-      const { data } = await api.post('/api/auth/password-reset/request-otp', { identifier, channel })
+      const { data } = await api.post('/api/auth/password-reset/request-otp', {
+        identifier, channel, captchaToken: captchaRequired ? captchaToken : undefined,
+      })
       setMessage(data.message)
       setSubmitted(true)
     } catch (err: any) {
+      const needsCaptcha = err.response?.data?.captchaRequired
       setError(err.response?.data?.error || 'Failed to send code')
+      if (needsCaptcha) setCaptchaRequired(true)
+      if (captchaRequired || needsCaptcha) {
+        setCaptchaToken('')
+        setCaptchaKey((k) => k + 1)
+      }
     } finally {
       setSending(false)
     }
@@ -61,10 +73,14 @@ export default function ForgotPasswordPage() {
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none disabled:bg-gray-50" />
         </div>
 
+        {captchaRequired && (
+          <Turnstile key={captchaKey} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />
+        )}
+
         {error && <p className="text-sm text-red-600">{error}</p>}
         {message && <p className="text-sm text-green-700">{message}</p>}
 
-        <button type="submit" disabled={sending}
+        <button type="submit" disabled={sending || (captchaRequired && !captchaToken)}
           className="flex w-full items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
           {sending && <Spinner />}
           {sending ? 'Sending code...' : 'Send code'}

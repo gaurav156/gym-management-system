@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
+import Turnstile from '../components/Turnstile'
 import type { AuthUser, Branch } from '../types'
 
 export default function RegisterPage() {
@@ -12,12 +13,13 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [branchId, setBranchId] = useState('')
   const [error, setError] = useState('')
+  const [captchaRequired, setCaptchaRequired] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaKey, setCaptchaKey] = useState(0)
   const setUser = useAuthStore((s) => s.setUser)
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Public branch list endpoint - swap for a dedicated /api/public/branches if you'd
-    // rather not expose the owner-only /api/branches list; kept simple for the MVP.
     api.get<Branch[]>('/api/public/branches').then((res) => setBranches(res.data)).catch(() => {})
   }, [])
 
@@ -27,11 +29,18 @@ export default function RegisterPage() {
     try {
       const { data } = await api.post<AuthUser>('/api/auth/register', {
         name, email, phone, password, branchId,
+        captchaToken: captchaRequired ? captchaToken : undefined,
       })
       setUser(data)
       navigate('/member')
     } catch (err: any) {
+      const needsCaptcha = err.response?.data?.captchaRequired
       setError(err.response?.data?.error || 'Registration failed')
+      if (needsCaptcha) setCaptchaRequired(true)
+      if (captchaRequired || needsCaptcha) {
+        setCaptchaToken('')
+        setCaptchaKey((k) => k + 1)
+      }
     }
   }
 
@@ -67,8 +76,14 @@ export default function RegisterPage() {
             {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </div>
+
+        {captchaRequired && (
+          <Turnstile key={captchaKey} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />
+        )}
+
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button type="submit" className="w-full rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+        <button type="submit" disabled={captchaRequired && !captchaToken}
+          className="w-full rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60">
           Create account
         </button>
       </form>

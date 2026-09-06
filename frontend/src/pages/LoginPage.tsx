@@ -2,12 +2,16 @@ import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
+import Turnstile from '../components/Turnstile'
 import type { AuthUser } from '../types'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [captchaRequired, setCaptchaRequired] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaKey, setCaptchaKey] = useState(0) // bump to force a fresh widget/token
   const setUser = useAuthStore((s) => s.setUser)
   const navigate = useNavigate()
 
@@ -15,7 +19,9 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     try {
-      const { data } = await api.post<AuthUser>('/api/auth/login', { email, password })
+      const { data } = await api.post<AuthUser>('/api/auth/login', {
+        email, password, captchaToken: captchaRequired ? captchaToken : undefined,
+      })
       setUser(data)
       const path = data.role === 'OWNER' ? '/owner'
         : data.role === 'MANAGER' ? '/manager'
@@ -23,7 +29,15 @@ export default function LoginPage() {
         : '/member'
       navigate(path)
     } catch (err: any) {
+      const needsCaptcha = err.response?.data?.captchaRequired
       setError(err.response?.data?.error || 'Login failed')
+      if (needsCaptcha) setCaptchaRequired(true)
+      // A Turnstile token is single-use regardless of outcome - force a fresh widget for
+      // the next attempt whenever one was in play for this submission.
+      if (captchaRequired || needsCaptcha) {
+        setCaptchaToken('')
+        setCaptchaKey((k) => k + 1)
+      }
     }
   }
 
@@ -44,15 +58,18 @@ export default function LoginPage() {
             type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none"
           />
-          {/* Placed after the password input (not beside the label above it) so Tab from
-              the email field lands on password first - a link between the two fields
-              would otherwise sit in the natural tab order ahead of password. */}
           <div className="mt-1 text-right">
             <Link to="/forgot-password" className="text-xs text-brand hover:underline">Forgot password?</Link>
           </div>
         </div>
+
+        {captchaRequired && (
+          <Turnstile key={captchaKey} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />
+        )}
+
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button type="submit" className="w-full rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+        <button type="submit" disabled={captchaRequired && !captchaToken}
+          className="w-full rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60">
           Log in
         </button>
       </form>
