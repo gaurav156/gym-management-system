@@ -245,10 +245,45 @@ export async function viewInvoice(inv: InvoiceResponse) {
   window.open(doc.output('bloburl') as unknown as string, '_blank')
 }
 
+function isMobileDevice(): boolean {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+}
+
 export async function printInvoice(inv: InvoiceResponse) {
   const doc = await buildInvoiceDoc(inv)
-  doc.autoPrint()
-  window.open(doc.output('bloburl') as unknown as string, '_blank')
+  const blob = doc.output('blob')
+  const blobUrl = URL.createObjectURL(blob)
+
+  // Mobile browsers don't support triggering a print dialog via iframe.contentWindow.print()
+  // or window.print() reliably - there's no JS-invokable native print pipeline there. Opening
+  // the PDF in a new tab lets the user print via their browser's own share/print menu instead.
+  if (isMobileDevice()) {
+    window.open(blobUrl, '_blank')
+    return
+  }
+
+  const iframe = document.createElement('iframe')
+  iframe.style.position = 'fixed'
+  iframe.style.right = '0'
+  iframe.style.bottom = '0'
+  iframe.style.width = '0'
+  iframe.style.height = '0'
+  iframe.style.border = '0'
+  iframe.src = blobUrl
+  document.body.appendChild(iframe)
+
+  iframe.onload = () => {
+    try {
+      iframe.contentWindow?.focus()
+      iframe.contentWindow?.print()
+    } catch {
+      window.open(blobUrl, '_blank')
+    }
+    setTimeout(() => {
+      document.body.removeChild(iframe)
+      URL.revokeObjectURL(blobUrl)
+    }, 60_000)
+  }
 }
 
 export async function downloadInvoice(inv: InvoiceResponse) {
