@@ -669,10 +669,12 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                       {detailMemberBranches.map((b) => <li key={b.id}>{b.name}</li>)}
                       {detailMemberBranches.length === 0 && <li className="text-gray-400">No branches assigned.</li>}
                     </ul>
-                    <button onClick={() => { setEditingMemberBranches(true); setMemberBranchEditIds(detailMemberBranches.map((b) => b.id)) }}
-                      className="mt-3 text-xs text-gray-600 hover:underline">
-                      Edit branches
-                    </button>
+                    {user?.role === 'OWNER' && (
+                      <button onClick={() => { setEditingMemberBranches(true); setMemberBranchEditIds(detailMemberBranches.map((b) => b.id)) }}
+                        className="mt-3 text-xs text-gray-600 hover:underline">
+                        Edit branches
+                      </button>
+                    )}
                   </>
                 )}
               </div>

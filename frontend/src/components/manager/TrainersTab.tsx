@@ -329,6 +329,7 @@ export default function TrainersTab({ selectedBranch, allBranches, lastCheckins,
                     )}
                   </>
                 )}
+                <hr/>
 
                 {editingTrainerDates ? (
                   <div className="space-y-3 rounded-md border border-gray-200 p-3">
@@ -433,10 +434,12 @@ export default function TrainersTab({ selectedBranch, allBranches, lastCheckins,
                       {detailTrainerBranches.map((b) => <li key={b.id}>{b.name}</li>)}
                       {detailTrainerBranches.length === 0 && <li className="text-gray-400">No branches assigned.</li>}
                     </ul>
-                    <button onClick={() => { setEditingTrainerBranches(true); setTrainerBranchEditIds(detailTrainerBranches.map((b) => b.id)) }}
-                      className="mt-3 text-xs text-gray-600 hover:underline">
-                      Edit branches
-                    </button>
+                    {user?.role === 'OWNER' && (
+                      <button onClick={() => { setEditingTrainerBranches(true); setTrainerBranchEditIds(detailTrainerBranches.map((b) => b.id)) }}
+                        className="mt-3 text-xs text-gray-600 hover:underline">
+                        Edit branches
+                      </button>
+                    )}
                   </>
                 )}
               </div>
