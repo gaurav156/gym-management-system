@@ -44,7 +44,17 @@ public class AttendanceService {
         User person;
 
         if (req.method() == CheckinMethod.QR) {
-            person = userRepository.findByQrToken(req.qrToken())
+            // The QR code rendered on the Member/Trainer dashboard encodes their raw
+            // userId (see QRCodeSVG value={user.userId}), not the separate qrToken
+            // column - so this looks the person up by ID, not by qrToken. qrToken stays
+            // on the User entity for now but is unused by this flow.
+            UUID scannedId;
+            try {
+                scannedId = UUID.fromString(req.qrToken());
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Invalid QR code");
+            }
+            person = userRepository.findById(scannedId)
                     .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));
         } else if (req.method() == CheckinMethod.PIN) {
             // In this simple version the kiosk supplies branchId + the 4-digit PIN;

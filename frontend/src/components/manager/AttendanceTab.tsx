@@ -1,8 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { api } from '../../api/client'
+import QrScanner from '../QrScanner'
 import type { HourlyCount, TodayAttendanceEntry } from '../../types'
 
 const PAGE_SIZE = 10
+const SCAN_COOLDOWN_MS = 3000
 
 interface Props {
   selectedBranch: string
@@ -16,6 +18,13 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendanceEntry[]>([])
   const [attendanceTab, setAttendanceTab] = useState<'MEMBERS' | 'TRAINERS'>('MEMBERS')
   const [todayAttendancePage, setTodayAttendancePage] = useState(1)
+
+  const [checkinMode, setCheckinMode] = useState<'PIN' | 'QR'>('PIN')
+  const [scanActive, setScanActive] = useState(false)
+  const [scanLocked, setScanLocked] = useState(false)
+  const [scanMessage, setScanMessage] = useState('')
+  const [scanOk, setScanOk] = useState(true)
+  const [cameraError, setCameraError] = useState('')
 
   function loadSummary() {
     if (!selectedBranch) return
@@ -36,6 +45,14 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
     setTodayAttendancePage(1)
   }, [attendanceTab, selectedBranch])
 
+  // Leaving the branch, or switching away from the QR tab, should always release the
+  // camera rather than leaving it running against a branch that's no longer selected.
+  useEffect(() => {
+    setScanActive(false)
+    setScanMessage('')
+    setCameraError('')
+  }, [selectedBranch, checkinMode])
+
   async function kioskCheckin(e: FormEvent) {
     e.preventDefault()
     setCheckinMessage('')
@@ -52,6 +69,30 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
     }
   }
 
+  // Called for every decoded QR frame while scanning is active. scanLocked guards
+  // against the same badge held in front of the camera firing dozens of requests a
+  // second (fps: 10) - one request goes out, then a short cooldown before the next scan
+  // is accepted, giving staff time to read the result too.
+  async function handleQrScan(decodedText: string) {
+    if (scanLocked) return
+    setScanLocked(true)
+    setScanMessage('Checking...')
+    try {
+      const { data } = await api.post('/api/attendance/checkin', {
+        qrToken: decodedText, branchId: selectedBranch, method: 'QR',
+      })
+      setScanOk(true)
+      setScanMessage(data.message)
+      loadTodayAttendance()
+      onCheckinSuccess()
+    } catch (err: any) {
+      setScanOk(false)
+      setScanMessage(err.response?.data?.error || 'Check-in failed')
+    } finally {
+      setTimeout(() => setScanLocked(false), SCAN_COOLDOWN_MS)
+    }
+  }
+
   const maxCount = Math.max(1, ...summary.map((s) => s.count))
   const filteredTodayAttendance = todayAttendance.filter((a) => (attendanceTab === 'MEMBERS' ? a.role === 'MEMBER' : a.role === 'TRAINER'))
   const todayAttendanceTotalPages = Math.max(1, Math.ceil(filteredTodayAttendance.length / PAGE_SIZE))
@@ -61,17 +102,66 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
     <div>
       <div className="grid gap-8 sm:grid-cols-2">
         <div className="rounded-lg border border-gray-200 p-6">
-          <h2 className="font-medium">Reception check-in (PIN)</h2>
-          <p className="mt-1 text-xs text-gray-500">Enter the member's 4-digit PIN to log their visit.</p>
-          <form onSubmit={kioskCheckin} className="mt-4 flex gap-2">
-            <input placeholder="1234" maxLength={4} required value={checkinPin}
-              onChange={(e) => setCheckinPin(e.target.value.replace(/\D/g, ''))}
-              className="w-24 rounded-md border border-gray-300 px-3 py-2 text-sm tracking-widest" />
-            <button className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
-              Check in
-            </button>
-          </form>
-          {checkinMessage && <p className="mt-3 text-sm text-gray-700">{checkinMessage}</p>}
+          <div className="flex items-center justify-between">
+            <h2 className="font-medium">Reception check-in</h2>
+            <div className="flex overflow-hidden rounded-md border border-gray-300 text-xs">
+              <button
+                onClick={() => setCheckinMode('PIN')}
+                className={`px-3 py-1.5 ${checkinMode === 'PIN' ? 'bg-brand text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >
+                PIN
+              </button>
+              <button
+                onClick={() => setCheckinMode('QR')}
+                className={`px-3 py-1.5 ${checkinMode === 'QR' ? 'bg-brand text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >
+                Scan QR
+              </button>
+            </div>
+          </div>
+
+          {checkinMode === 'PIN' ? (
+            <>
+              <p className="mt-1 text-xs text-gray-500">Enter the member's 4-digit PIN to log their visit.</p>
+              <form onSubmit={kioskCheckin} className="mt-4 flex gap-2">
+                <input placeholder="1234" maxLength={4} required value={checkinPin}
+                  onChange={(e) => setCheckinPin(e.target.value.replace(/\D/g, ''))}
+                  className="w-24 rounded-md border border-gray-300 px-3 py-2 text-sm tracking-widest" />
+                <button className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
+                  Check in
+                </button>
+              </form>
+              {checkinMessage && <p className="mt-3 text-sm text-gray-700">{checkinMessage}</p>}
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-xs text-gray-500">Scan the member's or trainer's QR code from their dashboard.</p>
+
+              {!selectedBranch ? (
+                <p className="mt-4 text-sm text-gray-400">Select a branch first.</p>
+              ) : !scanActive ? (
+                <button onClick={() => { setCameraError(''); setScanMessage(''); setScanActive(true) }}
+                  className="mt-4 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
+                  Start scanning
+                </button>
+              ) : (
+                <div className="mt-4">
+                  <QrScanner active={scanActive} onScan={handleQrScan} onCameraError={setCameraError} />
+                  <button onClick={() => setScanActive(false)}
+                    className="mt-3 w-full rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">
+                    Stop scanning
+                  </button>
+                </div>
+              )}
+
+              {cameraError && <p className="mt-3 text-sm text-red-600">{cameraError}</p>}
+              {scanMessage && (
+                <p className={`mt-3 text-sm font-medium ${scanOk ? 'text-green-700' : 'text-red-600'}`}>
+                  {scanOk ? '✅ ' : '❌ '}{scanMessage}
+                </p>
+              )}
+            </>
+          )}
         </div>
 
         <div className="rounded-lg border border-gray-200 p-6">

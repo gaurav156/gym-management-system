@@ -8,9 +8,10 @@ import java.util.UUID;
 
 public class AttendanceDtos {
 
-    // Either pin+branchId (PIN check-in from a reception kiosk) or qrToken (member scans
-    // their own QR) is supplied. This single endpoint shape is also what a future
-    // biometric device adapter will call - it just sends method=BIOMETRIC instead.
+    // Either pin+branchId (PIN check-in from a reception kiosk) or qrToken (the raw
+    // userId string decoded from a scanned QR code - see AttendanceService.checkin) is
+    // supplied. This single endpoint shape is also what a future biometric device
+    // adapter will call - it just sends method=BIOMETRIC instead.
     // branchId is now always required (not optional/defaulted) - it's what gets validated
     // against the person's branch assignments.
     public record CheckinRequest(
