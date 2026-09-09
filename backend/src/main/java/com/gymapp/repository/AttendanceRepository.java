@@ -26,4 +26,11 @@ public interface AttendanceRepository extends JpaRepository<Attendance, UUID> {
             + "AND a.checkInTime >= :startOfDay AND a.checkInTime < :endOfDay ORDER BY a.checkInTime DESC")
     List<Attendance> findTodayRecordsForPersonAndBranch(@Param("personId") UUID personId, @Param("branchId") UUID branchId,
                                                         @Param("startOfDay") LocalDateTime startOfDay, @Param("endOfDay") LocalDateTime endOfDay);
+
+    // Still-open records (never checked out) whose check-in happened before the given
+    // cutoff - powers the auto-checkout scheduled job in AttendanceService, so someone
+    // who scanned in and simply walked out without scanning again doesn't sit "checked
+    // in" forever.
+    @Query("SELECT a FROM Attendance a WHERE a.checkOutTime IS NULL AND a.checkInTime <= :cutoff")
+    List<Attendance> findOpenRecordsCheckedInBefore(@Param("cutoff") LocalDateTime cutoff);
 }

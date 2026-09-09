@@ -7,6 +7,9 @@ import com.gymapp.repository.BranchAssignmentRepository;
 import com.gymapp.repository.BranchRepository;
 import com.gymapp.repository.MembershipRepository;
 import com.gymapp.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +21,14 @@ import java.util.UUID;
 
 @Service
 public class AttendanceService {
+
+    private static final Logger log = LoggerFactory.getLogger(AttendanceService.class);
+
+    // A visit with no check-out scan is treated as ended after this many hours - both by
+    // the scheduled auto-checkout job below, and (defensively, so there's no display lag
+    // between visits) by the occupancy calculation in hourlySummary(). Kept as a single
+    // constant so the two stay in sync if this window is ever tuned.
+    private static final int AUTO_CHECKOUT_HOURS = 2;
 
     private final AttendanceRepository attendanceRepository;
     private final UserRepository userRepository;
@@ -135,6 +146,26 @@ public class AttendanceService {
                 attendance.getCheckOutTime(), action, message);
     }
 
+    // Runs every 15 minutes - closes out any attendance record that's still open
+    // (checkOutTime IS NULL) more than AUTO_CHECKOUT_HOURS after check-in. Handles the
+    // common case of someone scanning in, working out, and simply leaving without
+    // scanning again on the way out. checkOutTime is set to checkInTime + the window
+    // (not "now") so the recorded visit duration reflects the assumed length of a gym
+    // session, not however long it happened to take this job to run and notice.
+    @Scheduled(fixedRate = 15 * 60 * 1000)
+    @Transactional
+    public void autoCheckoutStaleRecords() {
+        LocalDateTime cutoff = LocalDateTime.now().minusHours(AUTO_CHECKOUT_HOURS);
+        List<Attendance> stale = attendanceRepository.findOpenRecordsCheckedInBefore(cutoff);
+        if (stale.isEmpty()) return;
+
+        for (Attendance a : stale) {
+            a.setCheckOutTime(a.getCheckInTime().plusHours(AUTO_CHECKOUT_HOURS));
+        }
+        attendanceRepository.saveAll(stale);
+        log.info("Auto checked-out {} stale attendance record(s) after {}h", stale.size(), AUTO_CHECKOUT_HOURS);
+    }
+
     // Powers the "busy hours" chart for MEMBERS only - staff check-ins shouldn't skew
     // what's meant to represent how busy the floor is for members. Unlike a simple
     // "how many people checked in during hour X" count, this reflects actual OCCUPANCY:
@@ -142,16 +173,18 @@ public class AttendanceService {
     // during the 9, 10, AND 11 o'clock buckets, not just the 9 o'clock one they scanned
     // in during - this is what makes the chart behave like Google Maps' popular-times
     // graph rather than a raw check-in histogram. A member still checked in (no
-    // check-out yet) is counted as present from their check-in hour through the current
-    // hour, since they're presumably still on the floor. Always returns all 24 hours
-    // (zero-filled) so the frontend never has to guess which hours are missing.
+    // check-out yet) is counted as present from their check-in hour up to now, capped at
+    // AUTO_CHECKOUT_HOURS after check-in - this cap is what stops someone who forgot to
+    // scan out from appearing "present" for the rest of the day; it also covers the
+    // (at most 15-minute) gap before the scheduled auto-checkout job actually runs and
+    // writes a real checkOutTime. Always returns all 24 hours (zero-filled) so the
+    // frontend never has to guess which hours are missing.
     @Transactional(readOnly = true)
     public List<HourlyCount> hourlySummary(UUID branchId) {
         LocalDate today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay();
         LocalDateTime endOfDay = startOfDay.plusDays(1);
         LocalDateTime now = LocalDateTime.now();
-        int currentHour = now.getHour();
 
         List<Attendance> records = attendanceRepository
                 .findByBranchIdAndCheckInTimeBetweenOrderByCheckInTimeDesc(branchId, startOfDay, endOfDay)
@@ -161,12 +194,20 @@ public class AttendanceService {
 
         int[] occupancy = new int[24];
         for (Attendance a : records) {
+            LocalDateTime effectiveEnd;
+            if (a.getCheckOutTime() != null) {
+                effectiveEnd = a.getCheckOutTime();
+            } else {
+                LocalDateTime autoCheckoutAt = a.getCheckInTime().plusHours(AUTO_CHECKOUT_HOURS);
+                effectiveEnd = autoCheckoutAt.isBefore(now) ? autoCheckoutAt : now;
+            }
+
             int startHour = a.getCheckInTime().getHour();
-            int endHour = a.getCheckOutTime() != null
-                    ? a.getCheckOutTime().getHour()
-                    : currentHour; // still checked in - counted as present up through now
-            if (endHour < startHour) endHour = startHour; // defensive, shouldn't happen same-day
-            if (endHour > 23) endHour = 23;
+            int endHour = effectiveEnd.toLocalDate().isAfter(a.getCheckInTime().toLocalDate())
+                    ? 23 // rolled past midnight - cap at the end of the check-in day
+                    : effectiveEnd.getHour();
+            if (endHour < startHour) endHour = startHour;
+
             for (int h = startHour; h <= endHour; h++) {
                 occupancy[h]++;
             }
@@ -181,7 +222,8 @@ public class AttendanceService {
 
     // Full check-in history for one person (member or trainer) - powers the modal's
     // Attendance tab. checkOutTime is populated when they scanned again the same day at
-    // the same branch; otherwise it's null (they haven't checked out yet).
+    // the same branch, or by the auto-checkout job if they never did; otherwise it's
+    // null (visit still in progress, within the auto-checkout window).
     @Transactional(readOnly = true)
     public List<AttendanceLogEntry> historyFor(UUID personId) {
         return attendanceRepository.findByMemberIdOrderByCheckInTimeDesc(personId).stream()
