@@ -4,7 +4,7 @@ import QrScanner from '../QrScanner'
 import type { HourlyCount, TodayAttendanceEntry } from '../../types'
 
 const PAGE_SIZE = 10
-const SCAN_COOLDOWN_MS = 3000
+const SCAN_RETRY_COOLDOWN_MS = 2000
 
 interface Props {
   selectedBranch: string
@@ -13,7 +13,6 @@ interface Props {
 
 export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Props) {
   const [checkinPin, setCheckinPin] = useState('')
-  const [checkinMessage, setCheckinMessage] = useState('')
   const [summary, setSummary] = useState<HourlyCount[]>([])
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendanceEntry[]>([])
   const [attendanceTab, setAttendanceTab] = useState<'MEMBERS' | 'TRAINERS'>('MEMBERS')
@@ -22,8 +21,12 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
   const [checkinMode, setCheckinMode] = useState<'PIN' | 'QR'>('PIN')
   const [scanActive, setScanActive] = useState(false)
   const [scanLocked, setScanLocked] = useState(false)
-  const [scanMessage, setScanMessage] = useState('')
-  const [scanOk, setScanOk] = useState(true)
+
+  // Shared by both PIN and QR check-in, so the same "✅ Welcome, ..." / "❌ No active
+  // membership - access denied" styling and copy shows regardless of which method was
+  // used - staff shouldn't have to learn two different result formats.
+  const [resultOk, setResultOk] = useState(true)
+  const [resultMessage, setResultMessage] = useState('')
   const [cameraError, setCameraError] = useState('')
 
   function loadSummary() {
@@ -46,51 +49,64 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
   }, [attendanceTab, selectedBranch])
 
   // Leaving the branch, or switching away from the QR tab, should always release the
-  // camera rather than leaving it running against a branch that's no longer selected.
+  // camera and clear any stale result rather than leaving it running against a branch
+  // that's no longer selected.
   useEffect(() => {
     setScanActive(false)
-    setScanMessage('')
+    setResultMessage('')
     setCameraError('')
   }, [selectedBranch, checkinMode])
 
   async function kioskCheckin(e: FormEvent) {
     e.preventDefault()
-    setCheckinMessage('')
+    setResultMessage('')
     try {
       const { data } = await api.post('/api/attendance/checkin', {
         pin: checkinPin, branchId: selectedBranch, method: 'PIN',
       })
-      setCheckinMessage(data.message)
+      setResultOk(true)
+      setResultMessage(data.message)
       setCheckinPin('')
       loadTodayAttendance()
       onCheckinSuccess()
     } catch (err: any) {
-      setCheckinMessage(err.response?.data?.error || 'Check-in failed')
+      setResultOk(false)
+      setResultMessage(err.response?.data?.error || 'Check-in failed')
     }
   }
 
-  // Called for every decoded QR frame while scanning is active. scanLocked guards
-  // against the same badge held in front of the camera firing dozens of requests a
-  // second (fps: 10) - one request goes out, then a short cooldown before the next scan
-  // is accepted, giving staff time to read the result too.
+  // Called for every decoded QR frame while scanning is active. On success, the camera
+  // is closed immediately (setScanActive(false)) - there's no reason to keep it open
+  // once that person is checked in/out, and it stops the same badge re-triggering if
+  // it's still sitting in frame. On failure, the camera stays open so staff can retry
+  // (e.g. re-position the code) without restarting the scanner, but scanLocked still
+  // gates a short cooldown so a failing scan can't spam requests every 100ms.
   async function handleQrScan(decodedText: string) {
     if (scanLocked) return
     setScanLocked(true)
-    setScanMessage('Checking...')
+    setResultMessage('Checking...')
     try {
       const { data } = await api.post('/api/attendance/checkin', {
         qrToken: decodedText, branchId: selectedBranch, method: 'QR',
       })
-      setScanOk(true)
-      setScanMessage(data.message)
+      setResultOk(true)
+      setResultMessage(data.message)
+      setScanActive(false)
       loadTodayAttendance()
       onCheckinSuccess()
     } catch (err: any) {
-      setScanOk(false)
-      setScanMessage(err.response?.data?.error || 'Check-in failed')
-    } finally {
-      setTimeout(() => setScanLocked(false), SCAN_COOLDOWN_MS)
+      setResultOk(false)
+      setResultMessage(err.response?.data?.error || 'Check-in failed')
+      setTimeout(() => setScanLocked(false), SCAN_RETRY_COOLDOWN_MS)
+      return
     }
+    setScanLocked(false)
+  }
+
+  function startScanning() {
+    setCameraError('')
+    setResultMessage('')
+    setScanActive(true)
   }
 
   const maxCount = Math.max(1, ...summary.map((s) => s.count))
@@ -131,7 +147,6 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
                   Check in
                 </button>
               </form>
-              {checkinMessage && <p className="mt-3 text-sm text-gray-700">{checkinMessage}</p>}
             </>
           ) : (
             <>
@@ -140,9 +155,9 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
               {!selectedBranch ? (
                 <p className="mt-4 text-sm text-gray-400">Select a branch first.</p>
               ) : !scanActive ? (
-                <button onClick={() => { setCameraError(''); setScanMessage(''); setScanActive(true) }}
+                <button onClick={startScanning}
                   className="mt-4 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
-                  Start scanning
+                  {resultMessage ? 'Scan next' : 'Start scanning'}
                 </button>
               ) : (
                 <div className="mt-4">
@@ -155,12 +170,14 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
               )}
 
               {cameraError && <p className="mt-3 text-sm text-red-600">{cameraError}</p>}
-              {scanMessage && (
-                <p className={`mt-3 text-sm font-medium ${scanOk ? 'text-green-700' : 'text-red-600'}`}>
-                  {scanOk ? '✅ ' : '❌ '}{scanMessage}
-                </p>
-              )}
             </>
+          )}
+
+          {/* Shared result banner - same styling/copy for both PIN and QR check-in. */}
+          {resultMessage && (
+            <p className={`mt-3 text-sm font-medium ${resultOk ? 'text-green-700' : 'text-red-600'}`}>
+              {resultOk ? '✅ ' : '❌ '}{resultMessage}
+            </p>
           )}
         </div>
 
