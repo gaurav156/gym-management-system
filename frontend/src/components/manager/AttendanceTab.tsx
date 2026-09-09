@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import QrScanner from '../QrScanner'
+import HourlyCrowdChart from '../HourlyCrowdChart'
 import type { HourlyCount, TodayAttendanceEntry } from '../../types'
 
 const PAGE_SIZE = 10
@@ -68,6 +69,7 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
       setResultMessage(data.message)
       setCheckinPin('')
       loadTodayAttendance()
+      loadSummary()
       onCheckinSuccess()
     } catch (err: any) {
       setResultOk(false)
@@ -93,6 +95,7 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
       setResultMessage(data.message)
       setScanActive(false)
       loadTodayAttendance()
+      loadSummary()
       onCheckinSuccess()
     } catch (err: any) {
       setResultOk(false)
@@ -109,7 +112,6 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
     setScanActive(true)
   }
 
-  const maxCount = Math.max(1, ...summary.map((s) => s.count))
   const filteredTodayAttendance = todayAttendance.filter((a) => (attendanceTab === 'MEMBERS' ? a.role === 'MEMBER' : a.role === 'TRAINER'))
   const todayAttendanceTotalPages = Math.max(1, Math.ceil(filteredTodayAttendance.length / PAGE_SIZE))
   const pagedTodayAttendance = filteredTodayAttendance.slice((todayAttendancePage - 1) * PAGE_SIZE, todayAttendancePage * PAGE_SIZE)
@@ -183,21 +185,8 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
 
         <div className="rounded-lg border border-gray-200 p-6">
           <h2 className="font-medium">Today's crowd by hour</h2>
-          <div className="mt-4 flex h-40 items-end gap-1">
-            {Array.from({ length: 24 }, (_, hour) => {
-              const entry = summary.find((s) => s.hour === hour)
-              const count = entry?.count ?? 0
-              return (
-                <div key={hour} className="flex flex-1 flex-col items-center justify-end">
-                  <div
-                    className="w-full rounded-t bg-brand/70"
-                    style={{ height: `${(count / maxCount) * 100}%`, minHeight: count > 0 ? '4px' : '0' }}
-                    title={`${count} check-ins`}
-                  />
-                  {hour % 4 === 0 && <span className="mt-1 text-[10px] text-gray-400">{hour}h</span>}
-                </div>
-              )
-            })}
+          <div className="mt-4">
+            <HourlyCrowdChart data={summary} />
           </div>
         </div>
       </div>

@@ -12,11 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 public class AttendanceService {
@@ -137,12 +135,23 @@ public class AttendanceService {
                 attendance.getCheckOutTime(), action, message);
     }
 
-    // Powers the "which slot is crowded" view for MEMBERS only - staff check-ins shouldn't
-    // skew what's meant to represent how busy the floor is for members.
+    // Powers the "busy hours" chart for MEMBERS only - staff check-ins shouldn't skew
+    // what's meant to represent how busy the floor is for members. Unlike a simple
+    // "how many people checked in during hour X" count, this reflects actual OCCUPANCY:
+    // a member who checked in at 9:15 and checked out at 11:20 is counted as present
+    // during the 9, 10, AND 11 o'clock buckets, not just the 9 o'clock one they scanned
+    // in during - this is what makes the chart behave like Google Maps' popular-times
+    // graph rather than a raw check-in histogram. A member still checked in (no
+    // check-out yet) is counted as present from their check-in hour through the current
+    // hour, since they're presumably still on the floor. Always returns all 24 hours
+    // (zero-filled) so the frontend never has to guess which hours are missing.
     @Transactional(readOnly = true)
     public List<HourlyCount> hourlySummary(UUID branchId) {
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfDay = today.atStartOfDay();
         LocalDateTime endOfDay = startOfDay.plusDays(1);
+        LocalDateTime now = LocalDateTime.now();
+        int currentHour = now.getHour();
 
         List<Attendance> records = attendanceRepository
                 .findByBranchIdAndCheckInTimeBetweenOrderByCheckInTimeDesc(branchId, startOfDay, endOfDay)
@@ -150,13 +159,24 @@ public class AttendanceService {
                 .filter(a -> a.getMember().getRole() == Role.MEMBER)
                 .toList();
 
-        Map<Integer, Long> grouped = records.stream()
-                .collect(Collectors.groupingBy(a -> a.getCheckInTime().getHour(), Collectors.counting()));
+        int[] occupancy = new int[24];
+        for (Attendance a : records) {
+            int startHour = a.getCheckInTime().getHour();
+            int endHour = a.getCheckOutTime() != null
+                    ? a.getCheckOutTime().getHour()
+                    : currentHour; // still checked in - counted as present up through now
+            if (endHour < startHour) endHour = startHour; // defensive, shouldn't happen same-day
+            if (endHour > 23) endHour = 23;
+            for (int h = startHour; h <= endHour; h++) {
+                occupancy[h]++;
+            }
+        }
 
-        return grouped.entrySet().stream()
-                .map(e -> new HourlyCount(e.getKey(), e.getValue()))
-                .sorted(Comparator.comparingInt(HourlyCount::hour))
-                .toList();
+        List<HourlyCount> result = new ArrayList<>(24);
+        for (int h = 0; h < 24; h++) {
+            result.add(new HourlyCount(h, occupancy[h]));
+        }
+        return result;
     }
 
     // Full check-in history for one person (member or trainer) - powers the modal's

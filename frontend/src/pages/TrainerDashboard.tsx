@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
-import type { Branch, AttendanceLogEntry } from '../types'
-
-interface HourlyCount { hour: number; count: number }
+import HourlyCrowdChart from '../components/HourlyCrowdChart'
+import type { Branch, AttendanceLogEntry, HourlyCount } from '../types'
 
 const PAGE_SIZE = 5
 
@@ -51,7 +50,6 @@ export default function TrainerDashboard() {
     setAttendancePage(1)
   }, [attendance.length])
 
-  const maxCount = Math.max(1, ...summary.map((s) => s.count))
   const attendanceTotalPages = Math.max(1, Math.ceil(attendance.length / PAGE_SIZE))
   const pagedAttendance = attendance.slice((attendancePage - 1) * PAGE_SIZE, attendancePage * PAGE_SIZE)
 
@@ -80,21 +78,8 @@ export default function TrainerDashboard() {
             </select>
           )}
         </div>
-        <div className="mt-4 flex h-32 items-end gap-1">
-          {Array.from({ length: 24 }, (_, hour) => {
-            const entry = summary.find((s) => s.hour === hour)
-            const count = entry?.count ?? 0
-            return (
-              <div key={hour} className="flex flex-1 flex-col items-center justify-end">
-                <div
-                  className="w-full rounded-t bg-brand/70"
-                  style={{ height: `${(count / maxCount) * 100}%`, minHeight: count > 0 ? '4px' : '0' }}
-                  title={`${count} check-ins`}
-                />
-                {hour % 4 === 0 && <span className="mt-1 text-[10px] text-gray-400">{hour}h</span>}
-              </div>
-            )
-          })}
+        <div className="mt-4">
+          <HourlyCrowdChart data={summary} />
         </div>
         {branches.length === 0 && <p className="mt-2 text-xs text-gray-400">No branch assigned yet.</p>}
       </div>
