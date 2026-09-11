@@ -176,6 +176,13 @@ root CA installed once:
 Both should show a padlock with no warnings, and the QR scanner's camera permission
 prompt should work on both.
 
+### HTTPS also covers the backend
+
+The frontend's mkcert cert (`frontend/.cert/`) is reused for the backend too, so both
+run on HTTPS together locally and mobile browsers don't hit "Mixed Content" errors
+calling the API. Set `SSL_ENABLED=true` and point `VITE_API_URL` at `https://` when you
+need this (e.g. testing QR camera scan on a phone); leave `SSL_ENABLED=false` for normal
+HTTP-only local dev.
 ---
 
 ## 5. Database Migrations (Flyway)
