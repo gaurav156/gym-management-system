@@ -35,6 +35,12 @@ public class ProfileController {
         return profileService.changePassword(callerId(authentication), req);
     }
 
+    @PostMapping("/me/password/request-otp")
+    public RequestPasswordChangeOtpResponse requestPasswordChangeOtp(
+            @Valid @RequestBody RequestPasswordChangeOtpRequest req, Authentication authentication) {
+        return profileService.requestPasswordChangeOtp(callerId(authentication), req);
+    }
+
     private UUID callerId(Authentication authentication) {
         return UUID.fromString((String) authentication.getDetails());
     }

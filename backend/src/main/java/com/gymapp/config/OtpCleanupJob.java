@@ -1,5 +1,6 @@
 package com.gymapp.config;
 
+import com.gymapp.repository.ChangePasswordOtpRepository;
 import com.gymapp.repository.PasswordResetOtpRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -18,17 +19,24 @@ import java.time.LocalDateTime;
 public class OtpCleanupJob {
 
     private final PasswordResetOtpRepository otpRepository;
+    private final ChangePasswordOtpRepository changePasswordOtpRepository;
 
-    public OtpCleanupJob(PasswordResetOtpRepository otpRepository) {
+    public OtpCleanupJob(PasswordResetOtpRepository otpRepository,
+                         ChangePasswordOtpRepository changePasswordOtpRepository) {
         this.otpRepository = otpRepository;
+        this.changePasswordOtpRepository = changePasswordOtpRepository;
     }
 
     @Scheduled(cron = "0 0 3 * * *") // 3:00 AM server time, daily
     @Transactional
     public void cleanupExpiredOtps() {
-        int deleted = otpRepository.deleteConsumedOrExpired(LocalDateTime.now());
-        if (deleted > 0) {
-            System.out.println("OtpCleanupJob: removed " + deleted + " consumed/expired password reset OTP row(s)");
+        int deletedResets = otpRepository.deleteConsumedOrExpired(LocalDateTime.now());
+        if (deletedResets > 0) {
+            System.out.println("OtpCleanupJob: removed " + deletedResets + " consumed/expired password reset OTP row(s)");
+        }
+        int deletedChanges = changePasswordOtpRepository.deleteConsumedOrExpired(LocalDateTime.now());
+        if (deletedChanges > 0) {
+            System.out.println("OtpCleanupJob: removed " + deletedChanges + " consumed/expired change-password OTP row(s)");
         }
     }
 }

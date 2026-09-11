@@ -33,17 +33,25 @@ public class ProfileDtos {
             String signature
     ) {}
 
-    // Self-service password change - requires proving knowledge of the current password
-    // rather than trusting the caller's JWT alone, since a JWT can be valid but the
-    // person at the keyboard right now may not be the account owner (shared/unlocked
-    // device, session left open, etc.). This is separate from the OTP-based reset flow,
-    // which is for when the person can't log in at all.
+    // Now requires proving both the current password AND a freshly emailed OTP - see
+    // RequestPasswordChangeOtpRequest, which must be called first to generate one.
     public record ChangePasswordRequest(
             @NotBlank String currentPassword,
-            @NotBlank @Size(min = 6) String newPassword
+            @NotBlank @Size(min = 6) String newPassword,
+            @NotBlank String otp
     ) {}
 
     public record ChangePasswordResponse(
+            String message
+    ) {}
+
+    // Step 1 of the change-password flow - verifies currentPassword, then emails a
+    // 6-digit code to the caller's OWN email on file (never a request-supplied address).
+    public record RequestPasswordChangeOtpRequest(
+            @NotBlank String currentPassword
+    ) {}
+
+    public record RequestPasswordChangeOtpResponse(
             String message
     ) {}
 }
