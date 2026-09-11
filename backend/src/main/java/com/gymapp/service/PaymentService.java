@@ -4,6 +4,8 @@ import com.gymapp.dto.PaymentDtos.InvoiceResponse;
 import com.gymapp.dto.PaymentDtos.PaymentResponse;
 import com.gymapp.entity.Membership;
 import com.gymapp.entity.Payment;
+import com.gymapp.invoice.InvoiceEmailService;
+import com.gymapp.invoice.InvoiceWhatsAppService;
 import com.gymapp.repository.PaymentRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,9 +17,15 @@ import java.util.UUID;
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
+    private final InvoiceEmailService invoiceEmailService;
+    private final InvoiceWhatsAppService invoiceWhatsAppService;
 
-    public PaymentService(PaymentRepository paymentRepository) {
+    public PaymentService(PaymentRepository paymentRepository,
+                          InvoiceEmailService invoiceEmailService,
+                          InvoiceWhatsAppService invoiceWhatsAppService) {
         this.paymentRepository = paymentRepository;
+        this.invoiceEmailService = invoiceEmailService;
+        this.invoiceWhatsAppService = invoiceWhatsAppService;
     }
 
     @Transactional(readOnly = true)
@@ -41,7 +49,47 @@ public class PaymentService {
         if (!isStaff && !p.getMember().getId().equals(requesterId)) {
             throw new IllegalArgumentException("You can only view your own invoice");
         }
+        return toInvoiceResponse(p);
+    }
 
+    // Used internally (auto-email listener, manual send endpoints) where the caller is
+    // already privileged by context - the ownership check in getInvoice() only matters
+    // for the member-facing GET endpoint where a client-supplied id could be spoofed.
+    @Transactional(readOnly = true)
+    public InvoiceResponse getInvoiceInternal(UUID paymentId) {
+        Payment p = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("Payment not found"));
+        return toInvoiceResponse(p);
+    }
+
+    // Manual "Send Email" trigger - Manager/Owner only (enforced at the controller).
+    @Transactional(readOnly = true)
+    public void sendInvoiceEmail(UUID paymentId) {
+        invoiceEmailService.sendInvoiceEmail(getInvoiceInternal(paymentId));
+    }
+
+    // Manual "Send WhatsApp" trigger - throws until InvoiceWhatsAppService is wired to a
+    // real provider, same as the OTP WhatsApp stub.
+    @Transactional(readOnly = true)
+    public void sendInvoiceWhatsApp(UUID paymentId) {
+        invoiceWhatsAppService.sendInvoiceWhatsApp(getInvoiceInternal(paymentId));
+    }
+
+    private PaymentResponse toResponse(Payment p) {
+        return new PaymentResponse(
+                p.getId(),
+                formatInvoiceNumber(p),
+                p.getMember().getName(),
+                p.getRecordedBy().getName(),
+                p.getMembership() != null ? p.getMembership().getPlan().getName() : null,
+                p.getAmount(),
+                p.getType().name(),
+                p.getMode().name(),
+                p.getCreatedAt()
+        );
+    }
+
+    private InvoiceResponse toInvoiceResponse(Payment p) {
         Membership m = p.getMembership();
         return new InvoiceResponse(
                 p.getId(),
@@ -61,20 +109,6 @@ public class PaymentService {
                 p.getMode().name(),
                 p.getRecordedBy().getName(),
                 p.getRecordedBy().getSignature()
-        );
-    }
-
-    private PaymentResponse toResponse(Payment p) {
-        return new PaymentResponse(
-                p.getId(),
-                formatInvoiceNumber(p),
-                p.getMember().getName(),
-                p.getRecordedBy().getName(),
-                p.getMembership() != null ? p.getMembership().getPlan().getName() : null,
-                p.getAmount(),
-                p.getType().name(),
-                p.getMode().name(),
-                p.getCreatedAt()
         );
     }
 

@@ -8,6 +8,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -53,5 +54,23 @@ public class PaymentController {
             throw new IllegalArgumentException("You can only view your own payment history");
         }
         return paymentService.listForMember(memberId);
+    }
+
+    // Manual send - Manager/Owner triggers this after recording a purchase, or any time
+    // later from the payment history table.
+    @PostMapping("/{paymentId}/send-email")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public Map<String, String> sendEmail(@PathVariable UUID paymentId) {
+        paymentService.sendInvoiceEmail(paymentId);
+        return Map.of("message", "Invoice emailed.");
+    }
+
+    // Stubbed until InvoiceWhatsAppService is wired to a real provider - returns a 400
+    // with a clear message, same pattern as the OTP WhatsApp stub.
+    @PostMapping("/{paymentId}/send-whatsapp")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public Map<String, String> sendWhatsApp(@PathVariable UUID paymentId) {
+        paymentService.sendInvoiceWhatsApp(paymentId);
+        return Map.of("message", "Invoice sent via WhatsApp.");
     }
 }

@@ -11,6 +11,7 @@ import ManagerDashboard from './pages/ManagerDashboard'
 import MemberDashboard from './pages/MemberDashboard'
 import TrainerDashboard from './pages/TrainerDashboard'
 import ProfileRouter from './pages/ProfileRouter'
+import InvoiceViewPage from './pages/InvoiceViewPage'
 
 export default function App() {
   return (
@@ -41,6 +42,10 @@ export default function App() {
 
         <Route element={<ProtectedRoute allowedRoles={['MEMBER', 'TRAINER', 'OWNER', 'MANAGER']} />}>
           <Route path="/profile" element={<ProfileRouter />} />
+        </Route>
+
+        <Route element={<ProtectedRoute allowedRoles={['MEMBER', 'OWNER', 'MANAGER']} />}>
+          <Route path="/invoice/:paymentId" element={<InvoiceViewPage />} />
         </Route>
       </Routes>
     </div>

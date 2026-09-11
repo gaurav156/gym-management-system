@@ -2,11 +2,13 @@ package com.gymapp.service;
 
 import com.gymapp.dto.MembershipDtos.*;
 import com.gymapp.entity.*;
+import com.gymapp.invoice.PaymentRecordedEvent;
 import com.gymapp.repository.BranchRepository;
 import com.gymapp.repository.MembershipPlanRepository;
 import com.gymapp.repository.MembershipRepository;
 import com.gymapp.repository.PaymentRepository;
 import com.gymapp.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,17 +25,20 @@ public class MembershipService {
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public MembershipService(MembershipPlanRepository planRepository,
                              MembershipRepository membershipRepository,
                              BranchRepository branchRepository,
                              UserRepository userRepository,
-                             PaymentRepository paymentRepository) {
+                             PaymentRepository paymentRepository,
+                             ApplicationEventPublisher eventPublisher) {
         this.planRepository = planRepository;
         this.membershipRepository = membershipRepository;
         this.branchRepository = branchRepository;
         this.userRepository = userRepository;
         this.paymentRepository = paymentRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     public PlanResponse createPlan(CreatePlanRequest req) {
@@ -100,6 +105,10 @@ public class MembershipService {
                 .mode(req.mode())
                 .build();
         paymentRepository.save(payment);
+
+        // Fires after this transaction commits (see InvoicePurchaseListener) - the
+        // purchase itself never waits on or fails because of mail delivery.
+        eventPublisher.publishEvent(new PaymentRecordedEvent(payment.getId()));
 
         // Enrollment date is the date of the member's FIRST purchase ever, set once and
         // never changed again - not tied to the plan's start date, since that can be

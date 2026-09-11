@@ -49,6 +49,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [detailMembershipsFetched, setDetailMembershipsFetched] = useState<MembershipAdmin[]>([])
   const [detailPaymentsPage, setDetailPaymentsPage] = useState(1)
   const [detailAttendancePage, setDetailAttendancePage] = useState(1)
+  const [paymentSendMessage, setPaymentSendMessage] = useState('')
 
   function loadMembers() {
     if (!selectedBranch) return
@@ -85,6 +86,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     setDetailAttendancePage(1)
     setEditingMemberInfo(false)
     setEditingMemberBranches(false)
+    setPaymentSendMessage('')
     api.get<Payment[]>(`/api/payments/member/${detailMemberId}`).then((res) => setDetailPayments(res.data))
     api.get<AttendanceLogEntry[]>(`/api/attendance/history/${detailMemberId}`).then((res) => setDetailAttendance(res.data))
     api.get<MembershipAdmin[]>(`/api/memberships/member/${detailMemberId}`).then((res) => setDetailMembershipsFetched(res.data))
@@ -114,6 +116,17 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       else await downloadInvoice(data)
     } catch (err: any) {
       setMemberModalMessage(err.response?.data?.error || 'Failed to load invoice')
+    }
+  }
+
+  async function handlePaymentSendAction(paymentId: string, channel: 'email' | 'whatsapp') {
+    setMemberModalMessage('')
+    setPaymentSendMessage('')
+    try {
+      const { data } = await api.post<{ message: string }>(`/api/payments/${paymentId}/send-${channel}`)
+      setPaymentSendMessage(data.message)
+    } catch (err: any) {
+      setMemberModalMessage(err.response?.data?.error || `Failed to send via ${channel}`)
     }
   }
 
@@ -584,6 +597,8 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                           <button onClick={() => handleInvoiceAction(p.id, 'view')} className="text-xs text-brand hover:underline">View</button>
                           <button onClick={() => handleInvoiceAction(p.id, 'print')} className="text-xs text-brand hover:underline">Print</button>
                           <button onClick={() => handleInvoiceAction(p.id, 'download')} className="text-xs text-brand hover:underline">Download</button>
+                          <button onClick={() => handlePaymentSendAction(p.id, 'email')} className="text-xs text-brand hover:underline">Email</button>
+                          <button onClick={() => handlePaymentSendAction(p.id, 'whatsapp')} className="text-xs text-brand hover:underline">WhatsApp</button>
                         </td>
                       </tr>
                     ))}
@@ -628,6 +643,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                   </tbody>
                 </table>
                 {detailAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
+                {paymentSendMessage && <p className="mt-2 text-sm text-green-700">{paymentSendMessage}</p>}
                 {detailAttendance.length > 0 && (
                   <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                     <span>Page {detailAttendancePage} of {detailAttendanceTotalPages} ({detailAttendance.length} total)</span>

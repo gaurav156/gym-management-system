@@ -27,6 +27,7 @@ export default function PaymentsTab({ selectedBranch }: Props) {
   const memberDropdownRef = useRef<HTMLDivElement>(null)
 
   const [invoiceError, setInvoiceError] = useState('')
+  const [sendMessage, setSendMessage] = useState('')
 
   useEffect(() => {
     api.get<Plan[]>('/api/plans').then((res) => setPlans(res.data))
@@ -96,6 +97,17 @@ export default function PaymentsTab({ selectedBranch }: Props) {
       else await downloadInvoice(data)
     } catch (err: any) {
       setInvoiceError(err.response?.data?.error || 'Failed to load invoice') // or setLoadError in MemberDashboard
+    }
+  }
+
+  async function handleSendAction(paymentId: string, channel: 'email' | 'whatsapp') {
+    setInvoiceError('')
+    setSendMessage('')
+    try {
+      const { data } = await api.post<{ message: string }>(`/api/payments/${paymentId}/send-${channel}`)
+      setSendMessage(data.message)
+    } catch (err: any) {
+      setInvoiceError(err.response?.data?.error || `Failed to send via ${channel}`)
     }
   }
 
@@ -234,12 +246,15 @@ export default function PaymentsTab({ selectedBranch }: Props) {
                     <button onClick={() => handleInvoiceAction(p.id, 'view')} className="text-xs text-brand hover:underline">View</button>
                     <button onClick={() => handleInvoiceAction(p.id, 'print')} className="text-xs text-brand hover:underline">Print</button>
                     <button onClick={() => handleInvoiceAction(p.id, 'download')} className="text-xs text-brand hover:underline">Download</button>
+                    <button onClick={() => handleSendAction(p.id, 'email')} className="text-xs text-brand hover:underline">Email</button>
+                    <button onClick={() => handleSendAction(p.id, 'whatsapp')} className="text-xs text-brand hover:underline">WhatsApp</button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
           {invoiceError && <p className="mt-2 text-sm text-red-600">{invoiceError}</p>}
+          {sendMessage && <p className="mt-2 text-sm text-green-700">{sendMessage}</p>}
           {payments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
           {payments.length > 0 && (
             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
