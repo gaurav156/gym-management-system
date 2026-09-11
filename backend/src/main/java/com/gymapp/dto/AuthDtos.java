@@ -11,15 +11,30 @@ import java.util.UUID;
 
 public class AuthDtos {
 
+    // Public: sent before registerMember() - verifies the email is real/reachable and
+    // not already registered. captchaToken is optional/nullable, same pattern as
+    // RegisterMemberRequest - only required once FailedAttemptTracker flags the IP.
+    public record RequestRegistrationOtpRequest(
+            @NotBlank @Email String email,
+            String captchaToken
+    ) {}
+
+    public record RequestRegistrationOtpResponse(
+            String message
+    ) {}
+
     // captchaToken is optional/nullable - only required when FailedAttemptTracker says
     // this IP has too many recent failures (see AuthController.requireCaptchaIfNeeded).
     // A normal, first-time registration never needs to supply it.
+    // otp is now required - must be a valid, unconsumed code obtained via
+    // RequestRegistrationOtpRequest for this exact email.
     public record RegisterMemberRequest(
             @NotBlank String name,
             @NotBlank @Email String email,
             String phone,
             @NotBlank @Size(min = 6) String password,
             @NotNull UUID branchId,
+            @NotBlank String otp,
             String captchaToken
     ) {}
 

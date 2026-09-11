@@ -2,6 +2,7 @@ package com.gymapp.config;
 
 import com.gymapp.repository.ChangePasswordOtpRepository;
 import com.gymapp.repository.PasswordResetOtpRepository;
+import com.gymapp.repository.RegistrationOtpRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,11 +21,14 @@ public class OtpCleanupJob {
 
     private final PasswordResetOtpRepository otpRepository;
     private final ChangePasswordOtpRepository changePasswordOtpRepository;
+    private final RegistrationOtpRepository registrationOtpRepository;
 
     public OtpCleanupJob(PasswordResetOtpRepository otpRepository,
-                         ChangePasswordOtpRepository changePasswordOtpRepository) {
+                         ChangePasswordOtpRepository changePasswordOtpRepository,
+                         RegistrationOtpRepository registrationOtpRepository) {
         this.otpRepository = otpRepository;
         this.changePasswordOtpRepository = changePasswordOtpRepository;
+        this.registrationOtpRepository = registrationOtpRepository;
     }
 
     @Scheduled(cron = "0 0 3 * * *") // 3:00 AM server time, daily
@@ -37,6 +41,10 @@ public class OtpCleanupJob {
         int deletedChanges = changePasswordOtpRepository.deleteConsumedOrExpired(LocalDateTime.now());
         if (deletedChanges > 0) {
             System.out.println("OtpCleanupJob: removed " + deletedChanges + " consumed/expired change-password OTP row(s)");
+        }
+        int deletedRegistrations = registrationOtpRepository.deleteConsumedOrExpired(LocalDateTime.now());
+        if (deletedRegistrations > 0) {
+            System.out.println("OtpCleanupJob: removed " + deletedRegistrations + " consumed/expired registration OTP row(s)");
         }
     }
 }

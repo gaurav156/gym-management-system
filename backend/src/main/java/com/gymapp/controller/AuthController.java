@@ -27,6 +27,25 @@ public class AuthController {
         this.captchaVerificationService = captchaVerificationService;
     }
 
+    // Public: step 1 of self-registration - sends a 6-digit code to the given email.
+    // Rate-limited by IP the same way as register()/login() (see FailedAttemptTracker) -
+    // this is an even more attractive spam target than register() itself, since it's
+    // pure "trigger an email send" with no account created.
+    @PostMapping("/register/request-otp")
+    public RequestRegistrationOtpResponse requestRegistrationOtp(
+            @Valid @RequestBody RequestRegistrationOtpRequest req, HttpServletRequest request) {
+        String ip = ClientIpResolver.resolve(request);
+        requireCaptchaIfNeeded(ip, req.captchaToken());
+        try {
+            RequestRegistrationOtpResponse response = authService.requestRegistrationOtp(req);
+            failedAttemptTracker.reset(ip);
+            return response;
+        } catch (IllegalArgumentException e) {
+            failedAttemptTracker.increment(ip);
+            throw e;
+        }
+    }
+
     // Public: visitors on the landing page register themselves as members. Rate-limited
     // by IP - after a few failed attempts (e.g. scripted bulk sign-ups repeatedly hitting
     // a duplicate-email or validation error), a CAPTCHA is required before trying again.
