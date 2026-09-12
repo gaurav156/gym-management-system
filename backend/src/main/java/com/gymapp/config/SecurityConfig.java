@@ -69,6 +69,9 @@ public class SecurityConfig {
                 // Owner + Manager + Trainer combined "Staff" directory for a branch.
                 .requestMatchers("/api/staff/**").hasAnyRole("OWNER", "MANAGER")
 
+                // Owner-only: editing a Manager's basic info. Deletion reuses /api/owner/users/**.
+                .requestMatchers("/api/managers/**").hasRole("OWNER")
+
                 .requestMatchers("/api/trainers/*/dates").hasRole("OWNER")
                 .requestMatchers("/api/trainers/**").hasAnyRole("OWNER", "MANAGER")
 

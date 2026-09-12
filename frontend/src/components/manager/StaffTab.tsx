@@ -26,11 +26,11 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const [staffModalTab, setStaffModalTab] = useState<'INFO' | 'ATTENDANCE' | 'BRANCHES'>('INFO')
   const [staffModalMessage, setStaffModalMessage] = useState('')
 
-  const [editingTrainerInfo, setEditingTrainerInfo] = useState(false)
-  const [trainerEditName, setTrainerEditName] = useState('')
-  const [trainerEditPhone, setTrainerEditPhone] = useState('')
-  const [trainerEditAddress, setTrainerEditAddress] = useState('')
-  const [trainerEditPhoto, setTrainerEditPhoto] = useState<string | null>(null)
+  const [editingStaffInfo, setEditingStaffInfo] = useState(false)
+  const [staffEditName, setStaffEditName] = useState('')
+  const [staffEditPhone, setStaffEditPhone] = useState('')
+  const [staffEditAddress, setStaffEditAddress] = useState('')
+  const [staffEditPhoto, setStaffEditPhoto] = useState<string | null>(null)
 
   const [editingTrainerDates, setEditingTrainerDates] = useState(false)
   const [joiningDateInput, setJoiningDateInput] = useState('')
@@ -60,7 +60,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
 
   useEffect(() => {
     setStaffModalMessage('')
-    setEditingTrainerInfo(false)
+    setEditingStaffInfo(false)
     setEditingStaffBranches(false)
     setEditingTrainerDates(false)
     if (detailStaffId) {
@@ -80,24 +80,27 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     setStaffModalMessage('')
   }, [staffModalTab])
 
-  function startEditTrainerInfo(t: StaffSummary) {
-    setEditingTrainerInfo(true)
-    setTrainerEditName(t.name)
-    setTrainerEditPhone(t.phone ?? '')
-    setTrainerEditAddress(t.address ?? '')
-    setTrainerEditPhoto(t.photo)
+  function startEditStaffInfo(s: StaffSummary) {
+    setEditingStaffInfo(true)
+    setStaffEditName(s.name)
+    setStaffEditPhone(s.phone ?? '')
+    setStaffEditAddress(s.address ?? '')
+    setStaffEditPhoto(s.photo)
     setStaffModalMessage('')
   }
 
-  async function saveTrainerInfo(trainerId: string) {
+  // Endpoint depends on role - Manager edits go through /api/managers/{id} (Owner-only
+  // on the backend), Trainer edits keep using /api/trainers/{id} (Owner or Manager).
+  async function saveStaffInfo(s: StaffSummary) {
+    const endpoint = s.role === 'MANAGER' ? `/api/managers/${s.id}` : `/api/trainers/${s.id}`
     try {
-      await api.put(`/api/trainers/${trainerId}`, {
-        name: trainerEditName, phone: trainerEditPhone, address: trainerEditAddress, photo: trainerEditPhoto ?? '',
+      await api.put(endpoint, {
+        name: staffEditName, phone: staffEditPhone, address: staffEditAddress, photo: staffEditPhoto ?? '',
       })
-      setEditingTrainerInfo(false)
+      setEditingStaffInfo(false)
       loadStaff()
     } catch (err: any) {
-      setStaffModalMessage(err.response?.data?.error || 'Failed to update trainer info')
+      setStaffModalMessage(err.response?.data?.error || 'Failed to update staff info')
     }
   }
 
@@ -145,12 +148,14 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     }
   }
 
-  async function deleteTrainer(trainerId: string, name: string) {
+  // Deletion already goes through the existing Owner-only /api/owner/users/{id} endpoint
+  // for any non-Owner account - works for Manager and Trainer alike.
+  async function deleteStaff(staffId: string, name: string) {
     if (!confirm(
       `Permanently delete ${name}'s account? This removes their attendance log and cannot be undone.`
     )) return
     try {
-      await api.delete(`/api/owner/users/${trainerId}`)
+      await api.delete(`/api/owner/users/${staffId}`)
       setDetailStaffId(null)
       loadStaff()
     } catch (err: any) {
@@ -166,6 +171,13 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const detailStaff = staff.find((s) => s.id === detailStaffId) ?? null
   const staffModalTotalPages = Math.max(1, Math.ceil(detailStaffAttendance.length / MODAL_PAGE_SIZE))
   const pagedStaffAttendance = detailStaffAttendance.slice((staffModalPage - 1) * MODAL_PAGE_SIZE, staffModalPage * MODAL_PAGE_SIZE)
+
+  // Edit-info is available for Trainer (Owner or Manager) and Manager (Owner only).
+  const canEditInfo = detailStaff && detailStaff.role !== 'OWNER' &&
+    (detailStaff.role === 'TRAINER' || user?.role === 'OWNER')
+
+  // Delete is Owner-only, and never for the Owner's own account.
+  const canDelete = detailStaff && detailStaff.role !== 'OWNER' && user?.role === 'OWNER'
 
   return (
     <div>
@@ -280,44 +292,44 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
 
             {staffModalTab === 'INFO' && (
               <div className="mt-4 space-y-2 text-sm">
-                {detailStaff.role === 'TRAINER' && editingTrainerInfo ? (
+                {editingStaffInfo ? (
                   <div className="space-y-3 rounded-md border border-gray-200 p-3">
                     <div className="flex items-center gap-3">
-                      {trainerEditPhoto ? (
-                        <img src={trainerEditPhoto} alt="" className="h-14 w-14 rounded-full object-cover" />
+                      {staffEditPhoto ? (
+                        <img src={staffEditPhoto} alt="" className="h-14 w-14 rounded-full object-cover" />
                       ) : (
                         <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
-                          {trainerEditName.charAt(0).toUpperCase()}
+                          {staffEditName.charAt(0).toUpperCase()}
                         </span>
                       )}
                       <div>
                         <input type="file" accept="image/*"
-                          onChange={(e) => handleEditPhotoChange(e, setTrainerEditPhoto, setStaffModalMessage)} className="text-xs" />
-                        {trainerEditPhoto && (
-                          <button type="button" onClick={() => setTrainerEditPhoto(null)}
+                          onChange={(e) => handleEditPhotoChange(e, setStaffEditPhoto, setStaffModalMessage)} className="text-xs" />
+                        {staffEditPhoto && (
+                          <button type="button" onClick={() => setStaffEditPhoto(null)}
                             className="block text-xs text-red-600 hover:underline">Remove photo</button>
                         )}
                       </div>
                     </div>
                     <div>
                       <label className="text-xs text-gray-500">Name</label>
-                      <input value={trainerEditName} onChange={(e) => setTrainerEditName(e.target.value)}
+                      <input value={staffEditName} onChange={(e) => setStaffEditName(e.target.value)}
                         className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
                     </div>
                     <div>
                       <label className="text-xs text-gray-500">Phone</label>
-                      <input value={trainerEditPhone} onChange={(e) => setTrainerEditPhone(e.target.value)}
+                      <input value={staffEditPhone} onChange={(e) => setStaffEditPhone(e.target.value)}
                         className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
                     </div>
                     <div>
                       <label className="text-xs text-gray-500">Address</label>
-                      <textarea value={trainerEditAddress} onChange={(e) => setTrainerEditAddress(e.target.value)} rows={2}
+                      <textarea value={staffEditAddress} onChange={(e) => setStaffEditAddress(e.target.value)} rows={2}
                         className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
                     </div>
                     <div className="space-x-2">
-                      <button onClick={() => saveTrainerInfo(detailStaff.id)}
+                      <button onClick={() => saveStaffInfo(detailStaff)}
                         className="text-xs text-green-700 hover:underline">Save</button>
-                      <button onClick={() => setEditingTrainerInfo(false)}
+                      <button onClick={() => setEditingStaffInfo(false)}
                         className="text-xs text-gray-500 hover:underline">Cancel</button>
                     </div>
                   </div>
@@ -332,22 +344,18 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                     <p><span className="text-gray-500">Last visit:</span> {
                       lastCheckins[detailStaff.id] ? new Date(lastCheckins[detailStaff.id]).toLocaleString() : 'Never'
                     }</p>
-                    {detailStaff.role === 'TRAINER' && (
-                      <button onClick={() => startEditTrainerInfo(detailStaff)}
+                    {canEditInfo && (
+                      <button onClick={() => startEditStaffInfo(detailStaff)}
                         className="text-xs text-gray-600 hover:underline">Edit info</button>
                     )}
-                    {user?.role === 'OWNER' && detailStaff.role === 'TRAINER' && (
-                      <button onClick={() => deleteTrainer(detailStaff.id, detailStaff.name)}
+                    {canDelete && (
+                      <button onClick={() => deleteStaff(detailStaff.id, detailStaff.name)}
                         className="ml-3 text-xs text-red-600 hover:underline">
                         Delete account
                       </button>
                     )}
-                    {detailStaff.role !== 'TRAINER' && (
-                      <p className="text-xs text-gray-400">
-                        {detailStaff.role === 'OWNER'
-                          ? 'Owner info is edited from the Profile page.'
-                          : 'Manager info and account deletion are managed from the Owner dashboard.'}
-                      </p>
+                    {detailStaff.role === 'OWNER' && (
+                      <p className="text-xs text-gray-400">Owner info is edited from the Profile page.</p>
                     )}
                   </>
                 )}
