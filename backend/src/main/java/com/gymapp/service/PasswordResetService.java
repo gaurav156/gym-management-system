@@ -5,6 +5,7 @@ import com.gymapp.entity.OtpChannel;
 import com.gymapp.entity.PasswordResetOtp;
 import com.gymapp.entity.User;
 import com.gymapp.otp.OtpDeliveryRouter;
+import com.gymapp.otp.OtpPurpose;
 import com.gymapp.repository.PasswordResetOtpRepository;
 import com.gymapp.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -78,7 +79,7 @@ public class PasswordResetService {
         otpRepository.save(record);
 
         try {
-            otpDeliveryRouter.forChannel(req.channel()).send(user, req.identifier().trim(), otp);
+            otpDeliveryRouter.forChannel(req.channel()).send(user, req.identifier().trim(), otp, OtpPurpose.PASSWORD_RESET);
         } catch (Exception e) {
             // Delivery failure shouldn't leak into the response either - log it server-side
             // and still return the generic message; the person can just retry.

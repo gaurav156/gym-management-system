@@ -17,7 +17,7 @@ public class WhatsAppOtpDeliveryService implements OtpDeliveryService {
     }
 
     @Override
-    public void send(User user, String destination, String otp) {
+    public void send(User user, String destination, String otp, OtpPurpose purpose) {
         throw new IllegalArgumentException("WhatsApp delivery is not yet configured - please use Email for now");
     }
 }

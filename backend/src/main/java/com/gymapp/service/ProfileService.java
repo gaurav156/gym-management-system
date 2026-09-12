@@ -6,6 +6,7 @@ import com.gymapp.entity.OtpChannel;
 import com.gymapp.entity.Role;
 import com.gymapp.entity.User;
 import com.gymapp.otp.OtpDeliveryRouter;
+import com.gymapp.otp.OtpPurpose;
 import com.gymapp.repository.ChangePasswordOtpRepository;
 import com.gymapp.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -103,7 +104,7 @@ public class ProfileService {
         // silently swallowing it would leave someone stuck waiting for a code that never
         // arrives with no way to know why.
         try {
-            otpDeliveryRouter.forChannel(OtpChannel.EMAIL).send(u, u.getEmail(), otp);
+            otpDeliveryRouter.forChannel(OtpChannel.EMAIL).send(u, u.getEmail(), otp, OtpPurpose.CHANGE_PASSWORD);
         } catch (Exception e) {
             throw new IllegalArgumentException("Failed to send the verification code - please try again.");
         }

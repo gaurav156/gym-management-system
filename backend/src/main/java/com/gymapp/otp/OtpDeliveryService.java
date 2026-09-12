@@ -10,8 +10,8 @@ public interface OtpDeliveryService {
 
     OtpChannel channel();
 
-    // destination is the resolved email/phone to send to. Implementations should throw
-    // if delivery fails, so the caller can log it - but see PasswordResetService, which
-    // deliberately never lets a delivery failure change what the HTTP caller sees.
-    void send(User user, String destination, String otp);
+    // purpose lets the implementation render accurate copy (see OtpPurpose) - e.g. the
+    // email channel uses it to pick the right subject line and reassurance footer rather
+    // than a generic message that may not apply to every flow.
+    void send(User user, String destination, String otp, OtpPurpose purpose);
 }

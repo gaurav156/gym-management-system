@@ -48,7 +48,7 @@ public class EmailOtpDeliveryService implements OtpDeliveryService {
     }
 
     @Override
-    public void send(User user, String destination, String otp) {
+    public void send(User user, String destination, String otp, OtpPurpose purpose) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             // multipart=true is required for setText(plain, html) to attach both parts -
@@ -56,21 +56,52 @@ public class EmailOtpDeliveryService implements OtpDeliveryService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress);
             helper.setTo(destination);
-            helper.setSubject("Your " + gymName + " verification code");
-            helper.setText(buildPlainText(user, otp), buildHtml(user, otp));
+            helper.setSubject(subjectFor(purpose));
+            helper.setText(buildPlainText(user, otp, purpose), buildHtml(user, otp, purpose));
             mailSender.send(message);
         } catch (Exception e) {
-            // Caller (PasswordResetService) deliberately swallows this and logs it -
-            // delivery failure must never change what the HTTP caller sees.
+            // Caller (PasswordResetService/ProfileService/AuthService) deliberately
+            // handles this per its own flow - delivery failure must never silently change
+            // what those callers do without their say-so.
             throw new RuntimeException("Failed to build/send OTP email", e);
         }
     }
 
-    private String buildPlainText(User user, String otp) {
+    private String subjectFor(OtpPurpose purpose) {
+        return switch (purpose) {
+            case PASSWORD_RESET -> "Your " + gymName + " password reset code";
+            case CHANGE_PASSWORD -> "Your " + gymName + " password change code";
+            case REGISTRATION -> "Your " + gymName + " verification code";
+        };
+    }
+
+    // What the code is actually confirming - shown just above the code box.
+    private String introFor(OtpPurpose purpose) {
+        return switch (purpose) {
+            case PASSWORD_RESET -> "Use the code below to reset your password.";
+            case CHANGE_PASSWORD -> "Use the code below to confirm your password change.";
+            case REGISTRATION -> "Use the code below to verify your email and finish creating your account.";
+        };
+    }
+
+    // The "if this wasn't you" reassurance - this is the line that used to always say
+    // "your password won't be changed" regardless of flow, which was simply false during
+    // registration (there's no password action pending to not-happen).
+    private String reassuranceFor(OtpPurpose purpose) {
+        return switch (purpose) {
+            case PASSWORD_RESET, CHANGE_PASSWORD ->
+                    "Didn't request this? You can safely ignore this email - your password won't be changed.";
+            case REGISTRATION ->
+                    "Didn't request this? You can safely ignore this email - no account will be created.";
+        };
+    }
+
+    private String buildPlainText(User user, String otp, OtpPurpose purpose) {
         return "Hi " + user.getName() + ",\n\n"
+                + introFor(purpose) + "\n\n"
                 + "Your " + gymName + " verification code is: " + otp + "\n"
                 + "This code expires in " + expiryMinutes + " minutes and can only be used once.\n\n"
-                + "If you didn't request this, you can safely ignore this email.\n";
+                + reassuranceFor(purpose) + "\n";
     }
 
     // All CSS is inline (style="...") rather than in a <style> block - most email clients
@@ -78,10 +109,11 @@ public class EmailOtpDeliveryService implements OtpDeliveryService {
     // inline styles are the only reliable way to control appearance across clients. Table-
     // based layout for the same reason: flexbox/grid support is inconsistent in email
     // clients, tables are not.
-    private String buildHtml(User user, String otp) {
+    private String buildHtml(User user, String otp, OtpPurpose purpose) {
         String safeName = HtmlUtils.htmlEscape(user.getName());
         String safeGymName = HtmlUtils.htmlEscape(gymName);
-        String otpSpaced = String.join(" ", otp.split(""));
+        String safeIntro = HtmlUtils.htmlEscape(introFor(purpose));
+        String safeReassurance = HtmlUtils.htmlEscape(reassuranceFor(purpose));
 
         String logoHtml = (logoUrl != null && !logoUrl.isBlank())
                 ? "<img src=\"" + HtmlUtils.htmlEscape(logoUrl) + "\" alt=\"" + safeGymName + "\" "
@@ -106,21 +138,29 @@ public class EmailOtpDeliveryService implements OtpDeliveryService {
                 + "<tr><td style=\"padding:32px;\">"
                 + "<p style=\"margin:0 0 4px;font-size:15px;color:#111827;\">Hi " + safeName + ",</p>"
                 + "<p style=\"margin:0 0 24px;font-size:15px;line-height:1.5;color:#4b5563;\">"
-                +   "Use the code below to reset your password. This code is valid for "
-                +   expiryMinutes + " minutes and can only be used once."
+                +   safeIntro + " This code is valid for " + expiryMinutes + " minutes and can only be used once."
                 + "</p>"
 
-                // OTP box
+                // OTP box - the code itself is one unbroken run of digits with NO literal
+                // space characters between them. Visual spacing comes entirely from
+                // letter-spacing (a rendering hint, not real characters), so: (1) selecting
+                // and copying the code copies exactly the 6 digits, never a stray space,
+                // and (2) there's no whitespace for a narrow/mobile viewport to wrap on -
+                // that's what previously split it into two rows of 3. white-space:nowrap
+                // and disabling the browser's automatic text-size-adjust are extra
+                // belt-and-braces against mobile mail clients that upscale small text.
                 + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">"
-                + "<tr><td align=\"center\" style=\"background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px 16px;\">"
-                + "<div style=\"font-size:32px;font-weight:700;letter-spacing:8px;color:#e11d48;font-family:'SF Mono',Consolas,Menlo,monospace;\">"
-                +   otpSpaced
+                + "<tr><td align=\"center\" style=\"background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px 12px;\">"
+                + "<div style=\"font-size:28px;font-weight:700;letter-spacing:6px;color:#e11d48;"
+                +   "font-family:'SF Mono',Consolas,Menlo,monospace;white-space:nowrap;"
+                +   "-webkit-text-size-adjust:100%;text-size-adjust:100%;\">"
+                +   otp
                 + "</div>"
                 + "</td></tr>"
                 + "</table>"
 
                 + "<p style=\"margin:24px 0 0;font-size:13px;line-height:1.5;color:#9ca3af;\">"
-                +   "Didn't request this? You can safely ignore this email - your password won't be changed."
+                +   safeReassurance
                 + "</p>"
                 + "</td></tr>"
 

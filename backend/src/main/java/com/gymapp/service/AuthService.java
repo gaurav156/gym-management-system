@@ -3,6 +3,7 @@ package com.gymapp.service;
 import com.gymapp.dto.AuthDtos.*;
 import com.gymapp.entity.*;
 import com.gymapp.otp.OtpDeliveryRouter;
+import com.gymapp.otp.OtpPurpose;
 import com.gymapp.repository.BranchAssignmentRepository;
 import com.gymapp.repository.BranchRepository;
 import com.gymapp.repository.RegistrationOtpRepository;
@@ -91,7 +92,7 @@ public class AuthService {
         // "Hi there," is enough; the template only ever reads getName().
         User placeholder = User.builder().name("there").build();
         try {
-            otpDeliveryRouter.forChannel(OtpChannel.EMAIL).send(placeholder, email, otp);
+            otpDeliveryRouter.forChannel(OtpChannel.EMAIL).send(placeholder, email, otp, OtpPurpose.REGISTRATION);
         } catch (Exception e) {
             throw new IllegalArgumentException("Failed to send the verification code - please try again.");
         }
