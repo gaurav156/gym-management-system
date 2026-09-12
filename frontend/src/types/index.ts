@@ -144,3 +144,16 @@ export interface HourlyCount {
   hour: number
   count: number
 }
+
+export interface StaffSummary {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  address: string | null
+  photo: string | null
+  checkinPin: string | null
+  role: Role
+  joiningDate: string | null
+  leftDate: string | null
+}

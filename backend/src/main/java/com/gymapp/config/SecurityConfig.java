@@ -65,11 +65,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/branches/**").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers("/api/plans/manage/**").hasRole("OWNER")
                 .requestMatchers("/api/members/**").hasAnyRole("OWNER", "MANAGER")
-                // owner-only: correcting a trainer's joining date, or marking/clearing them
-                // as left - a Manager must not be able to do either (must precede the
-                // broader /api/trainers/** rule below to take effect)
-                .requestMatchers("/api/trainers/*/dates").hasRole("OWNER")
 
+                // Owner + Manager + Trainer combined "Staff" directory for a branch.
+                .requestMatchers("/api/staff/**").hasAnyRole("OWNER", "MANAGER")
+
+                .requestMatchers("/api/trainers/*/dates").hasRole("OWNER")
                 .requestMatchers("/api/trainers/**").hasAnyRole("OWNER", "MANAGER")
 
                 // membership purchase is recorded by front-desk staff against cash payment,
@@ -91,13 +91,12 @@ public class SecurityConfig {
                 .requestMatchers("/api/payments/branch/**", "/api/payments/member/**").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers("/api/payments/mine").hasRole("MEMBER")
 
-                // attendance check-in can be triggered from a reception kiosk (manager/owner),
-                // a member's own QR/PIN screen, or a trainer's own QR/PIN screen
+                // Check-in now applies to all four roles - Owner and Manager included.
                 .requestMatchers("/api/attendance/checkin").hasAnyRole("OWNER", "MANAGER", "MEMBER", "TRAINER")
-                // members/trainers can see their own branch's crowd-by-hour, and their own
-                // attendance history (ownership for /mine is checked in the controller)
                 .requestMatchers("/api/attendance/summary/**").hasAnyRole("OWNER", "MANAGER", "MEMBER", "TRAINER")
-                .requestMatchers("/api/attendance/mine").hasAnyRole("MEMBER", "TRAINER")
+                // Owner/Manager can now view their own attendance log too (ProfileController-
+                // style "mine" endpoint, ownership already enforced in AttendanceController).
+                .requestMatchers("/api/attendance/mine").hasAnyRole("OWNER", "MANAGER", "MEMBER", "TRAINER")
                 .requestMatchers("/api/attendance/history/**", "/api/attendance/today/**",
                         "/api/attendance/last-checkin/**").hasAnyRole("OWNER", "MANAGER")
 

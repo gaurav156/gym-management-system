@@ -87,16 +87,19 @@ public class AttendanceService {
         Branch branch = branchRepository.findById(req.branchId())
                 .orElseThrow(() -> new IllegalArgumentException("Branch not found"));
 
-        // Applies to members and trainers alike - you can only check in at a branch
-        // you're actually assigned to, regardless of membership status or role.
-        boolean assignedToBranch = branchAssignmentRepository
-                .findByUserIdAndBranchId(person.getId(), branch.getId())
-                .isPresent();
+        // The Owner has implicit access to every branch (no branch_assignments row of
+        // their own - see BranchService) so they're exempt from this check. Everyone
+        // else - Manager, Trainer, Member - must actually be assigned to the branch
+        // they're checking in at.
+        boolean assignedToBranch = person.getRole() == Role.OWNER
+                || branchAssignmentRepository.findByUserIdAndBranchId(person.getId(), branch.getId()).isPresent();
         if (!assignedToBranch) {
             throw new IllegalArgumentException(person.getName() + " is not assigned to " + branch.getName());
         }
 
-        if (person.getRole() != Role.TRAINER) {
+        // Only Members need an active membership to check in - Owner/Manager/Trainer are
+        // staff, their check-in is about attendance tracking, not gym access control.
+        if (person.getRole() == Role.MEMBER) {
             LocalDate today = LocalDate.now();
             membershipRepository.findCurrentlyUsable(person.getId(), today)
                     .orElseGet(() -> {

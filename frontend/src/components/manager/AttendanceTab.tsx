@@ -16,7 +16,7 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
   const [checkinPin, setCheckinPin] = useState('')
   const [summary, setSummary] = useState<HourlyCount[]>([])
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendanceEntry[]>([])
-  const [attendanceTab, setAttendanceTab] = useState<'MEMBERS' | 'TRAINERS'>('MEMBERS')
+  const [attendanceTab, setAttendanceTab] = useState<'MEMBERS' | 'STAFF'>('MEMBERS')
   const [todayAttendancePage, setTodayAttendancePage] = useState(1)
 
   const [checkinMode, setCheckinMode] = useState<'PIN' | 'QR'>('PIN')
@@ -112,7 +112,7 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
     setScanActive(true)
   }
 
-  const filteredTodayAttendance = todayAttendance.filter((a) => (attendanceTab === 'MEMBERS' ? a.role === 'MEMBER' : a.role === 'TRAINER'))
+  const filteredTodayAttendance = todayAttendance.filter((a) => (attendanceTab === 'MEMBERS' ? a.role === 'MEMBER' : a.role !== 'MEMBER'))
   const todayAttendanceTotalPages = Math.max(1, Math.ceil(filteredTodayAttendance.length / PAGE_SIZE))
   const pagedTodayAttendance = filteredTodayAttendance.slice((todayAttendancePage - 1) * PAGE_SIZE, todayAttendancePage * PAGE_SIZE)
 
@@ -140,7 +140,7 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
 
           {checkinMode === 'PIN' ? (
             <>
-              <p className="mt-1 text-xs text-gray-500">Enter the member's 4-digit PIN to log their visit.</p>
+              <p className="mt-1 text-xs text-gray-500">Enter the 4-digit PIN to log a visit - works for members and staff alike.</p>
               <form onSubmit={kioskCheckin} className="mt-4 flex gap-2">
                 <input placeholder="1234" maxLength={4} required value={checkinPin}
                   onChange={(e) => setCheckinPin(e.target.value.replace(/\D/g, ''))}
@@ -152,7 +152,7 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
             </>
           ) : (
             <>
-              <p className="mt-1 text-xs text-gray-500">Scan the member's or trainer's QR code from their dashboard.</p>
+              <p className="mt-1 text-xs text-gray-500">Scan the QR code from anyone's dashboard - members, trainers, managers, or the owner.</p>
 
               {!selectedBranch ? (
                 <p className="mt-4 text-sm text-gray-400">Select a branch first.</p>
@@ -175,7 +175,6 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
             </>
           )}
 
-          {/* Shared result banner - same styling/copy for both PIN and QR check-in. */}
           {resultMessage && (
             <p className={`mt-3 text-sm font-medium ${resultOk ? 'text-green-700' : 'text-red-600'}`}>
               {resultOk ? '✅ ' : '❌ '}{resultMessage}
@@ -195,12 +194,12 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
         <h2 className="font-medium">Today's attendance</h2>
         <div className="mt-3 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
           <div className="flex min-w-max gap-1">
-            {(['MEMBERS', 'TRAINERS'] as const).map((tab) => (
+            {(['MEMBERS', 'STAFF'] as const).map((tab) => (
               <button key={tab} onClick={() => setAttendanceTab(tab)}
                 className={`-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm ${
                   attendanceTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}>
-                {tab === 'MEMBERS' ? 'Members' : 'Trainers'}
+                {tab === 'MEMBERS' ? 'Members' : 'Staff'}
               </button>
             ))}
           </div>
@@ -218,7 +217,7 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
             <tbody className="divide-y divide-gray-100">
               {pagedTodayAttendance.map((a, i) => (
                   <tr key={`${a.personId}-${i}`}>
-                    <td className="py-2 pr-4">{a.personName}</td>
+                    <td className="py-2 pr-4">{a.personName} <span className="text-xs text-gray-400">({a.role})</span></td>
                     <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleTimeString()}</td>
                     <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleTimeString() : '—'}</td>
                     <td className="py-2">{a.method}</td>

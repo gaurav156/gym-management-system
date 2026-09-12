@@ -1,10 +1,15 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { api } from '../api/client'
+import { useAuthStore } from '../store/authStore'
 import { handleEditPhotoChange } from '../utils/photo'
 import ChangePasswordSection from '../components/ChangePasswordSection'
-import type { Profile } from '../types'
+import type { Profile, AttendanceLogEntry } from '../types'
+
+const PAGE_SIZE = 5
 
 export default function StaffProfilePage() {
+    const user = useAuthStore((s) => s.user)
     const [profile, setProfile] = useState<Profile | null>(null)
     const [name, setName] = useState('')
     const [phone, setPhone] = useState('')
@@ -13,6 +18,10 @@ export default function StaffProfilePage() {
     const [signature, setSignature] = useState<string | null>(null)
     const [message, setMessage] = useState('')
     const [error, setError] = useState('')
+
+    const [attendance, setAttendance] = useState<AttendanceLogEntry[]>([])
+    const [attendanceError, setAttendanceError] = useState('')
+    const [attendancePage, setAttendancePage] = useState(1)
 
     function load() {
         api.get<Profile>('/api/profile/me').then((res) => {
@@ -25,7 +34,18 @@ export default function StaffProfilePage() {
         })
     }
 
+    function loadAttendance() {
+        api.get<AttendanceLogEntry[]>('/api/attendance/mine')
+            .then((res) => setAttendance(res.data))
+            .catch((err) => setAttendanceError(err.response?.data?.error || 'Failed to load your attendance log'))
+    }
+
     useEffect(() => { load() }, [])
+    useEffect(() => { loadAttendance() }, [])
+
+    useEffect(() => {
+        setAttendancePage(1)
+    }, [attendance.length])
 
     async function handleSubmit(e: FormEvent) {
         e.preventDefault()
@@ -41,9 +61,22 @@ export default function StaffProfilePage() {
 
     if (!profile) return null
 
+    const attendanceTotalPages = Math.max(1, Math.ceil(attendance.length / PAGE_SIZE))
+    const pagedAttendance = attendance.slice((attendancePage - 1) * PAGE_SIZE, attendancePage * PAGE_SIZE)
+
     return (
         <div className="mx-auto max-w-md px-4 py-10">
             <h1 className="text-2xl font-semibold">Your profile</h1>
+
+            {user && (
+                <div className="mt-6 rounded-lg border border-gray-200 p-6 text-center">
+                    <h2 className="font-medium">Your check-in code</h2>
+                    <p className="mt-1 text-xs text-gray-500">Scan this at the gym, or use your 4-digit PIN at reception.</p>
+                    <div className="mt-4 flex justify-center">
+                        <QRCodeSVG value={user.userId} size={160} />
+                    </div>
+                </div>
+            )}
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                 <div className="flex flex-col items-center gap-3">
@@ -120,6 +153,42 @@ export default function StaffProfilePage() {
                     Save changes
                 </button>
             </form>
+
+            <div className="mt-8 rounded-lg border border-gray-200 p-6">
+                <h2 className="font-medium">Your attendance log</h2>
+                <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
+                {attendanceError && <p className="mt-2 text-sm text-red-600">{attendanceError}</p>}
+                <ul className="mt-4 divide-y divide-gray-100 text-sm">
+                    {pagedAttendance.map((a) => (
+                        <li key={a.id} className="py-2">
+                            <div className="flex items-center justify-between">
+                                <span>Check-in: {new Date(a.checkInTime).toLocaleString()}</span>
+                                <span className="text-right text-gray-500">
+                                    {a.branchName}
+                                    <span className="ml-2 text-xs text-gray-400">{a.method}</span>
+                                </span>
+                            </div>
+                            <div className="mt-0.5 text-xs text-gray-400">
+                                {a.checkOutTime
+                                    ? `Check-out: ${new Date(a.checkOutTime).toLocaleString()}`
+                                    : 'Not checked out yet'}
+                            </div>
+                        </li>
+                    ))}
+                    {attendance.length === 0 && <li className="py-2 text-gray-400">No visits logged yet.</li>}
+                </ul>
+                {attendance.length > 0 && (
+                    <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                        <span>Page {attendancePage} of {attendanceTotalPages} ({attendance.length} total)</span>
+                        <div className="space-x-2">
+                            <button disabled={attendancePage === 1} onClick={() => setAttendancePage((p) => p - 1)}
+                                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                            <button disabled={attendancePage === attendanceTotalPages} onClick={() => setAttendancePage((p) => p + 1)}
+                                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             <ChangePasswordSection />
         </div>

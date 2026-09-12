@@ -150,6 +150,8 @@ public class AuthService {
         return new AuthResponse(token, member.getId().toString(), member.getName(), member.getEmail(), member.getRole().name());
     }
 
+    // Manager now also gets a check-in PIN/QR token, same as Trainer - Managers can
+    // check in/out at reception like everyone else on staff.
     @Transactional
     public AuthResponse createManager(CreateManagerRequest req) {
         if (userRepository.existsByEmail(req.email())) {
@@ -163,6 +165,8 @@ public class AuthService {
                 .phone(req.phone())
                 .passwordHash(passwordEncoder.encode(req.password()))
                 .role(Role.MANAGER)
+                .checkinPin(generatePin())
+                .qrToken(UUID.randomUUID().toString())
                 .active(true)
                 .build();
         manager = userRepository.save(manager);

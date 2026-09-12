@@ -8,6 +8,9 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.security.SecureRandom;
+import java.util.UUID;
+
 // Creates the single master OWNER account on first startup, if one doesn't already
 // exist. There is deliberately no public "register as owner" endpoint - this is the
 // only way an OWNER account gets created, matching the "one master account" requirement.
@@ -39,10 +42,19 @@ public class DataSeeder implements CommandLineRunner {
                     .email(ownerEmail)
                     .passwordHash(passwordEncoder.encode(ownerPassword))
                     .role(Role.OWNER)
+                    // Owner is staff too now - needs a PIN/QR to check in/out like
+                    // Managers and Trainers.
+                    .checkinPin(generatePin())
+                    .qrToken(UUID.randomUUID().toString())
                     .active(true)
                     .build();
             userRepository.save(owner);
             System.out.println("Seeded OWNER account: " + ownerEmail);
         }
+    }
+
+    private String generatePin() {
+        SecureRandom random = new SecureRandom();
+        return String.format("%04d", random.nextInt(10000));
     }
 }
