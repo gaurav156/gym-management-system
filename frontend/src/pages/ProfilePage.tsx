@@ -1,9 +1,8 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { api } from '../api/client'
+import PhotoUploadButton from '../components/PhotoUploadButton'
 import ChangePasswordSection from '../components/ChangePasswordSection'
 import type { Profile } from '../types'
-
-const MAX_PHOTO_BYTES = 1_500_000 // ~1.5MB - base64 in a DB column, keep it modest
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -26,22 +25,6 @@ export default function ProfilePage() {
 
   useEffect(() => { load() }, [])
 
-  function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    const inputEl = e.target
-    if (!file) return
-    if (file.size > MAX_PHOTO_BYTES) {
-      setError('Photo is too large - please use one under ~1.5MB.')
-      inputEl.value = ''
-      return
-    }
-    setError('')
-    const reader = new FileReader()
-    reader.onload = () => setPhoto(reader.result as string)
-    reader.readAsDataURL(file)
-    inputEl.value = ''
-  }
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setMessage(''); setError('')
@@ -63,13 +46,13 @@ export default function ProfilePage() {
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div className="flex flex-col items-center gap-3">
           {photo ? (
-            <img src={photo} alt="Profile" className="h-24 w-24 rounded-full object-cover" />
+            <img src={photo} alt="Profile" className="h-24 w-24 flex-shrink-0 rounded-full object-cover" />
           ) : (
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gray-200 text-2xl font-medium text-gray-500">
+            <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-2xl font-medium text-gray-500">
               {profile.name.charAt(0).toUpperCase()}
             </div>
           )}
-          <input type="file" accept="image/*" onChange={handlePhotoChange} className="text-sm" />
+          <PhotoUploadButton onLoaded={setPhoto} onError={setError} label="Upload photo" />
           {photo && (
             <button type="button" onClick={() => setPhoto(null)} className="text-xs text-red-600 hover:underline">
               Remove photo

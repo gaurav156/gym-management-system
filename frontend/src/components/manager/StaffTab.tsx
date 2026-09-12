@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
-import { handleEditPhotoChange } from '../../utils/photo'
+import PhotoUploadButton from '../PhotoUploadButton'
 import type { Branch, StaffSummary, AttendanceLogEntry, AuthUser } from '../../types'
 
 const PAGE_SIZE = 10
@@ -331,12 +331,11 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                           {staffEditName.charAt(0).toUpperCase()}
                         </span>
                       )}
-                      <div>
-                        <input type="file" accept="image/*"
-                          onChange={(e) => handleEditPhotoChange(e, setStaffEditPhoto, setStaffModalMessage)} className="text-xs" />
+                      <div className="flex flex-col items-start gap-1.5">
+                        <PhotoUploadButton onLoaded={setStaffEditPhoto} onError={setStaffModalMessage} label="Change photo" size="sm" />
                         {staffEditPhoto && (
                           <button type="button" onClick={() => setStaffEditPhoto(null)}
-                            className="block text-xs text-red-600 hover:underline">Remove photo</button>
+                            className="text-xs text-red-600 hover:underline">Remove photo</button>
                         )}
                       </div>
                     </div>

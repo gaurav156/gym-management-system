@@ -1,8 +1,8 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
-import { handleEditPhotoChange } from '../utils/photo'
+import PhotoUploadButton from '../components/PhotoUploadButton'
 import ChangePasswordSection from '../components/ChangePasswordSection'
 import type { Profile, AttendanceLogEntry } from '../types'
 
@@ -111,12 +111,7 @@ export default function StaffProfilePage() {
                                     {profile.name.charAt(0).toUpperCase()}
                                 </div>
                             )}
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => handleEditPhotoChange(e, setPhoto, setError)}
-                                className="text-sm"
-                            />
+                            <PhotoUploadButton onLoaded={setPhoto} onError={setError} label="Upload photo" />
                             {photo && (
                                 <button type="button" onClick={() => setPhoto(null)} className="text-xs text-red-600 hover:underline">
                                     Remove photo
@@ -156,12 +151,7 @@ export default function StaffProfilePage() {
                                         No signature yet
                                     </div>
                                 )}
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => handleEditPhotoChange(e, setSignature, setError)}
-                                    className="text-sm"
-                                />
+                                <PhotoUploadButton onLoaded={setSignature} onError={setError} label="Upload signature" size="sm" />
                                 {signature && (
                                     <button type="button" onClick={() => setSignature(null)} className="text-xs text-red-600 hover:underline">
                                         Remove signature

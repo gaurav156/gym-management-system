@@ -1,7 +1,7 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { getEffectiveStatus, statusColorClass, statusLabel, type EffectiveStatus } from '../../utils/membership'
-import { handleEditPhotoChange } from '../../utils/photo'
+import PhotoUploadButton from '../PhotoUploadButton'
 import type { Branch, MembershipAdmin, Payment, AttendanceLogEntry, MemberSummary, InvoiceResponse, AuthUser } from '../../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
 
@@ -415,12 +415,11 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                           {memberEditName.charAt(0).toUpperCase()}
                         </span>
                       )}
-                      <div>
-                        <input type="file" accept="image/*"
-                          onChange={(e) => handleEditPhotoChange(e, setMemberEditPhoto, setMemberModalMessage)} className="text-xs" />
+                      <div className="flex flex-col items-start gap-1.5">
+                        <PhotoUploadButton onLoaded={setMemberEditPhoto} onError={setMemberModalMessage} label="Change photo" size="sm" />
                         {memberEditPhoto && (
                           <button type="button" onClick={() => setMemberEditPhoto(null)}
-                            className="block text-xs text-red-600 hover:underline">Remove photo</button>
+                            className="text-xs text-red-600 hover:underline">Remove photo</button>
                         )}
                       </div>
                     </div>
