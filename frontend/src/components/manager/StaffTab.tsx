@@ -236,9 +236,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                   <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">
                       {s.photo ? (
-                        <img src={s.photo} alt="" className="h-6 w-6 rounded-full object-cover" />
+                        <img src={s.photo} alt="" className="h-6 w-6 flex-shrink-0 rounded-full object-cover" />
                       ) : (
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-[10px] text-gray-500">
+                        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] text-gray-500">
                           {s.name.charAt(0).toUpperCase()}
                         </span>
                       )}
@@ -288,9 +288,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 {detailStaff.photo ? (
-                  <img src={detailStaff.photo} alt="" className="h-12 w-12 rounded-full object-cover" />
+                  <img src={detailStaff.photo} alt="" className="h-12 w-12 flex-shrink-0 rounded-full object-cover" />
                 ) : (
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
+                  <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
                     {detailStaff.name.charAt(0).toUpperCase()}
                   </span>
                 )}
@@ -325,9 +325,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                   <div className="space-y-3 rounded-md border border-gray-200 p-3">
                     <div className="flex items-center gap-3">
                       {staffEditPhoto ? (
-                        <img src={staffEditPhoto} alt="" className="h-14 w-14 rounded-full object-cover" />
+                        <img src={staffEditPhoto} alt="" className="h-14 w-14 flex-shrink-0 rounded-full object-cover" />
                       ) : (
-                        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
+                        <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
                           {staffEditName.charAt(0).toUpperCase()}
                         </span>
                       )}
@@ -383,7 +383,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                         Delete account
                       </button>
                     )}
-                    {detailStaff.role === 'OWNER' && (
+                    {detailStaff.role === 'OWNER' && user?.role === 'OWNER' && (
                       <p className="text-xs text-gray-400">Owner info is edited from the Profile page.</p>
                     )}
                   </>

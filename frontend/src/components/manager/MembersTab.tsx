@@ -321,9 +321,9 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                   <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">
                       {member.photo ? (
-                        <img src={member.photo} alt="" className="h-6 w-6 rounded-full object-cover" />
+                        <img src={member.photo} alt="" className="h-6 w-6 flex-shrink-0 rounded-full object-cover" />
                       ) : (
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-[10px] text-gray-500">
+                        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] text-gray-500">
                           {member.name.charAt(0).toUpperCase()}
                         </span>
                       )}
@@ -373,9 +373,9 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 {detailMember.photo ? (
-                  <img src={detailMember.photo} alt="" className="h-12 w-12 rounded-full object-cover" />
+                  <img src={detailMember.photo} alt="" className="h-12 w-12 flex-shrink-0 rounded-full object-cover" />
                 ) : (
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
+                  <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
                     {detailMember.name.charAt(0).toUpperCase()}
                   </span>
                 )}
@@ -409,9 +409,9 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                   <div className="space-y-3 rounded-md border border-gray-200 p-3">
                     <div className="flex items-center gap-3">
                       {memberEditPhoto ? (
-                        <img src={memberEditPhoto} alt="" className="h-14 w-14 rounded-full object-cover" />
+                        <img src={memberEditPhoto} alt="" className="h-14 w-14 flex-shrink-0 rounded-full object-cover" />
                       ) : (
-                        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
+                        <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
                           {memberEditName.charAt(0).toUpperCase()}
                         </span>
                       )}
