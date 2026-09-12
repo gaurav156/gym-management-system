@@ -17,10 +17,16 @@ function roleLabel(role: string): string {
   return role === 'OWNER' ? 'Owner' : role === 'MANAGER' ? 'Manager' : 'Trainer'
 }
 
+// Fixed display order for role-based sorting - alphabetical ("Manager" < "Owner" 
+// "Trainer") wouldn't read naturally, so this sorts by seniority instead.
+const ROLE_SORT_ORDER: Record<string, number> = { OWNER: 0, MANAGER: 1, TRAINER: 2 }
+
 export default function StaffTab({ selectedBranch, allBranches, lastCheckins, user }: Props) {
   const [staff, setStaff] = useState<StaffSummary[]>([])
   const [showAllTrainers, setShowAllTrainers] = useState(false)
   const [staffPage, setStaffPage] = useState(1)
+  const [staffRoleFilter, setStaffRoleFilter] = useState<'ALL' | 'OWNER' | 'MANAGER' | 'TRAINER'>('ALL')
+  const [staffSort, setStaffSort] = useState<'NAME' | 'ROLE'>('NAME')
 
   const [detailStaffId, setDetailStaffId] = useState<string | null>(null)
   const [staffModalTab, setStaffModalTab] = useState<'INFO' | 'ATTENDANCE' | 'BRANCHES'>('INFO')
@@ -52,7 +58,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
 
   useEffect(() => {
     setStaffPage(1)
-  }, [showAllTrainers, selectedBranch])
+  }, [showAllTrainers, selectedBranch, staffRoleFilter, staffSort])
 
   function loadDetailStaffBranches(staffId: string) {
     api.get<Branch[]>('/api/branches/mine', { params: { userId: staffId } }).then((res) => setDetailStaffBranches(res.data))
@@ -163,8 +169,13 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     }
   }
 
-  // Only Trainer rows have a leftDate at all - Owner/Manager rows always pass this filter.
-  const visibleStaff = staff.filter((s) => s.role !== 'TRAINER' || showAllTrainers || !s.leftDate)
+  const visibleStaff = staff
+    .filter((s) => s.role !== 'TRAINER' || showAllTrainers || !s.leftDate)
+    .filter((s) => staffRoleFilter === 'ALL' || s.role === staffRoleFilter)
+    .sort((a, b) => staffSort === 'NAME'
+      ? a.name.localeCompare(b.name)
+      : (ROLE_SORT_ORDER[a.role] - ROLE_SORT_ORDER[b.role]) || a.name.localeCompare(b.name))
+
   const staffTotalPages = Math.max(1, Math.ceil(visibleStaff.length / PAGE_SIZE))
   const pagedStaff = visibleStaff.slice((staffPage - 1) * PAGE_SIZE, staffPage * PAGE_SIZE)
 
@@ -190,6 +201,22 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
           </label>
         </div>
         <p className="mt-1 text-xs text-gray-500">Owner, Managers, and Trainers for this branch - all can check in/out.</p>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <select value={staffRoleFilter} onChange={(e) => setStaffRoleFilter(e.target.value as any)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm">
+            <option value="ALL">All roles</option>
+            <option value="OWNER">Owner</option>
+            <option value="MANAGER">Manager</option>
+            <option value="TRAINER">Trainer</option>
+          </select>
+          <select value={staffSort} onChange={(e) => setStaffSort(e.target.value as any)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm">
+            <option value="NAME">Sort: Name</option>
+            <option value="ROLE">Sort: Role</option>
+          </select>
+        </div>
+
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -235,7 +262,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
             </tbody>
           </table>
           {visibleStaff.length === 0 && (
-            <p className="py-4 text-sm text-gray-400">No staff assigned to this branch yet.</p>
+            <p className="py-4 text-sm text-gray-400">
+              {staff.length === 0 ? 'No staff assigned to this branch yet.' : 'No staff match the current filters.'}
+            </p>
           )}
           {visibleStaff.length > 0 && (
             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
