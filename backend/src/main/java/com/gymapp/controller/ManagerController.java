@@ -2,6 +2,7 @@ package com.gymapp.controller;
 
 import com.gymapp.dto.ProfileDtos.UpdateProfileRequest;
 import com.gymapp.dto.TrainerDtos.TrainerSummary;
+import com.gymapp.dto.TrainerDtos.UpdateTrainerDatesRequest;
 import com.gymapp.service.ManagerDirectoryService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -25,5 +26,12 @@ public class ManagerController {
     @PreAuthorize("hasRole('OWNER')")
     public TrainerSummary updateInfo(@PathVariable UUID id, @RequestBody UpdateProfileRequest req) {
         return managerDirectoryService.updateManagerInfo(id, req);
+    }
+
+    // Owner-only, mirrors TrainerController's /dates endpoint.
+    @PutMapping("/{id}/dates")
+    @PreAuthorize("hasRole('OWNER')")
+    public TrainerSummary updateDates(@PathVariable UUID id, @RequestBody UpdateTrainerDatesRequest req) {
+        return managerDirectoryService.updateManagerDates(id, req);
     }
 }

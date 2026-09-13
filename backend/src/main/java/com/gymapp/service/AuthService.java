@@ -231,6 +231,13 @@ public class AuthService {
             throw new IllegalArgumentException("This account has been deactivated");
         }
 
+        // Same fallback as AttendanceService.checkin() - blocks dashboard login for
+        // staff marked as left who still hold the TRAINER/MANAGER role.
+        if ((user.getRole() == Role.TRAINER || user.getRole() == Role.MANAGER)
+                && user.getLeftDate() != null && !user.getLeftDate().isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("This account's staff access has ended - contact the Owner");
+        }
+
         String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name(), user.getId().toString());
         return new AuthResponse(token, user.getId().toString(), user.getName(), user.getEmail(), user.getRole().name());
     }

@@ -81,6 +81,16 @@ public class AttendanceService {
             throw new IllegalArgumentException("This account is inactive");
         }
 
+        // Staff who have left (leftDate set, in the past or today) shouldn't be able to
+        // check in as staff even if their role hasn't been changed yet - see
+        // RoleChangeService for the preferred long-term fix (changing their role away
+        // from TRAINER/MANAGER entirely), this is the fallback for anyone still holding
+        // the role with just leftDate set.
+        if ((person.getRole() == Role.TRAINER || person.getRole() == Role.MANAGER)
+                && person.getLeftDate() != null && !person.getLeftDate().isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException(person.getName() + " is no longer active staff - check-in denied");
+        }
+
         if (req.branchId() == null) {
             throw new IllegalArgumentException("branchId is required");
         }

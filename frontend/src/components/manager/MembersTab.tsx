@@ -2,7 +2,7 @@ import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { getEffectiveStatus, statusColorClass, statusLabel, type EffectiveStatus } from '../../utils/membership'
 import PhotoUploadButton from '../PhotoUploadButton'
-import type { Branch, MembershipAdmin, Payment, AttendanceLogEntry, MemberSummary, InvoiceResponse, AuthUser } from '../../types'
+import type { Branch, MembershipAdmin, Payment, AttendanceLogEntry, MemberSummary, InvoiceResponse, AuthUser, RoleHistoryEntry } from '../../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
 
 const PAGE_SIZE = 10
@@ -29,6 +29,11 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [modalShowExpired, setModalShowExpired] = useState(false)
   const [modalPage, setModalPage] = useState(1)
   const [memberModalMessage, setMemberModalMessage] = useState('')
+
+  // Change Role + its history - Owner-only, so a Member can be promoted to Trainer/Manager.
+  const [roleHistory, setRoleHistory] = useState<RoleHistoryEntry[]>([])
+  const [selectedNewRole, setSelectedNewRole] = useState('')
+  const [changingRole, setChangingRole] = useState(false)
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editStartDate, setEditStartDate] = useState('')
@@ -74,6 +79,13 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     api.get<Branch[]>('/api/branches/mine', { params: { userId: memberId } }).then((res) => setDetailMemberBranches(res.data))
   }
 
+  function loadRoleHistory(memberId: string) {
+    if (user?.role !== 'OWNER') return
+    api.get<RoleHistoryEntry[]>(`/api/owner/users/${memberId}/role-history`)
+      .then((res) => setRoleHistory(res.data))
+      .catch(() => setRoleHistory([]))
+  }
+
   useEffect(() => {
     setModalPage(1)
   }, [detailMemberId, modalShowExpired])
@@ -87,10 +99,13 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     setEditingMemberInfo(false)
     setEditingMemberBranches(false)
     setPaymentSendMessage('')
+    setSelectedNewRole('')
+    setRoleHistory([])
     api.get<Payment[]>(`/api/payments/member/${detailMemberId}`).then((res) => setDetailPayments(res.data))
     api.get<AttendanceLogEntry[]>(`/api/attendance/history/${detailMemberId}`).then((res) => setDetailAttendance(res.data))
     api.get<MembershipAdmin[]>(`/api/memberships/member/${detailMemberId}`).then((res) => setDetailMembershipsFetched(res.data))
     loadDetailMemberBranches(detailMemberId)
+    loadRoleHistory(detailMemberId)
   }, [detailMemberId])
 
   useEffect(() => {
@@ -220,6 +235,33 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       loadMemberships()
     } catch (err: any) {
       setMemberModalMessage(err.response?.data?.error || 'Failed to delete account')
+    }
+  }
+
+  // Owner-only. Promoting a Member to Trainer/Manager moves them out of the Members
+  // list entirely, so the modal closes and the branch-scoped lists refresh.
+  async function changeMemberRole(member: MemberSummary) {
+    if (!selectedNewRole) {
+      setMemberModalMessage('Select a role to change to.')
+      return
+    }
+    if (!confirm(
+      `Change ${member.name}'s role from Member to ${selectedNewRole === 'TRAINER' ? 'Trainer' : 'Manager'}? ` +
+      `This takes effect immediately for new logins, but anyone already signed in keeps ` +
+      `their current access until their session expires or they log in again.`
+    )) return
+
+    setChangingRole(true)
+    setMemberModalMessage('')
+    try {
+      await api.put(`/api/owner/users/${member.id}/role`, { newRole: selectedNewRole })
+      setDetailMemberId(null)
+      loadMembers()
+      loadMemberships()
+    } catch (err: any) {
+      setMemberModalMessage(err.response?.data?.error || 'Failed to change role')
+    } finally {
+      setChangingRole(false)
     }
   }
 
@@ -463,6 +505,44 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                         className="ml-3 text-xs text-red-600 hover:underline">
                         Delete account
                       </button>
+                    )}
+                    {user?.role === 'OWNER' && (
+                      <>
+                        <hr />
+                        <div className="rounded-md border border-gray-200 p-3">
+                          <p className="text-xs font-medium text-gray-700">Change role</p>
+                          <p className="mt-1 text-xs text-gray-500">
+                            Promotes this Member to staff. Today becomes their joining date as
+                            Trainer/Manager; their membership history stays intact either way.
+                          </p>
+                          <div className="mt-2 flex items-center gap-2">
+                            <select value={selectedNewRole} onChange={(e) => setSelectedNewRole(e.target.value)}
+                              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm">
+                              <option value="">Select new role...</option>
+                              <option value="TRAINER">Trainer</option>
+                              <option value="MANAGER">Manager</option>
+                            </select>
+                            <button onClick={() => changeMemberRole(detailMember)} disabled={!selectedNewRole || changingRole}
+                              className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-60">
+                              {changingRole ? 'Changing...' : 'Change role'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {roleHistory.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs font-medium text-gray-700">Past roles</p>
+                            <ul className="mt-1 space-y-1 text-xs text-gray-500">
+                              {roleHistory.map((h, i) => (
+                                <li key={i}>
+                                  {h.previousRole} → {h.newRole} by {h.changedByName} on{' '}
+                                  {new Date(h.changedAt).toLocaleDateString()}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </>
                     )}  
                   </>
                 )}

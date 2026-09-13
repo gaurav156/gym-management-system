@@ -2,6 +2,7 @@ package com.gymapp.service;
 
 import com.gymapp.dto.ProfileDtos.UpdateProfileRequest;
 import com.gymapp.dto.TrainerDtos.TrainerSummary;
+import com.gymapp.dto.TrainerDtos.UpdateTrainerDatesRequest;
 import com.gymapp.entity.Role;
 import com.gymapp.entity.User;
 import com.gymapp.repository.UserRepository;
@@ -46,5 +47,20 @@ public class ManagerDirectoryService {
     private TrainerSummary toSummary(User u) {
         return new TrainerSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(), u.getPhoto(),
                 u.getCheckinPin(), u.getJoiningDate(), u.getLeftDate());
+    }
+
+    // Owner-only, mirrors TrainerDirectoryService.updateDates() - lets the Owner correct
+    // a Manager's joining date or mark/clear a left date, same as for Trainers.
+    @Transactional
+    public TrainerSummary updateManagerDates(UUID managerId, UpdateTrainerDatesRequest req) {
+        User manager = userRepository.findById(managerId)
+                .orElseThrow(() -> new IllegalArgumentException("Manager not found"));
+        if (manager.getRole() != Role.MANAGER) {
+            throw new IllegalArgumentException("This account is not a manager");
+        }
+        if (req.joiningDate() != null) manager.setJoiningDate(req.joiningDate());
+        manager.setLeftDate(req.leftDate());
+        manager = userRepository.save(manager);
+        return toSummary(manager);
     }
 }

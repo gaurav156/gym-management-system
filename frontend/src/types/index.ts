@@ -157,3 +157,10 @@ export interface StaffSummary {
   joiningDate: string | null
   leftDate: string | null
 }
+
+export interface RoleHistoryEntry {
+  previousRole: string
+  newRole: string
+  changedByName: string
+  changedAt: string
+}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import PhotoUploadButton from '../PhotoUploadButton'
-import type { Branch, StaffSummary, AttendanceLogEntry, AuthUser } from '../../types'
+import type { Branch, StaffSummary, AttendanceLogEntry, AuthUser, RoleHistoryEntry } from '../../types'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -14,16 +14,20 @@ interface Props {
 }
 
 function roleLabel(role: string): string {
-  return role === 'OWNER' ? 'Owner' : role === 'MANAGER' ? 'Manager' : 'Trainer'
+  return role === 'OWNER' ? 'Owner' : role === 'MANAGER' ? 'Manager' : role === 'TRAINER' ? 'Trainer' : 'Member'
 }
 
 // Fixed display order for role-based sorting - alphabetical ("Manager" < "Owner" 
 // "Trainer") wouldn't read naturally, so this sorts by seniority instead.
 const ROLE_SORT_ORDER: Record<string, number> = { OWNER: 0, MANAGER: 1, TRAINER: 2 }
 
+// Every role a person could be changed TO from this screen - OWNER is deliberately
+// excluded, matching the backend's refusal to promote/demote anyone to Owner.
+const CHANGEABLE_ROLES = ['MEMBER', 'TRAINER', 'MANAGER'] as const
+
 export default function StaffTab({ selectedBranch, allBranches, lastCheckins, user }: Props) {
   const [staff, setStaff] = useState<StaffSummary[]>([])
-  const [showAllTrainers, setShowAllTrainers] = useState(false)
+  const [showLeftStaff, setShowLeftStaff] = useState(false)
   const [staffPage, setStaffPage] = useState(1)
   const [staffRoleFilter, setStaffRoleFilter] = useState<'ALL' | 'OWNER' | 'MANAGER' | 'TRAINER'>('ALL')
   const [staffSort, setStaffSort] = useState<'NAME' | 'ROLE'>('NAME')
@@ -38,7 +42,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const [staffEditAddress, setStaffEditAddress] = useState('')
   const [staffEditPhoto, setStaffEditPhoto] = useState<string | null>(null)
 
-  const [editingTrainerDates, setEditingTrainerDates] = useState(false)
+  // Joining/left dates now apply to Manager as well as Trainer - both are "staff" in the
+  // sense that they can leave and come back, unlike Owner.
+  const [editingStaffDates, setEditingStaffDates] = useState(false)
   const [joiningDateInput, setJoiningDateInput] = useState('')
   const [leftDateInput, setLeftDateInput] = useState('')
 
@@ -49,6 +55,11 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const [detailStaffAttendance, setDetailStaffAttendance] = useState<AttendanceLogEntry[]>([])
   const [staffModalPage, setStaffModalPage] = useState(1)
 
+  // Change Role + its history - Owner-only, fetched/shown only when the caller is Owner.
+  const [roleHistory, setRoleHistory] = useState<RoleHistoryEntry[]>([])
+  const [selectedNewRole, setSelectedNewRole] = useState('')
+  const [changingRole, setChangingRole] = useState(false)
+
   function loadStaff() {
     if (!selectedBranch) return
     api.get<StaffSummary[]>('/api/staff', { params: { branchId: selectedBranch } }).then((res) => setStaff(res.data))
@@ -58,22 +69,32 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
 
   useEffect(() => {
     setStaffPage(1)
-  }, [showAllTrainers, selectedBranch, staffRoleFilter, staffSort])
+  }, [showLeftStaff, selectedBranch, staffRoleFilter, staffSort])
 
   function loadDetailStaffBranches(staffId: string) {
     api.get<Branch[]>('/api/branches/mine', { params: { userId: staffId } }).then((res) => setDetailStaffBranches(res.data))
+  }
+
+  function loadRoleHistory(staffId: string) {
+    if (user?.role !== 'OWNER') return
+    api.get<RoleHistoryEntry[]>(`/api/owner/users/${staffId}/role-history`)
+      .then((res) => setRoleHistory(res.data))
+      .catch(() => setRoleHistory([]))
   }
 
   useEffect(() => {
     setStaffModalMessage('')
     setEditingStaffInfo(false)
     setEditingStaffBranches(false)
-    setEditingTrainerDates(false)
+    setEditingStaffDates(false)
+    setSelectedNewRole('')
+    setRoleHistory([])
     if (detailStaffId) {
       const s = staff.find((x) => x.id === detailStaffId)
       setStaffModalTab('INFO')
       setStaffModalPage(1)
       api.get<AttendanceLogEntry[]>(`/api/attendance/history/${detailStaffId}`).then((res) => setDetailStaffAttendance(res.data))
+      loadRoleHistory(detailStaffId)
       if (s?.role !== 'OWNER') {
         loadDetailStaffBranches(detailStaffId)
       } else {
@@ -110,29 +131,32 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     }
   }
 
-  function startEditTrainerDates(t: StaffSummary) {
-    setEditingTrainerDates(true)
-    setJoiningDateInput(t.joiningDate ?? '')
-    setLeftDateInput(t.leftDate ?? '')
+  function startEditStaffDates(s: StaffSummary) {
+    setEditingStaffDates(true)
+    setJoiningDateInput(s.joiningDate ?? '')
+    setLeftDateInput(s.leftDate ?? '')
     setStaffModalMessage('')
   }
 
-  async function saveTrainerDates(trainerId: string) {
+  // Same dates endpoint shape for Trainer and Manager now - only the path differs.
+  async function saveStaffDates(s: StaffSummary) {
+    const endpoint = s.role === 'MANAGER' ? `/api/managers/${s.id}/dates` : `/api/trainers/${s.id}/dates`
     try {
-      await api.put(`/api/trainers/${trainerId}/dates`, {
+      await api.put(endpoint, {
         joiningDate: joiningDateInput || null,
         leftDate: leftDateInput || null,
       })
-      setEditingTrainerDates(false)
+      setEditingStaffDates(false)
       loadStaff()
     } catch (err: any) {
-      setStaffModalMessage(err.response?.data?.error || 'Failed to update trainer dates')
+      setStaffModalMessage(err.response?.data?.error || 'Failed to update dates')
     }
   }
 
-  async function clearLeftDate(trainerId: string, joiningDate: string | null) {
+  async function clearLeftDate(s: StaffSummary) {
+    const endpoint = s.role === 'MANAGER' ? `/api/managers/${s.id}/dates` : `/api/trainers/${s.id}/dates`
     try {
-      await api.put(`/api/trainers/${trainerId}/dates`, { joiningDate, leftDate: null })
+      await api.put(endpoint, { joiningDate: s.joiningDate, leftDate: null })
       loadStaff()
     } catch (err: any) {
       setStaffModalMessage(err.response?.data?.error || 'Failed to clear left date')
@@ -169,8 +193,35 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     }
   }
 
+  // Owner-only. A role change can move this person out of the Staff directory entirely
+  // (e.g. Manager -> Member), so the modal closes and both the branch list and any
+  // dependent state get refreshed rather than trying to patch the row in place.
+  async function changeRole(s: StaffSummary) {
+    if (!selectedNewRole) {
+      setStaffModalMessage('Select a role to change to.')
+      return
+    }
+    if (!confirm(
+      `Change ${s.name}'s role from ${roleLabel(s.role)} to ${roleLabel(selectedNewRole)}? ` +
+      `This takes effect immediately for new logins, but anyone already signed in keeps ` +
+      `their current access until their session expires or they log in again.`
+    )) return
+
+    setChangingRole(true)
+    setStaffModalMessage('')
+    try {
+      await api.put(`/api/owner/users/${s.id}/role`, { newRole: selectedNewRole })
+      setDetailStaffId(null)
+      loadStaff()
+    } catch (err: any) {
+      setStaffModalMessage(err.response?.data?.error || 'Failed to change role')
+    } finally {
+      setChangingRole(false)
+    }
+  }
+
   const visibleStaff = staff
-    .filter((s) => s.role !== 'TRAINER' || showAllTrainers || !s.leftDate)
+    .filter((s) => (s.role !== 'TRAINER' && s.role !== 'MANAGER') || showLeftStaff || !s.leftDate)
     .filter((s) => staffRoleFilter === 'ALL' || s.role === staffRoleFilter)
     .sort((a, b) => staffSort === 'NAME'
       ? a.name.localeCompare(b.name)
@@ -187,8 +238,15 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const canEditInfo = detailStaff && detailStaff.role !== 'OWNER' &&
     (detailStaff.role === 'TRAINER' || user?.role === 'OWNER')
 
-  // Delete is Owner-only, and never for the Owner's own account.
+  // Dates editor now covers both staff roles that can actually leave/rejoin.
+  const canEditDates = detailStaff && user?.role === 'OWNER' &&
+    (detailStaff.role === 'TRAINER' || detailStaff.role === 'MANAGER')
+
+  // Delete and Change Role are both Owner-only, and never for the Owner's own account.
   const canDelete = detailStaff && detailStaff.role !== 'OWNER' && user?.role === 'OWNER'
+  const canChangeRole = detailStaff && detailStaff.role !== 'OWNER' && user?.role === 'OWNER'
+
+  const roleOptions = detailStaff ? CHANGEABLE_ROLES.filter((r) => r !== detailStaff.role) : []
 
   return (
     <div>
@@ -196,8 +254,8 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
         <div className="flex items-center justify-between">
           <h2 className="font-medium">Staff</h2>
           <label className="flex items-center gap-1.5 text-xs text-gray-500">
-            <input type="checkbox" checked={showAllTrainers} onChange={(e) => setShowAllTrainers(e.target.checked)} />
-            Show all trainers (including left)
+            <input type="checkbox" checked={showLeftStaff} onChange={(e) => setShowLeftStaff(e.target.checked)} />
+            Show all trainers/managers (including left)
           </label>
         </div>
         <p className="mt-1 text-xs text-gray-500">Owner, Managers, and Trainers for this branch - all can check in/out.</p>
@@ -243,6 +301,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                         </span>
                       )}
                       {s.name}
+                      {s.leftDate && (s.role === 'TRAINER' || s.role === 'MANAGER') && (
+                        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">Left</span>
+                      )}
                     </div>
                   </td>
                   <td className="py-2 pr-4 text-gray-500">{roleLabel(s.role)}</td>
@@ -298,6 +359,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                   <h3 className="text-lg font-medium">{detailStaff.name}</h3>
                   <p className="text-xs text-gray-500">
                     {roleLabel(detailStaff.role)} · {detailStaff.email} · PIN {detailStaff.checkinPin ?? '—'}
+                    {detailStaff.leftDate && (detailStaff.role === 'TRAINER' || detailStaff.role === 'MANAGER') && (
+                      <span className="ml-1 text-amber-600">· Left {detailStaff.leftDate}</span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -388,10 +452,10 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                   </>
                 )}
 
-                {detailStaff.role === 'TRAINER' && (
+                {(detailStaff.role === 'TRAINER' || detailStaff.role === 'MANAGER') && (
                   <>
                     <hr />
-                    {editingTrainerDates ? (
+                    {editingStaffDates ? (
                       <div className="space-y-3 rounded-md border border-gray-200 p-3">
                         <div>
                           <label className="text-xs text-gray-500">Joining date</label>
@@ -404,9 +468,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                             className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
                         </div>
                         <div className="space-x-2">
-                          <button onClick={() => saveTrainerDates(detailStaff.id)}
+                          <button onClick={() => saveStaffDates(detailStaff)}
                             className="text-xs text-green-700 hover:underline">Save</button>
-                          <button onClick={() => setEditingTrainerDates(false)}
+                          <button onClick={() => setEditingStaffDates(false)}
                             className="text-xs text-gray-500 hover:underline">Cancel</button>
                         </div>
                       </div>
@@ -414,17 +478,60 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                       <>
                         <p><span className="text-gray-500">Joining date:</span> {detailStaff.joiningDate ?? '—'}</p>
                         <p><span className="text-gray-500">Left date:</span> {detailStaff.leftDate ?? '—'}</p>
-                        {user?.role === 'OWNER' && (
+                        {detailStaff.leftDate && (
+                          <p className="text-xs text-amber-600">
+                            While a left date is set, this person can't check in or log into their dashboard.
+                          </p>
+                        )}
+                        {canEditDates && (
                           <div className="space-x-2">
-                            <button onClick={() => startEditTrainerDates(detailStaff)}
+                            <button onClick={() => startEditStaffDates(detailStaff)}
                               className="text-xs text-gray-600 hover:underline">Edit dates</button>
                             {detailStaff.leftDate && (
-                              <button onClick={() => clearLeftDate(detailStaff.id, detailStaff.joiningDate)}
+                              <button onClick={() => clearLeftDate(detailStaff)}
                                 className="text-xs text-brand hover:underline">Clear left date</button>
                             )}
                           </div>
                         )}
                       </>
+                    )}
+                  </>
+                )}
+
+                {canChangeRole && (
+                  <>
+                    <hr />
+                    <div className="rounded-md border border-gray-200 p-3">
+                      <p className="text-xs font-medium text-gray-700">Change role</p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Moving this person off staff (e.g. to Member) automatically sets today as their
+                        left date. Moving someone onto staff sets today as their joining date.
+                      </p>
+                      <div className="mt-2 flex items-center gap-2">
+                        <select value={selectedNewRole} onChange={(e) => setSelectedNewRole(e.target.value)}
+                          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm">
+                          <option value="">Select new role...</option>
+                          {roleOptions.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                        </select>
+                        <button onClick={() => changeRole(detailStaff)} disabled={!selectedNewRole || changingRole}
+                          className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-60">
+                          {changingRole ? 'Changing...' : 'Change role'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {roleHistory.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs font-medium text-gray-700">Past roles</p>
+                        <ul className="mt-1 space-y-1 text-xs text-gray-500">
+                          {roleHistory.map((h, i) => (
+                            <li key={i}>
+                              {roleLabel(h.previousRole)} → {roleLabel(h.newRole)} by {h.changedByName} on{' '}
+                              {new Date(h.changedAt).toLocaleDateString()}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
                   </>
                 )}

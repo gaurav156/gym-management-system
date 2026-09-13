@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import Turnstile from '../components/Turnstile'
@@ -14,6 +14,12 @@ export default function LoginPage() {
   const [captchaKey, setCaptchaKey] = useState(0) // bump to force a fresh widget/token
   const setUser = useAuthStore((s) => s.setUser)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
+  // Set by the api client's response interceptor when a request comes back 403 while a
+  // JWT is still present - almost always means an Owner changed this person's role
+  // after their token was issued, so their old session no longer has the access it did.
+  const accessChanged = searchParams.get('reason') === 'access-changed'
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -44,6 +50,13 @@ export default function LoginPage() {
   return (
     <div className="mx-auto max-w-sm px-4 py-16">
       <h1 className="text-2xl font-semibold">Log in</h1>
+
+      {accessChanged && (
+        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+          Your account access has changed - please log in again to continue.
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Email</label>
