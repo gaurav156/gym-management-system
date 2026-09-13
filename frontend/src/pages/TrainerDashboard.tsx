@@ -3,7 +3,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import HourlyCrowdChart from '../components/HourlyCrowdChart'
-import type { Branch, AttendanceLogEntry, HourlyCount } from '../types'
+import type { Branch, AttendanceLogEntry, HourlyCount, PageResponse } from '../types'
 
 const PAGE_SIZE = 5
 
@@ -12,23 +12,31 @@ export default function TrainerDashboard() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranch, setSelectedBranch] = useState('')
   const [summary, setSummary] = useState<HourlyCount[]>([])
-  const [attendance, setAttendance] = useState<AttendanceLogEntry[]>([])
   const [loadError, setLoadError] = useState('')
-  const [attendancePage, setAttendancePage] = useState(1)
 
-  function loadAttendance() {
-    api.get<AttendanceLogEntry[]>('/api/attendance/mine')
-      .then((res) => setAttendance(res.data))
+  const [attendance, setAttendance] = useState<AttendanceLogEntry[]>([])
+  const [attendancePage, setAttendancePage] = useState(0)
+  const [attendanceTotalPages, setAttendanceTotalPages] = useState(1)
+  const [attendanceTotalElements, setAttendanceTotalElements] = useState(0)
+
+  function loadAttendance(page = 0) {
+    api.get<PageResponse<AttendanceLogEntry>>('/api/attendance/mine', { params: { page, size: PAGE_SIZE } })
+      .then((res) => {
+        setAttendance(res.data.content)
+        setAttendanceTotalPages(res.data.totalPages)
+        setAttendanceTotalElements(res.data.totalElements)
+        setAttendancePage(res.data.page)
+      })
       .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your attendance log'))
   }
 
   useEffect(() => {
     if (!user) return
-    loadAttendance()
+    loadAttendance(0)
 
     // Attendance is logged from the reception kiosk, not this page - refetch on return
     // to the tab so a check-in doesn't look missing just because this stayed open.
-    function onFocus() { loadAttendance() }
+    function onFocus() { loadAttendance(0) }
     window.addEventListener('focus', onFocus)
 
     api.get<Branch[]>('/api/branches/mine', { params: { userId: user.userId } })
@@ -45,13 +53,6 @@ export default function TrainerDashboard() {
     if (!selectedBranch) return
     api.get<HourlyCount[]>(`/api/attendance/summary/${selectedBranch}`).then((res) => setSummary(res.data))
   }, [selectedBranch])
-
-  useEffect(() => {
-    setAttendancePage(1)
-  }, [attendance.length])
-
-  const attendanceTotalPages = Math.max(1, Math.ceil(attendance.length / PAGE_SIZE))
-  const pagedAttendance = attendance.slice((attendancePage - 1) * PAGE_SIZE, attendancePage * PAGE_SIZE)
 
   if (!user) return null
 
@@ -88,7 +89,7 @@ export default function TrainerDashboard() {
         <h2 className="font-medium">Your attendance log</h2>
         <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
         <ul className="mt-4 divide-y divide-gray-100 text-sm">
-          {pagedAttendance.map((a) => (
+          {attendance.map((a) => (
             <li key={a.id} className="py-2">
               <div className="flex items-center justify-between">
                 <span>Check-in: {new Date(a.checkInTime).toLocaleString()}</span>
@@ -108,11 +109,11 @@ export default function TrainerDashboard() {
         </ul>
         {attendance.length > 0 && (
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-            <span>Page {attendancePage} of {attendanceTotalPages} ({attendance.length} total)</span>
+            <span>Page {attendancePage + 1} of {attendanceTotalPages} ({attendanceTotalElements} total)</span>
             <div className="space-x-2">
-              <button disabled={attendancePage === 1} onClick={() => setAttendancePage((p) => p - 1)}
+              <button disabled={attendancePage === 0} onClick={() => loadAttendance(attendancePage - 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-              <button disabled={attendancePage === attendanceTotalPages} onClick={() => setAttendancePage((p) => p + 1)}
+              <button disabled={attendancePage + 1 >= attendanceTotalPages} onClick={() => loadAttendance(attendancePage + 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
             </div>
           </div>

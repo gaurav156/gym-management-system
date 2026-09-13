@@ -2,7 +2,7 @@ import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { getEffectiveStatus, statusColorClass, statusLabel, type EffectiveStatus } from '../../utils/membership'
 import PhotoUploadButton from '../PhotoUploadButton'
-import type { Branch, MembershipAdmin, Payment, AttendanceLogEntry, MemberSummary, InvoiceResponse, AuthUser, RoleHistoryEntry } from '../../types'
+import type { Branch, MembershipAdmin, Payment, AttendanceLogEntry, MemberSummary, InvoiceResponse, AuthUser, RoleHistoryEntry, PageResponse } from '../../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
 
 const PAGE_SIZE = 10
@@ -17,12 +17,15 @@ interface Props {
 
 export default function MembersTab({ selectedBranch, allBranches, lastCheckins, user }: Props) {
   const [members, setMembers] = useState<MemberSummary[]>([])
-  const [memberships, setMemberships] = useState<MembershipAdmin[]>([])
+  const [memberTotalPages, setMemberTotalPages] = useState(1)
+  const [memberTotalElements, setMemberTotalElements] = useState(0)
+  const [memberships, setMemberships] = useState<MembershipAdmin[]>([]) // still the full branch list - status is computed from this
 
-  const [memberSearch, setMemberSearch] = useState('')
+  const [memberSearchInput, setMemberSearchInput] = useState('') // what's in the box
+  const [memberSearch, setMemberSearch] = useState('')           // what was last sent to the server
   const [memberStatusFilter, setMemberStatusFilter] = useState<'ALL' | EffectiveStatus | 'NONE'>('ALL')
   const [memberSort, setMemberSort] = useState<'NAME' | 'STATUS'>('NAME')
-  const [memberPage, setMemberPage] = useState(1)
+  const [memberPage, setMemberPage] = useState(0) // 0-indexed
 
   const [detailMemberId, setDetailMemberId] = useState<string | null>(null)
   const [modalTab, setModalTab] = useState<'INFO' | 'MEMBERSHIPS' | 'PAYMENTS' | 'ATTENDANCE' | 'BRANCHES'>('INFO')
@@ -49,16 +52,30 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [editingMemberBranches, setEditingMemberBranches] = useState(false)
   const [memberBranchEditIds, setMemberBranchEditIds] = useState<string[]>([])
 
-  const [detailPayments, setDetailPayments] = useState<Payment[]>([])
-  const [detailAttendance, setDetailAttendance] = useState<AttendanceLogEntry[]>([])
-  const [detailMembershipsFetched, setDetailMembershipsFetched] = useState<MembershipAdmin[]>([])
-  const [detailPaymentsPage, setDetailPaymentsPage] = useState(1)
-  const [detailAttendancePage, setDetailAttendancePage] = useState(1)
   const [paymentSendMessage, setPaymentSendMessage] = useState('')
 
-  function loadMembers() {
+  const [detailPayments, setDetailPayments] = useState<Payment[]>([])
+  const [detailPaymentsPage, setDetailPaymentsPage] = useState(0)
+  const [detailPaymentsTotalPages, setDetailPaymentsTotalPages] = useState(1)
+  const [detailPaymentsTotalElements, setDetailPaymentsTotalElements] = useState(0)
+
+  const [detailAttendance, setDetailAttendance] = useState<AttendanceLogEntry[]>([])
+  const [detailAttendancePage, setDetailAttendancePage] = useState(0)
+  const [detailAttendanceTotalPages, setDetailAttendanceTotalPages] = useState(1)
+  const [detailAttendanceTotalElements, setDetailAttendanceTotalElements] = useState(0)
+
+  const [detailMembershipsFetched, setDetailMembershipsFetched] = useState<MembershipAdmin[]>([]) // unchanged, still full list
+
+  function loadMembers(page = 0, search = memberSearch) {
     if (!selectedBranch) return
-    api.get<MemberSummary[]>('/api/members', { params: { branchId: selectedBranch } }).then((res) => setMembers(res.data))
+    api.get<PageResponse<MemberSummary>>('/api/members', {
+      params: { branchId: selectedBranch, search: search || undefined, page, size: PAGE_SIZE },
+    }).then((res) => {
+      setMembers(res.data.content)
+      setMemberTotalPages(res.data.totalPages)
+      setMemberTotalElements(res.data.totalElements)
+      setMemberPage(res.data.page)
+    })
   }
 
   function loadMemberships() {
@@ -67,13 +84,21 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   }
 
   useEffect(() => {
-    loadMembers()
+    setMemberSearchInput('')
+    setMemberSearch('')
+    loadMembers(0, '')
     loadMemberships()
   }, [selectedBranch])
 
+  // Debounce typing into an actual request instead of firing one per keystroke.
   useEffect(() => {
-    setMemberPage(1)
-  }, [memberSearch, memberStatusFilter, memberSort, selectedBranch])
+    const handle = setTimeout(() => {
+      setMemberSearch(memberSearchInput)
+      loadMembers(0, memberSearchInput)
+    }, 300)
+    return () => clearTimeout(handle)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memberSearchInput])
 
   function loadDetailMemberBranches(memberId: string) {
     api.get<Branch[]>('/api/branches/mine', { params: { userId: memberId } }).then((res) => setDetailMemberBranches(res.data))
@@ -86,6 +111,26 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       .catch(() => setRoleHistory([]))
   }
 
+  function loadDetailPayments(memberId: string, page = 0) {
+    api.get<PageResponse<Payment>>(`/api/payments/member/${memberId}`, { params: { page, size: MODAL_PAGE_SIZE } })
+      .then((res) => {
+        setDetailPayments(res.data.content)
+        setDetailPaymentsTotalPages(res.data.totalPages)
+        setDetailPaymentsTotalElements(res.data.totalElements)
+        setDetailPaymentsPage(res.data.page)
+      })
+  }
+
+  function loadDetailAttendance(memberId: string, page = 0) {
+    api.get<PageResponse<AttendanceLogEntry>>(`/api/attendance/history/${memberId}`, { params: { page, size: MODAL_PAGE_SIZE } })
+      .then((res) => {
+        setDetailAttendance(res.data.content)
+        setDetailAttendanceTotalPages(res.data.totalPages)
+        setDetailAttendanceTotalElements(res.data.totalElements)
+        setDetailAttendancePage(res.data.page)
+      })
+  }
+
   useEffect(() => {
     setModalPage(1)
   }, [detailMemberId, modalShowExpired])
@@ -94,15 +139,13 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     setMemberModalMessage('')
     if (!detailMemberId) return
     setModalTab('INFO')
-    setDetailPaymentsPage(1)
-    setDetailAttendancePage(1)
     setEditingMemberInfo(false)
     setEditingMemberBranches(false)
     setPaymentSendMessage('')
     setSelectedNewRole('')
     setRoleHistory([])
-    api.get<Payment[]>(`/api/payments/member/${detailMemberId}`).then((res) => setDetailPayments(res.data))
-    api.get<AttendanceLogEntry[]>(`/api/attendance/history/${detailMemberId}`).then((res) => setDetailAttendance(res.data))
+    loadDetailPayments(detailMemberId, 0)
+    loadDetailAttendance(detailMemberId, 0)
     api.get<MembershipAdmin[]>(`/api/memberships/member/${detailMemberId}`).then((res) => setDetailMembershipsFetched(res.data))
     loadDetailMemberBranches(detailMemberId)
     loadRoleHistory(detailMemberId)
@@ -293,17 +336,13 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     return { member: mem, status }
   })
 
-  const filteredMemberRows = memberRows
-    .filter(({ member }) =>
-      member.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-      member.email.toLowerCase().includes(memberSearch.toLowerCase()))
+  // Status filter and sort apply within the currently loaded page only, since the roster
+  // itself is now paginated server-side - see the note rendered under the filters below.
+  const visibleMemberRows = memberRows
     .filter(({ status }) => memberStatusFilter === 'ALL' || status === memberStatusFilter)
     .sort((a, b) => memberSort === 'NAME'
       ? a.member.name.localeCompare(b.member.name)
       : a.status.localeCompare(b.status))
-
-  const memberTotalPages = Math.max(1, Math.ceil(filteredMemberRows.length / PAGE_SIZE))
-  const pagedMemberRows = filteredMemberRows.slice((memberPage - 1) * PAGE_SIZE, memberPage * PAGE_SIZE)
 
   const detailMember = members.find((m) => m.id === detailMemberId) ?? null
   const detailMemberships = detailMembershipsFetched
@@ -315,12 +354,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const modalTotalPages = Math.max(1, Math.ceil(detailMemberships.length / MODAL_PAGE_SIZE))
   const pagedDetailMemberships = detailMemberships.slice((modalPage - 1) * MODAL_PAGE_SIZE, modalPage * MODAL_PAGE_SIZE)
 
-  const detailPaymentsTotalPages = Math.max(1, Math.ceil(detailPayments.length / MODAL_PAGE_SIZE))
-  const pagedDetailPayments = detailPayments.slice((detailPaymentsPage - 1) * MODAL_PAGE_SIZE, detailPaymentsPage * MODAL_PAGE_SIZE)
-
-  const detailAttendanceTotalPages = Math.max(1, Math.ceil(detailAttendance.length / MODAL_PAGE_SIZE))
-  const pagedDetailAttendance = detailAttendance.slice((detailAttendancePage - 1) * MODAL_PAGE_SIZE, detailAttendancePage * MODAL_PAGE_SIZE)
-
   return (
     <div>
       <div className="rounded-lg border border-gray-200 p-6">
@@ -328,7 +361,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
         <p className="mt-1 text-xs text-gray-500">Click a member to view all their plans and take action.</p>
 
         <div className="mt-3 flex flex-wrap gap-2">
-          <input placeholder="Search name or email..." value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
+          <input placeholder="Search name or email..." value={memberSearchInput} onChange={(e) => setMemberSearchInput(e.target.value)}
             className="flex-1 min-w-[180px] rounded-md border border-gray-300 px-3 py-2 text-sm" />
           <select value={memberStatusFilter} onChange={(e) => setMemberStatusFilter(e.target.value as any)}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm">
@@ -344,6 +377,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
             <option value="STATUS">Sort: Status</option>
           </select>
         </div>
+          <p className="mt-2 text-xs text-gray-400">Status and sort apply to the current page only.</p>
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -358,7 +392,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {pagedMemberRows.map(({ member, status }) => (
+              {visibleMemberRows.map(({ member, status }) => (
                 <tr key={member.id}>
                   <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">
@@ -392,14 +426,14 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
               ))}
             </tbody>
           </table>
-          {filteredMemberRows.length === 0 && <p className="py-4 text-sm text-gray-400">No members match.</p>}
-          {filteredMemberRows.length > 0 && (
+          {members.length === 0 && <p className="py-4 text-sm text-gray-400">No members match.</p>}
+          {memberTotalElements > 0 && (
             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-              <span>Page {memberPage} of {memberTotalPages} ({filteredMemberRows.length} total)</span>
+              <span>Page {memberPage + 1} of {memberTotalPages} ({memberTotalElements} total)</span>
               <div className="space-x-2">
-                <button disabled={memberPage === 1} onClick={() => setMemberPage((p) => p - 1)}
+                <button disabled={memberPage === 0} onClick={() => loadMembers(memberPage - 1)}
                   className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                <button disabled={memberPage === memberTotalPages} onClick={() => setMemberPage((p) => p + 1)}
+                <button disabled={memberPage + 1 >= memberTotalPages} onClick={() => loadMembers(memberPage + 1)}
                   className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
               </div>
             </div>
@@ -665,7 +699,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {pagedDetailPayments.map((p) => (
+                    {detailPayments.map((p) => (
                       <tr key={p.id}>
                         <td className="py-2 pr-4 text-gray-500">{new Date(p.createdAt).toLocaleString()}</td>
                         <td className="py-2 pr-4">{p.planName ?? '—'}</td>
@@ -684,13 +718,13 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                   </tbody>
                 </table>
                 {detailPayments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
-                {detailPayments.length > 0 && (
+                {detailPaymentsTotalElements > 0 && (
                   <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                    <span>Page {detailPaymentsPage} of {detailPaymentsTotalPages} ({detailPayments.length} total)</span>
+                    <span>Page {detailPaymentsPage + 1} of {detailPaymentsTotalPages} ({detailPaymentsTotalElements} total)</span>
                     <div className="space-x-2">
-                      <button disabled={detailPaymentsPage === 1} onClick={() => setDetailPaymentsPage((p) => p - 1)}
+                      <button disabled={detailPaymentsPage === 0} onClick={() => loadDetailPayments(detailMember!.id, detailPaymentsPage - 1)}
                         className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                      <button disabled={detailPaymentsPage === detailPaymentsTotalPages} onClick={() => setDetailPaymentsPage((p) => p + 1)}
+                      <button disabled={detailPaymentsPage + 1 >= detailPaymentsTotalPages} onClick={() => loadDetailPayments(detailMember!.id, detailPaymentsPage + 1)}
                         className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
                     </div>
                   </div>
@@ -711,7 +745,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {pagedDetailAttendance.map((a) => (
+                    {detailAttendance.map((a) => (
                       <tr key={a.id}>
                         <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleString()}</td>
                         <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '—'}</td>
@@ -723,13 +757,13 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                 </table>
                 {detailAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
                 {paymentSendMessage && <p className="mt-2 text-sm text-green-700">{paymentSendMessage}</p>}
-                {detailAttendance.length > 0 && (
+                {detailAttendanceTotalElements > 0 && (
                   <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                    <span>Page {detailAttendancePage} of {detailAttendanceTotalPages} ({detailAttendance.length} total)</span>
+                    <span>Page {detailAttendancePage + 1} of {detailAttendanceTotalPages} ({detailAttendanceTotalElements} total)</span>
                     <div className="space-x-2">
-                      <button disabled={detailAttendancePage === 1} onClick={() => setDetailAttendancePage((p) => p - 1)}
+                      <button disabled={detailAttendancePage === 0} onClick={() => loadDetailAttendance(detailMemberId!, detailAttendancePage - 1)}
                         className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                      <button disabled={detailAttendancePage === detailAttendanceTotalPages} onClick={() => setDetailAttendancePage((p) => p + 1)}
+                      <button disabled={detailAttendancePage + 1 >= detailAttendanceTotalPages} onClick={() => loadDetailAttendance(detailMemberId!, detailAttendancePage + 1)}
                         className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
                     </div>
                   </div>

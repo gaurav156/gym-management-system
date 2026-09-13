@@ -1,10 +1,11 @@
 import { FormEvent, useEffect, useState, useRef } from 'react'
 import { api } from '../../api/client'
-import type { Plan, Payment, MemberSummary, InvoiceResponse } from '../../types'
+import type { Plan, Payment, MemberSummary, InvoiceResponse, PageResponse } from '../../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
 
 const PAGE_SIZE = 10
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
+const MEMBER_SEARCH_SIZE = 20
 
 interface Props {
   selectedBranch: string
@@ -13,8 +14,12 @@ interface Props {
 export default function PaymentsTab({ selectedBranch }: Props) {
   const [plans, setPlans] = useState<Plan[]>([])
   const [members, setMembers] = useState<MemberSummary[]>([])
+  const [selectedMember, setSelectedMember] = useState<MemberSummary | null>(null)
+
   const [payments, setPayments] = useState<Payment[]>([])
-  const [paymentPage, setPaymentPage] = useState(1)
+  const [paymentPage, setPaymentPage] = useState(0) // 0-indexed to match Spring's Pageable
+  const [paymentTotalPages, setPaymentTotalPages] = useState(1)
+  const [paymentTotalElements, setPaymentTotalElements] = useState(0)
 
   const [purchaseMemberId, setPurchaseMemberId] = useState('')
   const [purchasePlanId, setPurchasePlanId] = useState('')
@@ -33,16 +38,45 @@ export default function PaymentsTab({ selectedBranch }: Props) {
     api.get<Plan[]>('/api/plans').then((res) => setPlans(res.data))
   }, [])
 
-  function loadPayments() {
+  function loadMemberOptions(search: string) {
     if (!selectedBranch) return
-    api.get<Payment[]>(`/api/payments/branch/${selectedBranch}`).then((res) => setPayments(res.data))
+    api.get<PageResponse<MemberSummary>>('/api/members', {
+      params: { branchId: selectedBranch, search: search || undefined, page: 0, size: MEMBER_SEARCH_SIZE },
+    }).then((res) => setMembers(res.data.content))
+  }
+
+  useEffect(() => {
+    if (!selectedBranch) return
+    loadMemberOptions('')
+    loadPayments(0)
+  }, [selectedBranch])
+
+  // Debounced server-side search while the dropdown is open, same pattern as
+  // MembersTab's search box - avoids silently truncating to whatever fit in the
+  // first page when a branch has more than MEMBER_SEARCH_SIZE members.
+  useEffect(() => {
+    if (!memberDropdownOpen) return
+    const handle = setTimeout(() => loadMemberOptions(memberSearchQuery), 300)
+    return () => clearTimeout(handle)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memberSearchQuery, memberDropdownOpen])
+
+  function loadPayments(page = 0) {
+    if (!selectedBranch) return
+    api.get<PageResponse<Payment>>(`/api/payments/branch/${selectedBranch}`, {
+      params: { page, size: PAGE_SIZE },
+    }).then((res) => {
+      setPayments(res.data.content)
+      setPaymentTotalPages(res.data.totalPages)
+      setPaymentTotalElements(res.data.totalElements)
+      setPaymentPage(res.data.page)
+    })
   }
 
   useEffect(() => {
     if (!selectedBranch) return
     api.get<MemberSummary[]>('/api/members', { params: { branchId: selectedBranch } }).then((res) => setMembers(res.data))
-    loadPayments()
-    setPaymentPage(1)
+    loadPayments(0)
   }, [selectedBranch])
 
   useEffect(() => {
@@ -79,14 +113,12 @@ export default function PaymentsTab({ selectedBranch }: Props) {
       )
       setPurchaseMessage(`Recorded - valid until ${data.endDate}.`)
       setPurchaseMemberId(''); setPurchasePlanId(''); setPurchaseStartDate('')
-      loadPayments()
+      setSelectedMember(null)
+      loadPayments(0)
     } catch (err: any) {
       setPurchaseMessage(err.response?.data?.error || 'Failed to record purchase')
     }
   }
-
-  const paymentTotalPages = Math.max(1, Math.ceil(payments.length / PAGE_SIZE))
-  const pagedPayments = payments.slice((paymentPage - 1) * PAGE_SIZE, paymentPage * PAGE_SIZE)
 
   async function handleInvoiceAction(paymentId: string, action: 'view' | 'print' | 'download') {
     setInvoiceError('')
@@ -124,58 +156,36 @@ export default function PaymentsTab({ selectedBranch }: Props) {
                 required={!purchaseMemberId}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Search member by name or email..."
-                value={
-                  memberDropdownOpen
-                    ? memberSearchQuery
-                    : members.find((m) => m.id === purchaseMemberId)?.name ?? ''
-                }
+                value={memberDropdownOpen ? memberSearchQuery : selectedMember?.name ?? ''}
                 onFocus={() => {
                   setMemberDropdownOpen(true)
                   setMemberSearchQuery('')
+                  loadMemberOptions('')
                 }}
                 onChange={(e) => setMemberSearchQuery(e.target.value)}
               />
 
               {memberDropdownOpen && (
                 <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto bg-white border border-gray-300 rounded-md shadow-lg">
-                  {members
-                    .filter((m) => {
-                      const q = memberSearchQuery.trim().toLowerCase()
-                      if (!q) return true
-                      return (
-                        m.name.toLowerCase().includes(q) ||
-                        m.email?.toLowerCase().includes(q) ||
-                        String(m.checkinPin ?? '').toLowerCase().includes(q)
-                      )
-                    })
-                    .map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 ${
-                          m.id === purchaseMemberId ? 'bg-blue-100 font-medium' : ''
-                        }`}
-                        onClick={() => {
-                          setPurchaseMemberId(m.id)
-                          setMemberDropdownOpen(false)
-                          setMemberSearchQuery('')
-                        }}
-                      >
-                        <div>{m.name}</div>
-                        <div className="text-xs text-gray-500">
-                          {m.email} - PIN {m.checkinPin ?? '—'}
-                        </div>
-                      </button>
-                    ))}
-                  {members.filter((m) => {
-                    const q = memberSearchQuery.trim().toLowerCase()
-                    if (!q) return true
-                    return (
-                      m.name.toLowerCase().includes(q) ||
-                      m.email?.toLowerCase().includes(q) ||
-                      String(m.checkinPin ?? '').toLowerCase().includes(q)
-                    )
-                  }).length === 0 && (
+                  {members.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 ${
+                        m.id === purchaseMemberId ? 'bg-blue-100 font-medium' : ''
+                      }`}
+                      onClick={() => {
+                        setPurchaseMemberId(m.id)
+                        setSelectedMember(m)
+                        setMemberDropdownOpen(false)
+                        setMemberSearchQuery('')
+                      }}
+                    >
+                      <div>{m.name}</div>
+                      <div className="text-xs text-gray-500">{m.email} - PIN {m.checkinPin ?? '—'}</div>
+                    </button>
+                  ))}
+                  {members.length === 0 && (
                     <div className="px-3 py-2 text-sm text-gray-500">No members found</div>
                   )}
                 </div>
@@ -234,7 +244,7 @@ export default function PaymentsTab({ selectedBranch }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {pagedPayments.map((p) => (
+              {payments.map((p) => (
                 <tr key={p.id}>
                   <td className="py-2 pr-4 text-gray-500">{new Date(p.createdAt).toLocaleString()}</td>
                   <td className="py-2 pr-4">{p.memberName}</td>
@@ -256,13 +266,13 @@ export default function PaymentsTab({ selectedBranch }: Props) {
           {invoiceError && <p className="mt-2 text-sm text-red-600">{invoiceError}</p>}
           {sendMessage && <p className="mt-2 text-sm text-green-700">{sendMessage}</p>}
           {payments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
-          {payments.length > 0 && (
+          {paymentTotalElements > 0 && (
             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-              <span>Page {paymentPage} of {paymentTotalPages} ({payments.length} total)</span>
+              <span>Page {paymentPage + 1} of {paymentTotalPages} ({paymentTotalElements} total)</span>
               <div className="space-x-2">
-                <button disabled={paymentPage === 1} onClick={() => setPaymentPage((p) => p - 1)}
+                <button disabled={paymentPage === 0} onClick={() => loadPayments(paymentPage - 1)}
                   className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                <button disabled={paymentPage === paymentTotalPages} onClick={() => setPaymentPage((p) => p + 1)}
+                <button disabled={paymentPage + 1 >= paymentTotalPages} onClick={() => loadPayments(paymentPage + 1)}
                   className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
               </div>
             </div>

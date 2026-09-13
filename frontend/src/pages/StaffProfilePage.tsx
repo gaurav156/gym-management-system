@@ -4,7 +4,7 @@ import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import PhotoUploadButton from '../components/PhotoUploadButton'
 import ChangePasswordSection from '../components/ChangePasswordSection'
-import type { Profile, AttendanceLogEntry } from '../types'
+import type { Profile, AttendanceLogEntry, PageResponse } from '../types'
 
 const PAGE_SIZE = 5
 
@@ -25,7 +25,9 @@ export default function StaffProfilePage() {
 
     const [attendance, setAttendance] = useState<AttendanceLogEntry[]>([])
     const [attendanceError, setAttendanceError] = useState('')
-    const [attendancePage, setAttendancePage] = useState(1)
+    const [attendancePage, setAttendancePage] = useState(0)
+    const [attendanceTotalPages, setAttendanceTotalPages] = useState(1)
+    const [attendanceTotalElements, setAttendanceTotalElements] = useState(0)
     const [attendanceLoaded, setAttendanceLoaded] = useState(false)
 
     function load() {
@@ -39,11 +41,16 @@ export default function StaffProfilePage() {
         })
     }
 
-    function loadAttendance() {
-        api.get<AttendanceLogEntry[]>('/api/attendance/mine')
-            .then((res) => setAttendance(res.data))
-            .catch((err) => setAttendanceError(err.response?.data?.error || 'Failed to load your attendance log'))
-            .finally(() => setAttendanceLoaded(true))
+    function loadAttendance(page = 0) {
+    api.get<PageResponse<AttendanceLogEntry>>('/api/attendance/mine', { params: { page, size: PAGE_SIZE } })
+        .then((res) => {
+        setAttendance(res.data.content)
+        setAttendanceTotalPages(res.data.totalPages)
+        setAttendanceTotalElements(res.data.totalElements)
+        setAttendancePage(res.data.page)
+        })
+        .catch((err) => setAttendanceError(err.response?.data?.error || 'Failed to load your attendance log'))
+        .finally(() => setAttendanceLoaded(true))
     }
 
     useEffect(() => { load() }, [])
@@ -53,13 +60,9 @@ export default function StaffProfilePage() {
     // switches over, and this keeps the initial page load to just what's visible.
     useEffect(() => {
         if (activeTab === 'ATTENDANCE' && !attendanceLoaded) {
-            loadAttendance()
+            loadAttendance(0)
         }
     }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
-
-    useEffect(() => {
-        setAttendancePage(1)
-    }, [attendance.length])
 
     async function handleSubmit(e: FormEvent) {
         e.preventDefault()
@@ -74,9 +77,6 @@ export default function StaffProfilePage() {
     }
 
     if (!profile) return null
-
-    const attendanceTotalPages = Math.max(1, Math.ceil(attendance.length / PAGE_SIZE))
-    const pagedAttendance = attendance.slice((attendancePage - 1) * PAGE_SIZE, attendancePage * PAGE_SIZE)
 
     const TABS: { key: Tab; label: string }[] = [
         { key: 'PROFILE', label: 'Profile' },
@@ -189,7 +189,7 @@ export default function StaffProfilePage() {
                         <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
                         {attendanceError && <p className="mt-2 text-sm text-red-600">{attendanceError}</p>}
                         <ul className="mt-4 divide-y divide-gray-100 text-sm">
-                            {pagedAttendance.map((a) => (
+                            {attendance.map((a) => (
                                 <li key={a.id} className="py-2">
                                     <div className="flex items-center justify-between">
                                         <span>Check-in: {new Date(a.checkInTime).toLocaleString()}</span>
@@ -211,11 +211,11 @@ export default function StaffProfilePage() {
                         </ul>
                         {attendance.length > 0 && (
                             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                                <span>Page {attendancePage} of {attendanceTotalPages} ({attendance.length} total)</span>
+                                <span>Page {attendancePage + 1} of {attendanceTotalPages} ({attendanceTotalElements} total)</span>
                                 <div className="space-x-2">
-                                    <button disabled={attendancePage === 1} onClick={() => setAttendancePage((p) => p - 1)}
+                                    <button disabled={attendancePage === 0} onClick={() => loadAttendance(attendancePage - 1)}
                                         className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                                    <button disabled={attendancePage === attendanceTotalPages} onClick={() => setAttendancePage((p) => p + 1)}
+                                    <button disabled={attendancePage + 1 >= attendanceTotalPages} onClick={() => loadAttendance(attendancePage + 1)}
                                         className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
                                 </div>
                             </div>

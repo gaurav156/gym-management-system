@@ -4,7 +4,7 @@ import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import { getEffectiveStatus } from '../utils/membership'
 import HourlyCrowdChart from '../components/HourlyCrowdChart'
-import type { Membership, Plan, Payment, Branch, AttendanceLogEntry, HourlyCount } from '../types'
+import type { Membership, Plan, Payment, Branch, AttendanceLogEntry, HourlyCount, PageResponse } from '../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../utils/invoice'
 import type { InvoiceResponse } from '../types'
 
@@ -14,30 +14,53 @@ export default function MemberDashboard() {
   const user = useAuthStore((s) => s.user)
   const [memberships, setMemberships] = useState<Membership[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
-  const [payments, setPayments] = useState<Payment[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranch, setSelectedBranch] = useState('')
   const [summary, setSummary] = useState<HourlyCount[]>([])
-  const [attendance, setAttendance] = useState<AttendanceLogEntry[]>([])
   const [message, setMessage] = useState('')
   const [loadError, setLoadError] = useState('')
 
-  const [paymentPage, setPaymentPage] = useState(1)
-  const [attendancePage, setAttendancePage] = useState(1)
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [paymentPage, setPaymentPage] = useState(0)
+  const [paymentTotalPages, setPaymentTotalPages] = useState(1)
+  const [paymentTotalElements, setPaymentTotalElements] = useState(0)
+
+  const [attendance, setAttendance] = useState<AttendanceLogEntry[]>([])
+  const [attendancePage, setAttendancePage] = useState(0)
+  const [attendanceTotalPages, setAttendanceTotalPages] = useState(1)
+  const [attendanceTotalElements, setAttendanceTotalElements] = useState(0)
+
+  function loadPayments(page = 0) {
+    if (!user) return
+    api.get<PageResponse<Payment>>('/api/payments/mine', { params: { memberId: user.userId, page, size: PAGE_SIZE } })
+      .then((res) => {
+        setPayments(res.data.content)
+        setPaymentTotalPages(res.data.totalPages)
+        setPaymentTotalElements(res.data.totalElements)
+        setPaymentPage(res.data.page)
+      })
+      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your payment history'))
+  }
+  
+  function loadAttendance(page = 0) {
+    if (!user) return
+    api.get<PageResponse<AttendanceLogEntry>>('/api/attendance/mine', { params: { page, size: PAGE_SIZE } })
+      .then((res) => {
+        setAttendance(res.data.content)
+        setAttendanceTotalPages(res.data.totalPages)
+        setAttendanceTotalElements(res.data.totalElements)
+        setAttendancePage(res.data.page)
+      })
+      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your attendance log'))
+  }
 
   function loadMembershipData() {
     if (!user) return
     api.get<Membership[]>('/api/memberships/mine', { params: { memberId: user.userId } })
       .then((res) => setMemberships(res.data))
       .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your memberships'))
-
-    api.get<Payment[]>('/api/payments/mine', { params: { memberId: user.userId } })
-      .then((res) => setPayments(res.data))
-      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your payment history'))
-
-    api.get<AttendanceLogEntry[]>('/api/attendance/mine')
-      .then((res) => setAttendance(res.data))
-      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your attendance log'))
+    loadPayments(0)
+    loadAttendance(0)
   }
 
   async function handleInvoiceAction(paymentId: string, action: 'view' | 'print' | 'download') {
@@ -81,24 +104,11 @@ export default function MemberDashboard() {
     api.get<HourlyCount[]>(`/api/attendance/summary/${selectedBranch}`).then((res) => setSummary(res.data))
   }, [selectedBranch])
 
-  useEffect(() => {
-    setPaymentPage(1)
-  }, [payments.length])
-
-  useEffect(() => {
-    setAttendancePage(1)
-  }, [attendance.length])
-
   const activeMembership = memberships.find((m) => getEffectiveStatus(m) === 'ACTIVE')
   const pausedMembership = memberships.find((m) => getEffectiveStatus(m) === 'PAUSED')
   const upcomingMembership = memberships
     .filter((m) => getEffectiveStatus(m) === 'SCHEDULED')
     .sort((a, b) => a.startDate.localeCompare(b.startDate))[0]
-
-  const paymentTotalPages = Math.max(1, Math.ceil(payments.length / PAGE_SIZE))
-  const pagedPayments = payments.slice((paymentPage - 1) * PAGE_SIZE, paymentPage * PAGE_SIZE)
-  const attendanceTotalPages = Math.max(1, Math.ceil(attendance.length / PAGE_SIZE))
-  const pagedAttendance = attendance.slice((attendancePage - 1) * PAGE_SIZE, attendancePage * PAGE_SIZE)
 
   if (!user) return null
 
@@ -189,7 +199,7 @@ export default function MemberDashboard() {
         <h2 className="font-medium">Your attendance log</h2>
         <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
         <ul className="mt-4 divide-y divide-gray-100 text-sm">
-          {pagedAttendance.map((a) => (
+          {attendance.map((a) => (
             <li key={a.id} className="py-2">
               <div className="flex items-center justify-between">
                 <span>Check-in: {new Date(a.checkInTime).toLocaleString()}</span>
@@ -209,11 +219,11 @@ export default function MemberDashboard() {
         </ul>
         {attendance.length > 0 && (
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-            <span>Page {attendancePage} of {attendanceTotalPages} ({attendance.length} total)</span>
+            <span>Page {attendancePage + 1} of {attendanceTotalPages} ({attendanceTotalElements} total)</span>
             <div className="space-x-2">
-              <button disabled={attendancePage === 1} onClick={() => setAttendancePage((p) => p - 1)}
+              <button disabled={attendancePage === 0} onClick={() => loadAttendance(attendancePage - 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-              <button disabled={attendancePage === attendanceTotalPages} onClick={() => setAttendancePage((p) => p + 1)}
+              <button disabled={attendancePage + 1 >= attendanceTotalPages} onClick={() => loadAttendance(attendancePage + 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
             </div>
           </div>
@@ -223,7 +233,7 @@ export default function MemberDashboard() {
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">Your payment history</h2>
         <ul className="mt-4 divide-y divide-gray-100 text-sm">
-          {pagedPayments.map((p) => (
+          {payments.map((p) => (
             <li key={p.id} className="py-2">
               <div className="flex justify-between">
                 <span>{p.planName ?? 'Payment'} - {new Date(p.createdAt).toLocaleDateString()}</span>
@@ -240,11 +250,11 @@ export default function MemberDashboard() {
         </ul>
         {payments.length > 0 && (
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-            <span>Page {paymentPage} of {paymentTotalPages} ({payments.length} total)</span>
+            <span>Page {paymentPage + 1} of {paymentTotalPages} ({paymentTotalElements} total)</span>
             <div className="space-x-2">
-              <button disabled={paymentPage === 1} onClick={() => setPaymentPage((p) => p - 1)}
+              <button disabled={paymentPage === 0} onClick={() => loadPayments(paymentPage - 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-              <button disabled={paymentPage === paymentTotalPages} onClick={() => setPaymentPage((p) => p + 1)}
+              <button disabled={paymentPage + 1 >= paymentTotalPages} onClick={() => loadPayments(paymentPage + 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
             </div>
           </div>

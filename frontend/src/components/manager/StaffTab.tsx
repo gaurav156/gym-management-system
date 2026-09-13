@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import PhotoUploadButton from '../PhotoUploadButton'
-import type { Branch, StaffSummary, AttendanceLogEntry, AuthUser, RoleHistoryEntry } from '../../types'
+import type { Branch, StaffSummary, AttendanceLogEntry, AuthUser, RoleHistoryEntry, PageResponse } from '../../types'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -27,8 +27,10 @@ const CHANGEABLE_ROLES = ['MEMBER', 'TRAINER', 'MANAGER'] as const
 
 export default function StaffTab({ selectedBranch, allBranches, lastCheckins, user }: Props) {
   const [staff, setStaff] = useState<StaffSummary[]>([])
+  const [staffTotalPages, setStaffTotalPages] = useState(1)
+  const [staffTotalElements, setStaffTotalElements] = useState(0)
   const [showLeftStaff, setShowLeftStaff] = useState(false)
-  const [staffPage, setStaffPage] = useState(1)
+  const [staffPage, setStaffPage] = useState(0) // 0-indexed
   const [staffRoleFilter, setStaffRoleFilter] = useState<'ALL' | 'OWNER' | 'MANAGER' | 'TRAINER'>('ALL')
   const [staffSort, setStaffSort] = useState<'NAME' | 'ROLE'>('NAME')
 
@@ -53,23 +55,37 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const [staffBranchEditIds, setStaffBranchEditIds] = useState<string[]>([])
 
   const [detailStaffAttendance, setDetailStaffAttendance] = useState<AttendanceLogEntry[]>([])
-  const [staffModalPage, setStaffModalPage] = useState(1)
+  const [staffModalPage, setStaffModalPage] = useState(0)
+  const [staffModalTotalPages, setStaffModalTotalPages] = useState(1)
+  const [staffModalTotalElements, setStaffModalTotalElements] = useState(0)
 
   // Change Role + its history - Owner-only, fetched/shown only when the caller is Owner.
   const [roleHistory, setRoleHistory] = useState<RoleHistoryEntry[]>([])
   const [selectedNewRole, setSelectedNewRole] = useState('')
   const [changingRole, setChangingRole] = useState(false)
 
-  function loadStaff() {
+  function loadStaff(page = 0) {
     if (!selectedBranch) return
-    api.get<StaffSummary[]>('/api/staff', { params: { branchId: selectedBranch } }).then((res) => setStaff(res.data))
+    api.get<PageResponse<StaffSummary>>('/api/staff', { params: { branchId: selectedBranch, page, size: PAGE_SIZE } })
+      .then((res) => {
+        setStaff(res.data.content)
+        setStaffTotalPages(res.data.totalPages)
+        setStaffTotalElements(res.data.totalElements)
+        setStaffPage(res.data.page)
+      })
   }
 
-  useEffect(() => { loadStaff() }, [selectedBranch])
+  useEffect(() => { loadStaff(0) }, [selectedBranch])
 
-  useEffect(() => {
-    setStaffPage(1)
-  }, [showLeftStaff, selectedBranch, staffRoleFilter, staffSort])
+  function loadDetailStaffAttendance(staffId: string, page = 0) {
+    api.get<PageResponse<AttendanceLogEntry>>(`/api/attendance/history/${staffId}`, { params: { page, size: MODAL_PAGE_SIZE } })
+      .then((res) => {
+        setDetailStaffAttendance(res.data.content)
+        setStaffModalTotalPages(res.data.totalPages)
+        setStaffModalTotalElements(res.data.totalElements)
+        setStaffModalPage(res.data.page)
+      })
+  }
 
   function loadDetailStaffBranches(staffId: string) {
     api.get<Branch[]>('/api/branches/mine', { params: { userId: staffId } }).then((res) => setDetailStaffBranches(res.data))
@@ -92,8 +108,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     if (detailStaffId) {
       const s = staff.find((x) => x.id === detailStaffId)
       setStaffModalTab('INFO')
-      setStaffModalPage(1)
-      api.get<AttendanceLogEntry[]>(`/api/attendance/history/${detailStaffId}`).then((res) => setDetailStaffAttendance(res.data))
+      loadDetailStaffAttendance(detailStaffId, 0)
       loadRoleHistory(detailStaffId)
       if (s?.role !== 'OWNER') {
         loadDetailStaffBranches(detailStaffId)
@@ -227,12 +242,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       ? a.name.localeCompare(b.name)
       : (ROLE_SORT_ORDER[a.role] - ROLE_SORT_ORDER[b.role]) || a.name.localeCompare(b.name))
 
-  const staffTotalPages = Math.max(1, Math.ceil(visibleStaff.length / PAGE_SIZE))
-  const pagedStaff = visibleStaff.slice((staffPage - 1) * PAGE_SIZE, staffPage * PAGE_SIZE)
-
   const detailStaff = staff.find((s) => s.id === detailStaffId) ?? null
-  const staffModalTotalPages = Math.max(1, Math.ceil(detailStaffAttendance.length / MODAL_PAGE_SIZE))
-  const pagedStaffAttendance = detailStaffAttendance.slice((staffModalPage - 1) * MODAL_PAGE_SIZE, staffModalPage * MODAL_PAGE_SIZE)
 
   // Edit-info is available for Trainer (Owner or Manager) and Manager (Owner only).
   const canEditInfo = detailStaff && detailStaff.role !== 'OWNER' &&
@@ -274,6 +284,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
             <option value="ROLE">Sort: Role</option>
           </select>
         </div>
+        <p className="mt-1 text-xs text-gray-400">Role filter and sort apply to the current page only.</p>
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -289,7 +300,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {pagedStaff.map((s) => (
+              {visibleStaff.map((s) => (
                 <tr key={s.id}>
                   <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">
@@ -327,13 +338,13 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
               {staff.length === 0 ? 'No staff assigned to this branch yet.' : 'No staff match the current filters.'}
             </p>
           )}
-          {visibleStaff.length > 0 && (
+          {staffTotalElements > 0 && (
             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-              <span>Page {staffPage} of {staffTotalPages} ({visibleStaff.length} total)</span>
+              <span>Page {staffPage + 1} of {staffTotalPages} ({staffTotalElements} total)</span>
               <div className="space-x-2">
-                <button disabled={staffPage === 1} onClick={() => setStaffPage((p) => p - 1)}
+                <button disabled={staffPage === 0} onClick={() => loadStaff(staffPage - 1)}
                   className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                <button disabled={staffPage === staffTotalPages} onClick={() => setStaffPage((p) => p + 1)}
+                <button disabled={staffPage + 1 >= staffTotalPages} onClick={() => loadStaff(staffPage + 1)}
                   className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
               </div>
             </div>
@@ -551,7 +562,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {pagedStaffAttendance.map((a) => (
+                    {detailStaffAttendance.map((a) => (
                       <tr key={a.id}>
                         <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleString()}</td>
                         <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '—'}</td>
@@ -562,13 +573,13 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                   </tbody>
                 </table>
                 {detailStaffAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
-                {detailStaffAttendance.length > 0 && (
+                {staffModalTotalElements > 0 && (
                   <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                    <span>Page {staffModalPage} of {staffModalTotalPages} ({detailStaffAttendance.length} total)</span>
+                    <span>Page {staffModalPage + 1} of {staffModalTotalPages} ({staffModalTotalElements} total)</span>
                     <div className="space-x-2">
-                      <button disabled={staffModalPage === 1} onClick={() => setStaffModalPage((p) => p - 1)}
+                      <button disabled={staffModalPage === 0} onClick={() => loadDetailStaffAttendance(detailStaff!.id, staffModalPage - 1)}
                         className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                      <button disabled={staffModalPage === staffModalTotalPages} onClick={() => setStaffModalPage((p) => p + 1)}
+                      <button disabled={staffModalPage + 1 >= staffModalTotalPages} onClick={() => loadDetailStaffAttendance(detailStaff!.id, staffModalPage + 1)}
                         className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
                     </div>
                   </div>
