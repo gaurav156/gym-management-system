@@ -1,16 +1,16 @@
 package com.gymapp.service;
 
 import com.gymapp.dto.MemberDtos.MemberSummary;
+import com.gymapp.dto.PageDtos.PageResponse;
 import com.gymapp.dto.ProfileDtos.UpdateProfileRequest;
-import com.gymapp.entity.BranchAssignment;
 import com.gymapp.entity.Role;
 import com.gymapp.entity.User;
-import com.gymapp.repository.BranchAssignmentRepository;
 import com.gymapp.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.UUID;
 
 // Powers the manager's "who am I recording this purchase/check-in for" lookups, and
@@ -18,22 +18,23 @@ import java.util.UUID;
 @Service
 public class MemberDirectoryService {
 
-    private final BranchAssignmentRepository branchAssignmentRepository;
     private final UserRepository userRepository;
 
-    public MemberDirectoryService(BranchAssignmentRepository branchAssignmentRepository,
-                                  UserRepository userRepository) {
-        this.branchAssignmentRepository = branchAssignmentRepository;
+    public MemberDirectoryService(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
-    public List<MemberSummary> listMembersForBranch(UUID branchId) {
-        return branchAssignmentRepository.findByBranchId(branchId).stream()
-                .map(BranchAssignment::getUser)
-                .filter(u -> u.getRole() == Role.MEMBER)
-                .map(this::toSummary)
-                .toList();
+    public PageResponse<MemberSummary> listMembersForBranch(UUID branchId, String search, Pageable pageable) {
+        String term = blankToNull(search);
+        Page<User> page = term == null
+                ? userRepository.findByRoleAssignedToBranch(Role.MEMBER, branchId, pageable)
+                : userRepository.findByRoleAssignedToBranchWithSearch(Role.MEMBER, branchId, term, pageable);
+        return PageResponse.from(page.map(this::toSummary));
+    }
+
+    private String blankToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
     }
 
     // Owner/Manager only (enforced at the controller) - name/phone/address/photo, same

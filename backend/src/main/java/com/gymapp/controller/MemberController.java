@@ -1,12 +1,13 @@
 package com.gymapp.controller;
 
 import com.gymapp.dto.MemberDtos.MemberSummary;
+import com.gymapp.dto.PageDtos.PageResponse;
 import com.gymapp.dto.ProfileDtos.UpdateProfileRequest;
 import com.gymapp.service.MemberDirectoryService;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -20,8 +21,11 @@ public class MemberController {
 
     @GetMapping("/api/members")
     @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
-    public List<MemberSummary> listMembers(@RequestParam UUID branchId) {
-        return memberDirectoryService.listMembersForBranch(branchId);
+    public PageResponse<MemberSummary> listMembers(@RequestParam UUID branchId,
+                                                            @RequestParam(required = false) String search,
+                                                            @RequestParam(defaultValue = "0") int page,
+                                                            @RequestParam(defaultValue = "20") int size) {
+        return memberDirectoryService.listMembersForBranch(branchId, search, PageRequest.of(page, size));
     }
 
     // Staff-facing basic info edit (name/phone/address/photo) - deliberately reuses the

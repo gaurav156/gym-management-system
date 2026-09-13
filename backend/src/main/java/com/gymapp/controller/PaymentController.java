@@ -1,13 +1,14 @@
 package com.gymapp.controller;
 
+import com.gymapp.dto.PageDtos.PageResponse;
 import com.gymapp.dto.PaymentDtos.InvoiceResponse;
 import com.gymapp.dto.PaymentDtos.PaymentResponse;
 import com.gymapp.service.PaymentService;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -23,15 +24,17 @@ public class PaymentController {
 
     @GetMapping("/branch/{branchId}")
     @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
-    public List<PaymentResponse> branchHistory(@PathVariable UUID branchId) {
-        return paymentService.listForBranch(branchId);
+    public PageResponse<PaymentResponse> branchHistory(@PathVariable UUID branchId,
+                                                                @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        return paymentService.listForBranch(branchId, PageRequest.of(page, size));
     }
 
     // Staff-facing: view a specific member's payment history (for the member details modal)
     @GetMapping("/member/{memberId}")
     @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
-    public List<PaymentResponse> memberHistory(@PathVariable UUID memberId) {
-        return paymentService.listForMember(memberId);
+    public PageResponse<PaymentResponse> memberHistory(@PathVariable UUID memberId,
+                                                       @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        return paymentService.listForMember(memberId, PageRequest.of(page, size));
     }
 
     // Any of the three roles can call this - the service itself enforces that a MEMBER
@@ -48,12 +51,13 @@ public class PaymentController {
     // A member can only ever see their own payment history - memberId is checked against
     // the caller's own JWT, not trusted as given, since this is financial data.
     @GetMapping("/mine")
-    public List<PaymentResponse> mine(@RequestParam UUID memberId, Authentication authentication) {
+    public PageResponse<PaymentResponse> mine(@RequestParam UUID memberId, Authentication authentication,
+                                              @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
         UUID requesterId = UUID.fromString((String) authentication.getDetails());
         if (!requesterId.equals(memberId)) {
             throw new IllegalArgumentException("You can only view your own payment history");
         }
-        return paymentService.listForMember(memberId);
+        return paymentService.listForMember(memberId, PageRequest.of(page, size));
     }
 
     // Manual send - Manager/Owner triggers this after recording a purchase, or any time

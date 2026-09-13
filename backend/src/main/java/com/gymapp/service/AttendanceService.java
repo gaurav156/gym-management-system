@@ -1,6 +1,7 @@
 package com.gymapp.service;
 
 import com.gymapp.dto.AttendanceDtos.*;
+import com.gymapp.dto.PageDtos.PageResponse;
 import com.gymapp.entity.*;
 import com.gymapp.repository.AttendanceRepository;
 import com.gymapp.repository.BranchAssignmentRepository;
@@ -9,6 +10,7 @@ import com.gymapp.repository.MembershipRepository;
 import com.gymapp.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -238,11 +240,10 @@ public class AttendanceService {
     // the same branch, or by the auto-checkout job if they never did; otherwise it's
     // null (visit still in progress, within the auto-checkout window).
     @Transactional(readOnly = true)
-    public List<AttendanceLogEntry> historyFor(UUID personId) {
-        return attendanceRepository.findByMemberIdOrderByCheckInTimeDesc(personId).stream()
+    public PageResponse<AttendanceLogEntry> historyFor(UUID personId, Pageable pageable) {
+        return PageResponse.from(attendanceRepository.findByMemberIdOrderByCheckInTimeDesc(personId, pageable)
                 .map(a -> new AttendanceLogEntry(a.getId(), a.getCheckInTime(), a.getCheckOutTime(),
-                        a.getMethod().name(), a.getBranch().getName()))
-                .toList();
+                        a.getMethod().name(), a.getBranch().getName())));
     }
 
     // Today's check-ins at a branch, members and trainers together - the frontend splits

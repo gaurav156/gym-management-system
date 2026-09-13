@@ -1,5 +1,6 @@
 package com.gymapp.service;
 
+import com.gymapp.dto.PageDtos.PageResponse;
 import com.gymapp.dto.PaymentDtos.InvoiceResponse;
 import com.gymapp.dto.PaymentDtos.PaymentResponse;
 import com.gymapp.entity.Membership;
@@ -7,10 +8,10 @@ import com.gymapp.entity.Payment;
 import com.gymapp.invoice.InvoiceEmailService;
 import com.gymapp.invoice.InvoiceWhatsAppService;
 import com.gymapp.repository.PaymentRepository;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -28,16 +29,15 @@ public class PaymentService {
         this.invoiceWhatsAppService = invoiceWhatsAppService;
     }
 
+    // PaymentService.java
     @Transactional(readOnly = true)
-    public List<PaymentResponse> listForBranch(UUID branchId) {
-        return paymentRepository.findByBranchIdOrderByCreatedAtDesc(branchId).stream()
-                .map(this::toResponse).toList();
+    public PageResponse<PaymentResponse> listForBranch(UUID branchId, Pageable pageable) {
+        return PageResponse.from(paymentRepository.findByBranchIdOrderByCreatedAtDesc(branchId, pageable).map(this::toResponse));
     }
 
     @Transactional(readOnly = true)
-    public List<PaymentResponse> listForMember(UUID memberId) {
-        return paymentRepository.findByMemberIdOrderByCreatedAtDesc(memberId).stream()
-                .map(this::toResponse).toList();
+    public PageResponse<PaymentResponse> listForMember(UUID memberId, Pageable pageable) {
+        return PageResponse.from(paymentRepository.findByMemberIdOrderByCreatedAtDesc(memberId, pageable).map(this::toResponse));
     }
 
     // isStaff comes from the caller's JWT authorities (OWNER/MANAGER), never a client flag -

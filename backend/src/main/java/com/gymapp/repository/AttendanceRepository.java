@@ -1,6 +1,8 @@
 package com.gymapp.repository;
 
 import com.gymapp.entity.Attendance;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,7 +13,7 @@ import java.util.UUID;
 
 public interface AttendanceRepository extends JpaRepository<Attendance, UUID> {
     List<Attendance> findByBranchIdAndCheckInTimeBetweenOrderByCheckInTimeDesc(UUID branchId, LocalDateTime from, LocalDateTime to);
-    List<Attendance> findByMemberIdOrderByCheckInTimeDesc(UUID memberId);
+    Page<Attendance> findByMemberIdOrderByCheckInTimeDesc(UUID memberId, Pageable pageable);
 
     // MAX(checkInTime) per person at a branch, ever - used for the "last visit" column so
     // it doesn't require fetching every attendance row per member on the frontend.

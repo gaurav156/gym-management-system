@@ -1,16 +1,14 @@
 package com.gymapp.service;
 
+import com.gymapp.dto.PageDtos.PageResponse;
 import com.gymapp.dto.StaffDtos.StaffSummary;
-import com.gymapp.entity.BranchAssignment;
-import com.gymapp.entity.Role;
 import com.gymapp.entity.User;
-import com.gymapp.repository.BranchAssignmentRepository;
 import com.gymapp.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 // Powers the Manager dashboard's "Staff" tab. Combines Owner + Manager + Trainer for a
@@ -18,12 +16,9 @@ import java.util.UUID;
 @Service
 public class StaffDirectoryService {
 
-    private final BranchAssignmentRepository branchAssignmentRepository;
     private final UserRepository userRepository;
 
-    public StaffDirectoryService(BranchAssignmentRepository branchAssignmentRepository,
-                                 UserRepository userRepository) {
-        this.branchAssignmentRepository = branchAssignmentRepository;
+    public StaffDirectoryService(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 
@@ -32,20 +27,16 @@ public class StaffDirectoryService {
     // branch is selected. Managers and Trainers only show up here if actually assigned
     // to this specific branch.
     @Transactional(readOnly = true)
-    public List<StaffSummary> listStaffForBranch(UUID branchId) {
-        List<StaffSummary> result = new ArrayList<>();
+    public PageResponse<StaffSummary> listStaffForBranch(UUID branchId, String search, Pageable pageable) {
+        String term = blankToNull(search);
+        Page<User> page = term == null
+                ? userRepository.findStaffForBranch(branchId, pageable)
+                : userRepository.findStaffForBranchWithSearch(branchId, term, pageable);
+        return PageResponse.from(page.map(this::toSummary));
+    }
 
-        userRepository.findByRole(Role.OWNER).stream()
-                .findFirst()
-                .ifPresent(owner -> result.add(toSummary(owner)));
-
-        branchAssignmentRepository.findByBranchId(branchId).stream()
-                .map(BranchAssignment::getUser)
-                .filter(u -> u.getRole() == Role.MANAGER || u.getRole() == Role.TRAINER)
-                .map(this::toSummary)
-                .forEach(result::add);
-
-        return result;
+    private String blankToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
     }
 
     private StaffSummary toSummary(User u) {
