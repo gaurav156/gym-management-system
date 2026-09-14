@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
+import { getDashboardPath } from '../utils/navigation'
 
 const GYM_NAME = import.meta.env.VITE_GYM_NAME || 'FitZone Gym'
 const GYM_LOGO_URL = import.meta.env.VITE_GYM_LOGO_URL || '/logo.svg'
@@ -62,11 +63,23 @@ export default function Navbar() {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const dashboardPath =
-    user?.role === 'OWNER' ? '/owner'
-    : user?.role === 'MANAGER' ? '/manager'
-    : user?.role === 'TRAINER' ? '/trainer'
-    : '/member'
+  // Tracks whether the page has been scrolled past the top, purely to swap in a subtle
+  // shadow/translucent-blur treatment once content is passing underneath the docked bar -
+  // a flat top border looks fine at scrollY=0 but reads as "stuck to the page" once
+  // there's content sliding under it. Threshold of a few px (not 0) avoids the shadow
+  // flickering on/off from the tiny overscroll bounce some browsers report.
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    function onScroll() {
+      setScrolled(window.scrollY > 4)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  const dashboardPath = user ? getDashboardPath(user.role) : '/member'
 
   function closeMenu() {
     setMenuOpen(false)
@@ -79,7 +92,11 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="border-b border-gray-200 bg-white">
+    <nav
+      className={`sticky top-0 z-50 border-b bg-white/90 backdrop-blur-md transition-shadow duration-200 ${
+        scrolled ? 'border-gray-200 shadow-sm' : 'border-transparent'
+      }`}
+    >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
         <Link to="/" className="flex min-w-0 items-center gap-2 text-xl font-semibold text-brand">
           <img src={GYM_LOGO_URL} alt="" className="h-7 w-7 flex-shrink-0" />
