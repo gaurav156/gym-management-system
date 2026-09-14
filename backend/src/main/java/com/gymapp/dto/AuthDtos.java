@@ -38,10 +38,14 @@ public class AuthDtos {
             String captchaToken
     ) {}
 
-    // Same optional-captchaToken pattern as RegisterMemberRequest.
+    // Same optional-captchaToken pattern as RegisterMemberRequest. rememberMe is
+    // optional/nullable and defaults to false-ish (treated as null/false) - when true,
+    // AuthService issues a longer-lived token (see app.jwt.remember-me-expiration-ms)
+    // instead of the normal short-lived one.
     public record LoginRequest(
             @NotBlank @Email String email,
             @NotBlank String password,
+            Boolean rememberMe,
             String captchaToken
     ) {}
 

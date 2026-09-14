@@ -40,6 +40,12 @@ public class AuthService {
     @Value("${app.otp.expiry-minutes}")
     private int expiryMinutes;
 
+    @Value("${app.jwt.expiration-ms}")
+    private long expirationMs;
+
+    @Value("${app.jwt.remember-me-expiration-ms}")
+    private long rememberMeExpirationMs;
+
     @Value("${app.mail.gym-name}")
     private String gymName;
 
@@ -238,7 +244,8 @@ public class AuthService {
             throw new IllegalArgumentException("This account's staff access has ended - contact the Owner");
         }
 
-        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name(), user.getId().toString());
+        long ttl = Boolean.TRUE.equals(req.rememberMe()) ? rememberMeExpirationMs : expirationMs;
+        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name(), user.getId().toString(), ttl);
         return new AuthResponse(token, user.getId().toString(), user.getName(), user.getEmail(), user.getRole().name());
     }
 

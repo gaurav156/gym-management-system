@@ -14,24 +14,28 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// If the token is rejected, log the user out so they're sent back to /login
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const hadUser = !!useAuthStore.getState().user
+
+    // 401 = no valid, unexpired JWT at all on this request - almost always because the
+    // token simply expired while the person was away (see SecurityConfig's
+    // authenticationEntryPoint). This is a routine "please log back in", not anything
+    // about the account itself changing.
+    if (err.response?.status === 401 && hadUser) {
       useAuthStore.getState().logout()
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login?reason=session-expired'
+      }
     }
 
-    // A 403 on an authenticated request means the JWT is still cryptographically valid
-    // but its embedded role no longer matches what the backend enforces - the most
-    // likely cause is the Owner changing this person's role after the token was issued
-    // (see RoleChangeService). 401 handling above won't catch this since the token
-    // itself hasn't expired. Rather than leaving the person on a dashboard full of
-    // silent "Failed to load..." errors that don't explain why, force a full logout and
-    // reload straight to login with a reason the UI can surface clearly. A full page
-    // navigation (not react-router) is deliberate here - this runs outside the component
-    // tree, and a hard reload guarantees no stale dashboard state lingers.
-    if (err.response?.status === 403 && useAuthStore.getState().user) {
+    // 403 = the JWT is still cryptographically valid and unexpired, but its embedded
+    // role no longer matches what the backend enforces - the most likely cause is the
+    // Owner changing this person's role after the token was issued (see
+    // RoleChangeService). Distinct from 401 above precisely because the token hasn't
+    // expired; this really is an access change, not a stale session.
+    if (err.response?.status === 403 && hadUser) {
       useAuthStore.getState().logout()
       if (!window.location.pathname.startsWith('/login')) {
         window.location.href = '/login?reason=access-changed'

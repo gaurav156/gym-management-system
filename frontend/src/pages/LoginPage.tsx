@@ -8,6 +8,7 @@ import type { AuthUser } from '../types'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState('')
   const [captchaRequired, setCaptchaRequired] = useState(false)
   const [captchaToken, setCaptchaToken] = useState('')
@@ -16,17 +17,20 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
-  // Set by the api client's response interceptor when a request comes back 403 while a
-  // JWT is still present - almost always means an Owner changed this person's role
-  // after their token was issued, so their old session no longer has the access it did.
-  const accessChanged = searchParams.get('reason') === 'access-changed'
+  // Set by the api client's response interceptor. These are mutually exclusive: a
+  // simply-expired token comes back as 401 ("session-expired"); a still-valid token
+  // whose role no longer has access comes back as 403 ("access-changed") - see
+  // api/client.ts and SecurityConfig for how the two are told apart.
+  const reason = searchParams.get('reason')
+  const sessionExpired = reason === 'session-expired'
+  const accessChanged = reason === 'access-changed'
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
     try {
       const { data } = await api.post<AuthUser>('/api/auth/login', {
-        email, password, captchaToken: captchaRequired ? captchaToken : undefined,
+        email, password, rememberMe, captchaToken: captchaRequired ? captchaToken : undefined,
       })
       setUser(data)
       const path = data.role === 'OWNER' ? '/owner'
@@ -51,6 +55,11 @@ export default function LoginPage() {
     <div className="mx-auto max-w-sm px-4 py-16">
       <h1 className="text-2xl font-semibold">Log in</h1>
 
+      {sessionExpired && (
+        <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700">
+          Your session has expired - please log in again.
+        </div>
+      )}
       {accessChanged && (
         <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
           Your account access has changed - please log in again to continue.
@@ -75,6 +84,11 @@ export default function LoginPage() {
             <Link to="/forgot-password" className="text-xs text-brand hover:underline">Forgot password?</Link>
           </div>
         </div>
+
+        <label className="flex items-center gap-2 text-sm text-gray-600">
+          <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+          Remember me for 30 days
+        </label>
 
         {captchaRequired && (
           <Turnstile key={captchaKey} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />

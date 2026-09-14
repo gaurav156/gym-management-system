@@ -49,6 +49,7 @@ app:
   jwt:
     secret: ${JWT_SECRET:change-this-to-a-long-random-string-in-your-env-file-min-32-chars}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}   # 24 hours
+    remember-me-expiration-ms: ${JWT_REMEMBER_ME_EXPIRATION_MS:2592000000}   # 30 days
   cors:
     allowed-origins: ${CORS_ORIGIN:http://localhost:5173}
   seed:

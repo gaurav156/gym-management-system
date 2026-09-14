@@ -1,6 +1,7 @@
 package com.gymapp.config;
 
 import com.gymapp.security.JwtAuthFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,6 +45,19 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // Without this, Spring's default AuthenticationEntryPoint
+            // (Http403ForbiddenEntryPoint) returns 403 for a request with NO valid
+            // authentication at all - including a simply-expired JWT - making it
+            // indistinguishable from a role-mismatch 403 (see RoleChangeService /
+            // api/client.ts). Explicitly separating the two: no/invalid/expired token
+            // -> 401 ("please log in again"); valid token but insufficient role -> 403
+            // ("your access changed, log in again to refresh it").
+            .exceptionHandling(ex -> ex
+                    .authenticationEntryPoint((request, response, authException) ->
+                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Authentication required"))
+                    .accessDeniedHandler((request, response, accessDeniedException) ->
+                            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied"))
+            )
             .authorizeHttpRequests(auth -> auth
                 // public endpoints
                 .requestMatchers("/api/auth/**").permitAll()

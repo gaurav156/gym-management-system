@@ -24,8 +24,16 @@ public class JwtUtil {
     }
 
     public String generateToken(String email, String role, String userId) {
+        return generateToken(email, role, userId, expirationMs);
+    }
+
+    // Lets a caller (e.g. AuthService's "remember me" login) issue a token with a
+    // different lifetime than the standard one, without touching how tokens are
+    // validated/parsed - isTokenValid()/extract*() below don't care how long a token was
+    // issued for, only whether it's still within whatever expiry it was given.
+    public String generateToken(String email, String role, String userId, long ttlMs) {
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + expirationMs);
+        Date expiry = new Date(now.getTime() + ttlMs);
         return Jwts.builder()
                 .subject(email)
                 .claim("role", role)
