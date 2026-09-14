@@ -270,11 +270,16 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   return (
     <div>
       <div className="rounded-lg border border-gray-200 p-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="font-medium">Staff</h2>
           <label className="flex items-center gap-1.5 text-xs text-gray-500">
-            <input type="checkbox" checked={showLeftStaff} onChange={(e) => handleShowLeftChange(e.target.checked)} />
-            Show all trainers/managers (including left)
+            <input
+              type="checkbox"
+              checked={showLeftStaff}
+              onChange={(e) => handleShowLeftChange(e.target.checked)}
+              className="flex-shrink-0"
+            />
+            <span>Show all trainers/managers (including left)</span>
           </label>
         </div>
         <p className="mt-1 text-xs text-gray-500">Owner, Managers, and Trainers for this branch - all can check in/out.</p>
