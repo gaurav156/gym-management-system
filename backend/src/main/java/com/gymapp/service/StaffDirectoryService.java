@@ -27,11 +27,11 @@ public class StaffDirectoryService {
     // branch is selected. Managers and Trainers only show up here if actually assigned
     // to this specific branch.
     @Transactional(readOnly = true)
-    public PageResponse<StaffSummary> listStaffForBranch(UUID branchId, String search, Pageable pageable) {
-        String term = blankToNull(search);
-        Page<User> page = term == null
-                ? userRepository.findStaffForBranch(branchId, pageable)
-                : userRepository.findStaffForBranchWithSearch(branchId, term, pageable);
+    public PageResponse<StaffSummary> listStaffForBranch(UUID branchId, String role, boolean includeLeft,
+                                                         String sort, Pageable pageable) {
+        String roleParam = (role == null || role.isBlank()) ? "ALL" : role.toUpperCase();
+        String sortParam = (sort == null || sort.isBlank()) ? "NAME" : sort.toUpperCase();
+        Page<User> page = userRepository.findStaffForBranch(branchId, roleParam, includeLeft, sortParam, pageable);
         return PageResponse.from(page.map(this::toSummary));
     }
 

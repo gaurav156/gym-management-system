@@ -22,40 +22,87 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     // isn't unique the way email is, so this is "first match" rather than "the" match.
     Optional<User> findFirstByPhone(String phone);
 
-    // No-search variant - used whenever the caller hasn't typed anything. Deliberately
-    // separate from the *WithSearch variant below rather than a single query with
-    // "(:search IS NULL OR ...)": Postgres can't infer a type for a literal NULL bound
-    // into CONCAT(), and defaults it to bytea, which then blows up on LOWER(bytea).
-    // Splitting into two queries means :search is only ever bound as a real String.
-    @Query("SELECT u FROM User u WHERE u.role = :role " +
-            "AND u.id IN (SELECT ba.user.id FROM BranchAssignment ba WHERE ba.branch.id = :branchId) " +
-            "ORDER BY u.name")
-    Page<User> findByRoleAssignedToBranch(@Param("role") Role role, @Param("branchId") UUID branchId, Pageable pageable);
+    // Members roster for a branch - filtering, status, and sort all run in the database
+    // so they apply across the WHOLE roster, not just the page currently in memory.
+    // `status` is ALL/ACTIVE/SCHEDULED/PAUSED/NONE (never null - the controller
+    // defaults it), derived the same way MembershipRepository/utils/membership.ts do:
+    // ACTIVE = an ACTIVE row whose range covers today; SCHEDULED = an ACTIVE row not
+    // started yet; PAUSED = a PAUSED row; NONE = none of those. `sort` STATUS orders
+    // by the same alphabetical priority (ACTIVE, NONE, PAUSED, SCHEDULED) the frontend
+    // used to sort by client-side, then by name.
+    @Query(value = "SELECT u.* FROM users u " +
+            "WHERE u.role = 'MEMBER' " +
+            "AND u.id IN (SELECT ba.user_id FROM branch_assignments ba WHERE ba.branch_id = :branchId) " +
+            "AND (CAST(:search AS text) IS NULL " +
+            "     OR LOWER(u.name) LIKE LOWER(CONCAT('%', CAST(:search AS text), '%')) " +
+            "     OR LOWER(u.email) LIKE LOWER(CONCAT('%', CAST(:search AS text), '%'))) " +
+            "AND (:status = 'ALL' " +
+            "  OR (:status = 'ACTIVE' AND EXISTS (SELECT 1 FROM memberships m WHERE m.member_id = u.id " +
+            "        AND m.status = 'ACTIVE' AND m.start_date <= CURRENT_DATE AND m.end_date >= CURRENT_DATE)) " +
+            "  OR (:status = 'SCHEDULED' AND EXISTS (SELECT 1 FROM memberships m WHERE m.member_id = u.id " +
+            "        AND m.status = 'ACTIVE' AND m.start_date > CURRENT_DATE)) " +
+            "  OR (:status = 'PAUSED' AND EXISTS (SELECT 1 FROM memberships m WHERE m.member_id = u.id " +
+            "        AND m.status = 'PAUSED')) " +
+            "  OR (:status = 'NONE' AND NOT EXISTS (SELECT 1 FROM memberships m WHERE m.member_id = u.id " +
+            "        AND ((m.status = 'ACTIVE' AND m.start_date <= CURRENT_DATE AND m.end_date >= CURRENT_DATE) " +
+            "          OR (m.status = 'ACTIVE' AND m.start_date > CURRENT_DATE) " +
+            "          OR (m.status = 'PAUSED'))))) " +
+            "ORDER BY " +
+            "  CASE WHEN :sort = 'STATUS' THEN " +
+            "    CASE " +
+            "      WHEN EXISTS (SELECT 1 FROM memberships m WHERE m.member_id = u.id AND m.status = 'ACTIVE' " +
+            "             AND m.start_date <= CURRENT_DATE AND m.end_date >= CURRENT_DATE) THEN 0 " +
+            "      WHEN NOT EXISTS (SELECT 1 FROM memberships m WHERE m.member_id = u.id " +
+            "             AND ((m.status = 'ACTIVE' AND m.start_date <= CURRENT_DATE AND m.end_date >= CURRENT_DATE) " +
+            "               OR (m.status = 'ACTIVE' AND m.start_date > CURRENT_DATE) OR (m.status = 'PAUSED'))) THEN 1 " +
+            "      WHEN EXISTS (SELECT 1 FROM memberships m WHERE m.member_id = u.id AND m.status = 'PAUSED') THEN 2 " +
+            "      ELSE 3 " +
+            "    END " +
+            "  ELSE 0 END, " +
+            "  u.name",
+            countQuery = "SELECT count(u.*) FROM users u " +
+                    "WHERE u.role = 'MEMBER' " +
+                    "AND u.id IN (SELECT ba.user_id FROM branch_assignments ba WHERE ba.branch_id = :branchId) " +
+                    "AND (CAST(:search AS text) IS NULL " +
+                    "     OR LOWER(u.name) LIKE LOWER(CONCAT('%', CAST(:search AS text), '%')) " +
+                    "     OR LOWER(u.email) LIKE LOWER(CONCAT('%', CAST(:search AS text), '%'))) " +
+                    "AND (:status = 'ALL' " +
+                    "  OR (:status = 'ACTIVE' AND EXISTS (SELECT 1 FROM memberships m WHERE m.member_id = u.id " +
+                    "        AND m.status = 'ACTIVE' AND m.start_date <= CURRENT_DATE AND m.end_date >= CURRENT_DATE)) " +
+                    "  OR (:status = 'SCHEDULED' AND EXISTS (SELECT 1 FROM memberships m WHERE m.member_id = u.id " +
+                    "        AND m.status = 'ACTIVE' AND m.start_date > CURRENT_DATE)) " +
+                    "  OR (:status = 'PAUSED' AND EXISTS (SELECT 1 FROM memberships m WHERE m.member_id = u.id " +
+                    "        AND m.status = 'PAUSED')) " +
+                    "  OR (:status = 'NONE' AND NOT EXISTS (SELECT 1 FROM memberships m WHERE m.member_id = u.id " +
+                    "        AND ((m.status = 'ACTIVE' AND m.start_date <= CURRENT_DATE AND m.end_date >= CURRENT_DATE) " +
+                    "          OR (m.status = 'ACTIVE' AND m.start_date > CURRENT_DATE) " +
+                    "          OR (m.status = 'PAUSED')))))",
+            nativeQuery = true)
+    Page<User> findMembersForBranch(@Param("branchId") UUID branchId, @Param("search") String search,
+                                    @Param("status") String status, @Param("sort") String sort, Pageable pageable);
 
-    @Query("SELECT u FROM User u WHERE u.role = :role " +
-            "AND u.id IN (SELECT ba.user.id FROM BranchAssignment ba WHERE ba.branch.id = :branchId) " +
-            "AND (LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
-            "     OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))) " +
-            "ORDER BY u.name")
-    Page<User> findByRoleAssignedToBranchWithSearch(@Param("role") Role role, @Param("branchId") UUID branchId,
-                                                    @Param("search") String search, Pageable pageable);
-
-    // Same split for the Staff directory query.
-    @Query("SELECT u FROM User u WHERE " +
-            "(u.role = com.gymapp.entity.Role.OWNER " +
-            " OR (u.role IN (com.gymapp.entity.Role.MANAGER, com.gymapp.entity.Role.TRAINER) " +
-            "     AND u.id IN (SELECT ba.user.id FROM BranchAssignment ba WHERE ba.branch.id = :branchId))) " +
-            "ORDER BY CASE u.role WHEN com.gymapp.entity.Role.OWNER THEN 0 " +
-            "  WHEN com.gymapp.entity.Role.MANAGER THEN 1 ELSE 2 END, u.name")
-    Page<User> findStaffForBranch(@Param("branchId") UUID branchId, Pageable pageable);
-
-    @Query("SELECT u FROM User u WHERE " +
-            "(u.role = com.gymapp.entity.Role.OWNER " +
-            " OR (u.role IN (com.gymapp.entity.Role.MANAGER, com.gymapp.entity.Role.TRAINER) " +
-            "     AND u.id IN (SELECT ba.user.id FROM BranchAssignment ba WHERE ba.branch.id = :branchId))) " +
-            "AND (LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
-            "     OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))) " +
-            "ORDER BY CASE u.role WHEN com.gymapp.entity.Role.OWNER THEN 0 " +
-            "  WHEN com.gymapp.entity.Role.MANAGER THEN 1 ELSE 2 END, u.name")
-    Page<User> findStaffForBranchWithSearch(@Param("branchId") UUID branchId, @Param("search") String search, Pageable pageable);
+    // Staff roster - Owner always included (implicit access to every branch), Manager/
+    // Trainer only if assigned to this branch. `role` is ALL/OWNER/MANAGER/TRAINER,
+    // `includeLeft` mirrors the old "Show all trainers/managers (including left)"
+    // checkbox, `sort` ROLE orders by seniority (Owner, Manager, Trainer) then name.
+    @Query(value = "SELECT u.* FROM users u " +
+            "WHERE (u.role = 'OWNER' " +
+            "  OR (u.role IN ('MANAGER', 'TRAINER') " +
+            "      AND u.id IN (SELECT ba.user_id FROM branch_assignments ba WHERE ba.branch_id = :branchId))) " +
+            "AND (:role = 'ALL' OR u.role = :role) " +
+            "AND (u.role = 'OWNER' OR :includeLeft = true OR u.left_date IS NULL) " +
+            "ORDER BY " +
+            "  CASE WHEN :sort = 'ROLE' THEN " +
+            "    CASE u.role WHEN 'OWNER' THEN 0 WHEN 'MANAGER' THEN 1 ELSE 2 END " +
+            "  ELSE 0 END, " +
+            "  u.name",
+            countQuery = "SELECT count(u.*) FROM users u " +
+                    "WHERE (u.role = 'OWNER' " +
+                    "  OR (u.role IN ('MANAGER', 'TRAINER') " +
+                    "      AND u.id IN (SELECT ba.user_id FROM branch_assignments ba WHERE ba.branch_id = :branchId))) " +
+                    "AND (:role = 'ALL' OR u.role = :role) " +
+                    "AND (u.role = 'OWNER' OR :includeLeft = true OR u.left_date IS NULL)",
+            nativeQuery = true)
+    Page<User> findStaffForBranch(@Param("branchId") UUID branchId, @Param("role") String role,
+                                  @Param("includeLeft") boolean includeLeft, @Param("sort") String sort, Pageable pageable);
 }

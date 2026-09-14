@@ -22,10 +22,12 @@ public class MemberController {
     @GetMapping("/api/members")
     @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
     public PageResponse<MemberSummary> listMembers(@RequestParam UUID branchId,
-                                                            @RequestParam(required = false) String search,
-                                                            @RequestParam(defaultValue = "0") int page,
-                                                            @RequestParam(defaultValue = "20") int size) {
-        return memberDirectoryService.listMembersForBranch(branchId, search, PageRequest.of(page, size));
+                                                   @RequestParam(required = false) String search,
+                                                   @RequestParam(defaultValue = "ALL") String status,
+                                                   @RequestParam(defaultValue = "NAME") String sort,
+                                                   @RequestParam(defaultValue = "0") int page,
+                                                   @RequestParam(defaultValue = "20") int size) {
+        return memberDirectoryService.listMembersForBranch(branchId, search, status, sort, PageRequest.of(page, size));
     }
 
     // Staff-facing basic info edit (name/phone/address/photo) - deliberately reuses the

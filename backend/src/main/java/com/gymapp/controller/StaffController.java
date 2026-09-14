@@ -22,9 +22,11 @@ public class StaffController {
     @GetMapping
     @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
     public PageResponse<StaffSummary> listStaff(@RequestParam UUID branchId,
-                                                         @RequestParam(required = false) String search,
-                                                         @RequestParam(defaultValue = "0") int page,
-                                                         @RequestParam(defaultValue = "20") int size) {
-        return staffDirectoryService.listStaffForBranch(branchId, search, PageRequest.of(page, size));
+                                                @RequestParam(defaultValue = "ALL") String role,
+                                                @RequestParam(defaultValue = "false") boolean includeLeft,
+                                                @RequestParam(defaultValue = "NAME") String sort,
+                                                @RequestParam(defaultValue = "0") int page,
+                                                @RequestParam(defaultValue = "20") int size) {
+        return staffDirectoryService.listStaffForBranch(branchId, role, includeLeft, sort, PageRequest.of(page, size));
     }
 }

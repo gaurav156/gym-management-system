@@ -66,10 +66,10 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
 
   const [detailMembershipsFetched, setDetailMembershipsFetched] = useState<MembershipAdmin[]>([]) // unchanged, still full list
 
-  function loadMembers(page = 0, search = memberSearch) {
+  function loadMembers(page = 0, search = memberSearch, status = memberStatusFilter, sort = memberSort) {
     if (!selectedBranch) return
     api.get<PageResponse<MemberSummary>>('/api/members', {
-      params: { branchId: selectedBranch, search: search || undefined, page, size: PAGE_SIZE },
+      params: { branchId: selectedBranch, search: search || undefined, status, sort, page, size: PAGE_SIZE },
     }).then((res) => {
       setMembers(res.data.content)
       setMemberTotalPages(res.data.totalPages)
@@ -86,7 +86,9 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   useEffect(() => {
     setMemberSearchInput('')
     setMemberSearch('')
-    loadMembers(0, '')
+    setMemberStatusFilter('ALL')
+    setMemberSort('NAME')
+    loadMembers(0, '', 'ALL', 'NAME')
     loadMemberships()
   }, [selectedBranch])
 
@@ -94,11 +96,21 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   useEffect(() => {
     const handle = setTimeout(() => {
       setMemberSearch(memberSearchInput)
-      loadMembers(0, memberSearchInput)
+      loadMembers(0, memberSearchInput, memberStatusFilter, memberSort)
     }, 300)
     return () => clearTimeout(handle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memberSearchInput])
+
+  function handleStatusFilterChange(value: typeof memberStatusFilter) {
+    setMemberStatusFilter(value)
+    loadMembers(0, memberSearch, value, memberSort)
+  }
+
+  function handleSortChange(value: typeof memberSort) {
+    setMemberSort(value)
+    loadMembers(0, memberSearch, memberStatusFilter, value)
+  }
 
   function loadDetailMemberBranches(memberId: string) {
     api.get<Branch[]>('/api/branches/mine', { params: { userId: memberId } }).then((res) => setDetailMemberBranches(res.data))
@@ -260,7 +272,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
         name: memberEditName, phone: memberEditPhone, address: memberEditAddress, photo: memberEditPhoto ?? '',
       })
       setEditingMemberInfo(false)
-      loadMembers()
+      loadMembers(memberPage, memberSearch, memberStatusFilter, memberSort)
     } catch (err: any) {
       setMemberModalMessage(err.response?.data?.error || 'Failed to update member info')
     }
@@ -274,7 +286,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     try {
       await api.delete(`/api/owner/users/${memberId}`)
       setDetailMemberId(null)
-      loadMembers()
+      loadMembers(0, memberSearch, memberStatusFilter, memberSort)
       loadMemberships()
     } catch (err: any) {
       setMemberModalMessage(err.response?.data?.error || 'Failed to delete account')
@@ -299,7 +311,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     try {
       await api.put(`/api/owner/users/${member.id}/role`, { newRole: selectedNewRole })
       setDetailMemberId(null)
-      loadMembers()
+      loadMembers(0, memberSearch, memberStatusFilter, memberSort)
       loadMemberships()
     } catch (err: any) {
       setMemberModalMessage(err.response?.data?.error || 'Failed to change role')
@@ -326,9 +338,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   type MemberRow = { member: MemberSummary; status: EffectiveStatus | 'NONE' }
 
   const memberRows: MemberRow[] = members.map((mem): MemberRow => {
-    const relevant = memberships
-      .filter((ms) => ms.memberId === mem.id)
-      .map((ms) => getEffectiveStatus(ms))
+    const relevant = memberships.filter((ms) => ms.memberId === mem.id).map((ms) => getEffectiveStatus(ms))
     const status: EffectiveStatus | 'NONE' =
       relevant.includes('ACTIVE') ? 'ACTIVE' :
       relevant.includes('SCHEDULED') ? 'SCHEDULED' :
@@ -336,13 +346,13 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     return { member: mem, status }
   })
 
-  // Status filter and sort apply within the currently loaded page only, since the roster
-  // itself is now paginated server-side - see the note rendered under the filters below.
-  const visibleMemberRows = memberRows
-    .filter(({ status }) => memberStatusFilter === 'ALL' || status === memberStatusFilter)
-    .sort((a, b) => memberSort === 'NAME'
-      ? a.member.name.localeCompare(b.member.name)
-      : a.status.localeCompare(b.status))
+  // // Status filter and sort apply within the currently loaded page only, since the roster
+  // // itself is now paginated server-side - see the note rendered under the filters below.
+  // const visibleMemberRows = memberRows
+  //   .filter(({ status }) => memberStatusFilter === 'ALL' || status === memberStatusFilter)
+  //   .sort((a, b) => memberSort === 'NAME'
+  //     ? a.member.name.localeCompare(b.member.name)
+  //     : a.status.localeCompare(b.status))
 
   const detailMember = members.find((m) => m.id === detailMemberId) ?? null
   const detailMemberships = detailMembershipsFetched
@@ -363,7 +373,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
         <div className="mt-3 flex flex-wrap gap-2">
           <input placeholder="Search name or email..." value={memberSearchInput} onChange={(e) => setMemberSearchInput(e.target.value)}
             className="flex-1 min-w-[180px] rounded-md border border-gray-300 px-3 py-2 text-sm" />
-          <select value={memberStatusFilter} onChange={(e) => setMemberStatusFilter(e.target.value as any)}
+          <select value={memberStatusFilter} onChange={(e) => handleStatusFilterChange(e.target.value as any)}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm">
             <option value="ALL">All statuses</option>
             <option value="ACTIVE">Active</option>
@@ -371,13 +381,12 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
             <option value="PAUSED">Paused</option>
             <option value="NONE">No plan</option>
           </select>
-          <select value={memberSort} onChange={(e) => setMemberSort(e.target.value as any)}
+          <select value={memberSort} onChange={(e) => handleSortChange(e.target.value as any)}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm">
             <option value="NAME">Sort: Name</option>
             <option value="STATUS">Sort: Status</option>
           </select>
         </div>
-          <p className="mt-2 text-xs text-gray-400">Status and sort apply to the current page only.</p>
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -392,7 +401,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {visibleMemberRows.map(({ member, status }) => (
+              {memberRows.map(({ member, status }) => (
                 <tr key={member.id}>
                   <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">

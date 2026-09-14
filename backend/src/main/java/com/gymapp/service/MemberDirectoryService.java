@@ -25,11 +25,12 @@ public class MemberDirectoryService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<MemberSummary> listMembersForBranch(UUID branchId, String search, Pageable pageable) {
+    public PageResponse<MemberSummary> listMembersForBranch(UUID branchId, String search, String status,
+                                                            String sort, Pageable pageable) {
         String term = blankToNull(search);
-        Page<User> page = term == null
-                ? userRepository.findByRoleAssignedToBranch(Role.MEMBER, branchId, pageable)
-                : userRepository.findByRoleAssignedToBranchWithSearch(Role.MEMBER, branchId, term, pageable);
+        String statusParam = (status == null || status.isBlank()) ? "ALL" : status.toUpperCase();
+        String sortParam = (sort == null || sort.isBlank()) ? "NAME" : sort.toUpperCase();
+        Page<User> page = userRepository.findMembersForBranch(branchId, term, statusParam, sortParam, pageable);
         return PageResponse.from(page.map(this::toSummary));
     }
 

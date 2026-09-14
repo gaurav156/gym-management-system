@@ -64,18 +64,34 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const [selectedNewRole, setSelectedNewRole] = useState('')
   const [changingRole, setChangingRole] = useState(false)
 
-  function loadStaff(page = 0) {
+  function loadStaff(page = 0, roleFilter = staffRoleFilter, includeLeft = showLeftStaff, sort = staffSort) {
     if (!selectedBranch) return
-    api.get<PageResponse<StaffSummary>>('/api/staff', { params: { branchId: selectedBranch, page, size: PAGE_SIZE } })
-      .then((res) => {
-        setStaff(res.data.content)
-        setStaffTotalPages(res.data.totalPages)
-        setStaffTotalElements(res.data.totalElements)
-        setStaffPage(res.data.page)
-      })
+    api.get<PageResponse<StaffSummary>>('/api/staff', {
+      params: { branchId: selectedBranch, role: roleFilter, includeLeft, sort, page, size: PAGE_SIZE },
+    }).then((res) => {
+      setStaff(res.data.content)
+      setStaffTotalPages(res.data.totalPages)
+      setStaffTotalElements(res.data.totalElements)
+      setStaffPage(res.data.page)
+    })
   }
 
   useEffect(() => { loadStaff(0) }, [selectedBranch])
+
+  function handleRoleFilterChange(value: typeof staffRoleFilter) {
+    setStaffRoleFilter(value)
+    loadStaff(0, value, showLeftStaff, staffSort)
+  }
+
+  function handleShowLeftChange(value: boolean) {
+    setShowLeftStaff(value)
+    loadStaff(0, staffRoleFilter, value, staffSort)
+  }
+
+  function handleSortChange(value: typeof staffSort) {
+    setStaffSort(value)
+    loadStaff(0, staffRoleFilter, showLeftStaff, value)
+  }
 
   function loadDetailStaffAttendance(staffId: string, page = 0) {
     api.get<PageResponse<AttendanceLogEntry>>(`/api/attendance/history/${staffId}`, { params: { page, size: MODAL_PAGE_SIZE } })
@@ -140,7 +156,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
         name: staffEditName, phone: staffEditPhone, address: staffEditAddress, photo: staffEditPhoto ?? '',
       })
       setEditingStaffInfo(false)
-      loadStaff()
+      loadStaff(staffPage)
     } catch (err: any) {
       setStaffModalMessage(err.response?.data?.error || 'Failed to update staff info')
     }
@@ -162,7 +178,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
         leftDate: leftDateInput || null,
       })
       setEditingStaffDates(false)
-      loadStaff()
+      loadStaff(staffPage)
     } catch (err: any) {
       setStaffModalMessage(err.response?.data?.error || 'Failed to update dates')
     }
@@ -172,7 +188,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     const endpoint = s.role === 'MANAGER' ? `/api/managers/${s.id}/dates` : `/api/trainers/${s.id}/dates`
     try {
       await api.put(endpoint, { joiningDate: s.joiningDate, leftDate: null })
-      loadStaff()
+      loadStaff(staffPage)
     } catch (err: any) {
       setStaffModalMessage(err.response?.data?.error || 'Failed to clear left date')
     }
@@ -187,7 +203,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       await api.put(`/api/branches/assignments/${staffId}`, { branchIds: staffBranchEditIds })
       setEditingStaffBranches(false)
       loadDetailStaffBranches(staffId)
-      loadStaff()
+      loadStaff(staffPage)
     } catch (err: any) {
       setStaffModalMessage(err.response?.data?.error || 'Failed to update branch assignments')
     }
@@ -202,7 +218,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     try {
       await api.delete(`/api/owner/users/${staffId}`)
       setDetailStaffId(null)
-      loadStaff()
+      loadStaff(0)
     } catch (err: any) {
       setStaffModalMessage(err.response?.data?.error || 'Failed to delete account')
     }
@@ -227,20 +243,13 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     try {
       await api.put(`/api/owner/users/${s.id}/role`, { newRole: selectedNewRole })
       setDetailStaffId(null)
-      loadStaff()
+      loadStaff(0)
     } catch (err: any) {
       setStaffModalMessage(err.response?.data?.error || 'Failed to change role')
     } finally {
       setChangingRole(false)
     }
   }
-
-  const visibleStaff = staff
-    .filter((s) => (s.role !== 'TRAINER' && s.role !== 'MANAGER') || showLeftStaff || !s.leftDate)
-    .filter((s) => staffRoleFilter === 'ALL' || s.role === staffRoleFilter)
-    .sort((a, b) => staffSort === 'NAME'
-      ? a.name.localeCompare(b.name)
-      : (ROLE_SORT_ORDER[a.role] - ROLE_SORT_ORDER[b.role]) || a.name.localeCompare(b.name))
 
   const detailStaff = staff.find((s) => s.id === detailStaffId) ?? null
 
@@ -264,27 +273,26 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
         <div className="flex items-center justify-between">
           <h2 className="font-medium">Staff</h2>
           <label className="flex items-center gap-1.5 text-xs text-gray-500">
-            <input type="checkbox" checked={showLeftStaff} onChange={(e) => setShowLeftStaff(e.target.checked)} />
+            <input type="checkbox" checked={showLeftStaff} onChange={(e) => handleShowLeftChange(e.target.checked)} />
             Show all trainers/managers (including left)
           </label>
         </div>
         <p className="mt-1 text-xs text-gray-500">Owner, Managers, and Trainers for this branch - all can check in/out.</p>
 
         <div className="mt-3 flex flex-wrap gap-2">
-          <select value={staffRoleFilter} onChange={(e) => setStaffRoleFilter(e.target.value as any)}
+          <select value={staffRoleFilter} onChange={(e) => handleRoleFilterChange(e.target.value as any)}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm">
             <option value="ALL">All roles</option>
             <option value="OWNER">Owner</option>
             <option value="MANAGER">Manager</option>
             <option value="TRAINER">Trainer</option>
           </select>
-          <select value={staffSort} onChange={(e) => setStaffSort(e.target.value as any)}
+          <select value={staffSort} onChange={(e) => handleSortChange(e.target.value as any)}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm">
             <option value="NAME">Sort: Name</option>
             <option value="ROLE">Sort: Role</option>
           </select>
         </div>
-        <p className="mt-1 text-xs text-gray-400">Role filter and sort apply to the current page only.</p>
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -300,7 +308,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {visibleStaff.map((s) => (
+              {staff.map((s) => (
                 <tr key={s.id}>
                   <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">
@@ -333,7 +341,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
               ))}
             </tbody>
           </table>
-          {visibleStaff.length === 0 && (
+          {staff.length === 0 && (
             <p className="py-4 text-sm text-gray-400">
               {staff.length === 0 ? 'No staff assigned to this branch yet.' : 'No staff match the current filters.'}
             </p>
