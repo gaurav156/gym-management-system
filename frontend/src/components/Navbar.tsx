@@ -79,6 +79,15 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  // Locks background scroll while the mobile drawer is open, so the page underneath
+  // can't be dragged around behind the overlay on touch devices.
+  useEffect(() => {
+    if (!menuOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previousOverflow }
+  }, [menuOpen])
+
   const dashboardPath = user ? getDashboardPath(user.role) : '/member'
 
   function closeMenu() {
@@ -92,53 +101,61 @@ export default function Navbar() {
   }
 
   return (
-    <nav
-      className={`sticky top-0 z-50 border-b bg-white/90 backdrop-blur-md transition-shadow duration-200 ${
-        scrolled ? 'border-gray-200 shadow-sm' : 'border-transparent'
-      }`}
-    >
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-        <Link to="/" className="flex min-w-0 items-center gap-2 text-xl font-semibold text-brand">
-          <img src={GYM_LOGO_URL} alt="" className="h-7 w-7 flex-shrink-0" />
-          <span className="truncate">{GYM_NAME}</span>
-        </Link>
+    // IMPORTANT: the mobile drawer below is a SIBLING of <nav>, not a child of it.
+    // <nav> uses backdrop-blur-md, and backdrop-filter (like transform) makes an
+    // element the containing block for any position:fixed descendant - so a
+    // `fixed inset-0` drawer nested inside a blurred <nav> gets sized against the
+    // ~70px-tall nav bar instead of the viewport, which is what made it render
+    // squashed/behind other content. Keeping it outside <nav> avoids that entirely.
+    <>
+      <nav
+        className={`sticky top-0 z-50 border-b bg-white/90 backdrop-blur-md transition-shadow duration-200 ${
+          scrolled ? 'border-gray-200 shadow-sm' : 'border-transparent'
+        }`}
+      >
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+          <Link to="/" className="flex min-w-0 items-center gap-2 text-xl font-semibold text-brand">
+            <img src={GYM_LOGO_URL} alt="" className="h-7 w-7 flex-shrink-0" />
+            <span className="truncate">{GYM_NAME}</span>
+          </Link>
 
-        {/* Desktop nav - hidden on narrow screens to avoid overflow with a long gym name */}
-        <div className="hidden flex-shrink-0 items-center gap-4 text-sm sm:flex">
-          {user ? (
-            <>
-              <Link to={dashboardPath} className="text-gray-700 hover:text-brand">Dashboard</Link>
-              {(user.role === 'MEMBER' || user.role === 'TRAINER' || user.role === 'OWNER' || user.role === 'MANAGER') && (
-                <Link to="/profile" className="text-gray-700 hover:text-brand">Profile</Link>
-              )}
-              <span className="text-gray-400">{user.name}</span>
-              <button
-                onClick={handleLogout}
-                className="rounded-md bg-gray-100 px-3 py-1.5 text-gray-700 hover:bg-gray-200"
-              >
-                Log out
-              </button>
-            </>
-          ) : (
-            <>
-              <Link to="/login" className="text-gray-700 hover:text-brand">Log in</Link>
-              <Link to="/register" className="rounded-md bg-brand px-3 py-1.5 text-white hover:bg-brand-dark">
-                Join now
-              </Link>
-            </>
-          )}
+          {/* Desktop nav - hidden on narrow screens to avoid overflow with a long gym name */}
+          <div className="hidden flex-shrink-0 items-center gap-4 text-sm sm:flex">
+            {user ? (
+              <>
+                <Link to={dashboardPath} className="text-gray-700 hover:text-brand">Dashboard</Link>
+                {(user.role === 'MEMBER' || user.role === 'TRAINER' || user.role === 'OWNER' || user.role === 'MANAGER') && (
+                  <Link to="/profile" className="text-gray-700 hover:text-brand">Profile</Link>
+                )}
+                <span className="text-gray-400">{user.name}</span>
+                <button
+                  onClick={handleLogout}
+                  className="rounded-md bg-gray-100 px-3 py-1.5 text-gray-700 hover:bg-gray-200"
+                >
+                  Log out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="text-gray-700 hover:text-brand">Log in</Link>
+                <Link to="/register" className="rounded-md bg-brand px-3 py-1.5 text-white hover:bg-brand-dark">
+                  Join now
+                </Link>
+              </>
+            )}
+          </div>
+
+          {/* Hamburger - only on narrow screens */}
+          <button onClick={() => setMenuOpen(true)} aria-label="Open menu"
+            className="flex-shrink-0 rounded-md p-1.5 text-gray-700 hover:bg-gray-100 sm:hidden">
+            <MenuIcon />
+          </button>
         </div>
+      </nav>
 
-        {/* Hamburger - only on narrow screens */}
-        <button onClick={() => setMenuOpen(true)} aria-label="Open menu"
-          className="flex-shrink-0 rounded-md p-1.5 text-gray-700 hover:bg-gray-100 sm:hidden">
-          <MenuIcon />
-        </button>
-      </div>
-
-      {/* Slide-in mobile menu */}
+      {/* Slide-in mobile menu - deliberately outside <nav>, see comment above */}
       {menuOpen && (
-        <div className="fixed inset-0 z-50 sm:hidden" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-[60] sm:hidden" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/40" onClick={closeMenu} />
           <div className="absolute right-0 top-0 flex h-full w-72 max-w-[85vw] flex-col bg-white p-4 shadow-lg">
             <div className="flex items-center justify-between">
@@ -186,6 +203,6 @@ export default function Navbar() {
           </div>
         </div>
       )}
-    </nav>
+    </>
   )
 }

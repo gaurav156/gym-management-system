@@ -122,8 +122,11 @@ export default function LandingPage() {
   }, [])
 
   const selectedBranch = branches.find((b) => b.id === selectedBranchId) ?? branches[0] ?? null
+  // Include the gym's own brand name, not just the branch name - "Andheri Branch, 123
+  // MG Road" alone is often ambiguous enough that Google resolves it to the wrong place
+  // entirely; prefixing the brand name is what actually disambiguates the search.
   const mapQuery = selectedBranch
-    ? `${selectedBranch.name}, ${selectedBranch.address ?? ''}`
+    ? `${GYM_NAME} ${selectedBranch.name}, ${selectedBranch.address ?? ''}`
     : GYM_NAME
   const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`
   const mapEmbedSrc = `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`
@@ -217,10 +220,9 @@ export default function LandingPage() {
             <h2 className="font-display text-3xl font-semibold tracking-tight text-gray-900">About us</h2>
             <p className="mt-4 text-base leading-relaxed text-gray-600">
               Since {ESTABLISHED_YEAR}, {GYM_NAME} has grown from a single location into
-              a multi-branch gym built around the same idea Director {DIRECTOR_NAME}
-              started with: real coaching, honest programming, and facilities worth
-              showing up to. Wherever you train with us, your membership, your check-ins,
-              and your progress follow you.
+              a multi-branch gym built around the same idea Director {DIRECTOR_NAME} started 
+              with: real coaching, honest programming, and facilities worth showing up to. 
+              Wherever you train with us, your membership, your check-ins, and your progress follow you.
             </p>
             <div className="mt-8 grid gap-6 sm:grid-cols-3">
               {VALUES.map((v) => (
