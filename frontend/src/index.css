@@ -12,3 +12,18 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;              /* Chrome, Safari, newer Edge */
 }
+
+/* The landing page's single deliberate motion moment: the concentric plate rings behind
+   the hero headline turn very slowly, like a loaded barbell settling into a set. Nothing
+   else on the page animates on load or on hover - this is it. Respects reduced-motion. */
+@keyframes slow-spin {
+  to { transform: rotate(360deg); }
+}
+.animate-slow-spin {
+  animation: slow-spin 50s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-slow-spin {
+    animation: none;
+  }
+}
