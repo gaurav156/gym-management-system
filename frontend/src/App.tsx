@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom'
 import Navbar from './components/Navbar'
+import ScrollToTop from './components/ScrollToTop'
 import ProtectedRoute from './components/ProtectedRoute'
 import PublicOnlyRoute from './components/PublicOnlyRoute'
 import LandingPage from './pages/LandingPage'
@@ -19,6 +20,7 @@ import InvoiceViewPage from './pages/InvoiceViewPage'
 export default function App() {
   return (
     <div className="min-h-screen bg-gray-50">
+      <ScrollToTop />
       <Navbar />
       <Routes>
         <Route path="/" element={<LandingPage />} />
