@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
+import { ChangeEvent, FormEvent, useEffect, useState, useRef } from 'react'
 import { api } from '../../api/client'
 import { getEffectiveStatus, statusColorClass, statusLabel, type EffectiveStatus } from '../../utils/membership'
 import PhotoUploadButton from '../PhotoUploadButton'
@@ -76,6 +76,8 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [savingMemberBranches, setSavingMemberBranches] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
 
+  const isFirstSearchRun = useRef(true)
+
   function loadMembers(page = 0, search = memberSearch, status = memberStatusFilter, sort = memberSort) {
     if (!selectedBranch) return
     setMembersLoading(true)
@@ -95,6 +97,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   }
 
   useEffect(() => {
+    isFirstSearchRun.current = true
     setMemberSearchInput('')
     setMemberSearch('')
     setMemberStatusFilter('ALL')
@@ -103,8 +106,11 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     loadMemberships()
   }, [selectedBranch])
 
-  // Debounce typing into an actual request instead of firing one per keystroke.
   useEffect(() => {
+    if (isFirstSearchRun.current) {
+      isFirstSearchRun.current = false
+      return
+    }
     const handle = setTimeout(() => {
       setMemberSearch(memberSearchInput)
       loadMembers(0, memberSearchInput, memberStatusFilter, memberSort)
