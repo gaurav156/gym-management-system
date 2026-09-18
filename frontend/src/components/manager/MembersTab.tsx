@@ -4,6 +4,10 @@ import { getEffectiveStatus, statusColorClass, statusLabel, type EffectiveStatus
 import PhotoUploadButton from '../PhotoUploadButton'
 import type { Branch, MembershipAdmin, Payment, AttendanceLogEntry, MemberSummary, InvoiceResponse, AuthUser, RoleHistoryEntry, PageResponse } from '../../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
+import ConfirmDialog from '../ConfirmDialog'
+import { TableSkeleton } from '../Skeleton'
+import { useConfirm } from '../../hooks/useConfirm'
+import Spinner from '../Spinner'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -66,8 +70,15 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
 
   const [detailMembershipsFetched, setDetailMembershipsFetched] = useState<MembershipAdmin[]>([]) // unchanged, still full list
 
+  const [membersLoading, setMembersLoading] = useState(true)
+  const { confirm, dialogProps } = useConfirm()
+  const [savingMemberInfo, setSavingMemberInfo] = useState(false)
+  const [savingMemberBranches, setSavingMemberBranches] = useState(false)
+  const [savingEdit, setSavingEdit] = useState(false)
+
   function loadMembers(page = 0, search = memberSearch, status = memberStatusFilter, sort = memberSort) {
     if (!selectedBranch) return
+    setMembersLoading(true)
     api.get<PageResponse<MemberSummary>>('/api/members', {
       params: { branchId: selectedBranch, search: search || undefined, status, sort, page, size: PAGE_SIZE },
     }).then((res) => {
@@ -75,7 +86,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       setMemberTotalPages(res.data.totalPages)
       setMemberTotalElements(res.data.totalElements)
       setMemberPage(res.data.page)
-    })
+    }).finally(() => setMembersLoading(false))
   }
 
   function loadMemberships() {
@@ -217,24 +228,30 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       return
     }
     setMemberModalMessage('')
+    setSavingEdit(true)
     try {
       await api.put(`/api/memberships/${id}`, { startDate: editStartDate, endDate: editEndDate })
       setEditingId(null)
       refreshMembershipViews()
     } catch (err: any) {
       setMemberModalMessage(err.response?.data?.error || 'Failed to update')
+    } finally {
+      setSavingEdit(false)
     }
   }
 
-  async function cancelMembership(id: string) {
-    if (!confirm('Cancel this membership? The member will lose gym access immediately.')) return
-    setMemberModalMessage('')
-    try {
-      await api.post(`/api/memberships/${id}/cancel`)
-      refreshMembershipViews()
-    } catch (err: any) {
-      setMemberModalMessage(err.response?.data?.error || 'Failed to cancel')
-    }
+  function cancelMembership(id: string) {
+    confirm({
+      title: 'Cancel membership',
+      message: 'Cancel this membership? The member will lose gym access immediately.',
+      confirmLabel: 'Cancel membership',
+      danger: true,
+      onConfirm: async () => {
+        setMemberModalMessage('')
+        await api.post(`/api/memberships/${id}/cancel`)
+        refreshMembershipViews()
+      },
+    })
   }
 
   async function pauseMembership(id: string) {
@@ -267,6 +284,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   }
 
   async function saveMemberInfo(memberId: string) {
+    setSavingMemberInfo(true)
     try {
       await api.put(`/api/members/${memberId}`, {
         name: memberEditName, phone: memberEditPhone, address: memberEditAddress, photo: memberEditPhoto ?? '',
@@ -275,49 +293,51 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       loadMembers(memberPage, memberSearch, memberStatusFilter, memberSort)
     } catch (err: any) {
       setMemberModalMessage(err.response?.data?.error || 'Failed to update member info')
+    } finally {
+      setSavingMemberInfo(false)
     }
   }
 
-  async function deleteMember(memberId: string, name: string) {
-    if (!confirm(
-      `Permanently delete ${name}'s account? This removes their membership history, ` +
-      `payment records, and attendance log, and cannot be undone.`
-    )) return
-    try {
-      await api.delete(`/api/owner/users/${memberId}`)
-      setDetailMemberId(null)
-      loadMembers(0, memberSearch, memberStatusFilter, memberSort)
-      loadMemberships()
-    } catch (err: any) {
-      setMemberModalMessage(err.response?.data?.error || 'Failed to delete account')
-    }
+  function deleteMember(memberId: string, name: string) {
+    confirm({
+      title: 'Delete member account',
+      message: `Permanently delete ${name}'s account? This removes their membership history, payment records, and attendance log, and cannot be undone.`,
+      confirmLabel: 'Delete account',
+      danger: true,
+      onConfirm: async () => {
+        await api.delete(`/api/owner/users/${memberId}`)
+        setDetailMemberId(null)
+        loadMembers(0, memberSearch, memberStatusFilter, memberSort)
+        loadMemberships()
+      },
+    })
   }
 
   // Owner-only. Promoting a Member to Trainer/Manager moves them out of the Members
   // list entirely, so the modal closes and the branch-scoped lists refresh.
-  async function changeMemberRole(member: MemberSummary) {
-    if (!selectedNewRole) {
-      setMemberModalMessage('Select a role to change to.')
-      return
+  function changeMemberRole(member: MemberSummary) {
+    if (!selectedNewRole) { 
+      setMemberModalMessage('Select a role to change to.'); 
+      return 
     }
-    if (!confirm(
-      `Change ${member.name}'s role from Member to ${selectedNewRole === 'TRAINER' ? 'Trainer' : 'Manager'}? ` +
+    confirm({
+      title: 'Change role',
+      message: `Change ${member.name}'s role from Member to ${selectedNewRole === 'TRAINER' ? 'Trainer' : 'Manager'}? ` +
       `This takes effect immediately for new logins, but anyone already signed in keeps ` +
-      `their current access until their session expires or they log in again.`
-    )) return
-
-    setChangingRole(true)
-    setMemberModalMessage('')
-    try {
-      await api.put(`/api/owner/users/${member.id}/role`, { newRole: selectedNewRole })
-      setDetailMemberId(null)
-      loadMembers(0, memberSearch, memberStatusFilter, memberSort)
-      loadMemberships()
-    } catch (err: any) {
-      setMemberModalMessage(err.response?.data?.error || 'Failed to change role')
-    } finally {
-      setChangingRole(false)
-    }
+      `their current access until their session expires or they log in again.`,
+      confirmLabel: 'Change role',
+      onConfirm: async () => {
+        setChangingRole(true)
+        try {
+          await api.put(`/api/owner/users/${member.id}/role`, { newRole: selectedNewRole })
+          setDetailMemberId(null)
+          loadMembers(0, memberSearch, memberStatusFilter, memberSort)
+          loadMemberships()
+        } finally {
+          setChangingRole(false)
+        }
+      },
+    })
   }
 
   async function saveMemberBranches(memberId: string) {
@@ -325,6 +345,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       setMemberModalMessage('Select at least one branch.')
       return
     }
+    setSavingMemberBranches(true)
     try {
       await api.put(`/api/branches/assignments/${memberId}`, { branchIds: memberBranchEditIds })
       setEditingMemberBranches(false)
@@ -332,6 +353,8 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       loadMembers()
     } catch (err: any) {
       setMemberModalMessage(err.response?.data?.error || 'Failed to update branch assignments')
+    } finally {
+      setSavingMemberBranches(false)
     }
   }
 
@@ -401,41 +424,45 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {memberRows.map(({ member, status }) => (
-                <tr key={member.id}>
-                  <td className="py-2 pr-4">
-                    <div className="flex items-center gap-2">
-                      {member.photo ? (
-                        <img src={member.photo} alt="" className="h-6 w-6 flex-shrink-0 rounded-full object-cover" />
-                      ) : (
-                        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] text-gray-500">
-                          {member.name.charAt(0).toUpperCase()}
-                        </span>
-                      )}
-                      {member.name}
-                    </div>
-                  </td>
-                  <td className="py-2 pr-4 text-gray-500">{member.email}</td>
-                  <td className="py-2 pr-4 text-gray-500">{member.checkinPin ?? '—'}</td>
-                  <td className="py-2 pr-4">
-                    <span className={status === 'NONE' ? 'text-gray-400' : statusColorClass(status)}>
-                      {status === 'NONE' ? 'No plan' : statusLabel(status)}
-                    </span>
-                  </td>
-                  <td className="py-2 pr-4 text-gray-500">
-                    {lastCheckins[member.id] ? new Date(lastCheckins[member.id]).toLocaleString() : 'Never'}
-                  </td>
-                  <td className="py-2">
-                    <button onClick={() => { setDetailMemberId(member.id); setModalShowExpired(false) }}
-                      className="text-xs text-brand hover:underline">
-                      View/Edit details
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {membersLoading ? (
+                <TableSkeleton rows={6} columns={6} />
+              ) : (
+                memberRows.map(({ member, status }) => (
+                  <tr key={member.id}>
+                    <td className="py-2 pr-4">
+                      <div className="flex items-center gap-2">
+                        {member.photo ? (
+                          <img src={member.photo} alt="" className="h-6 w-6 flex-shrink-0 rounded-full object-cover" />
+                        ) : (
+                          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] text-gray-500">
+                            {member.name.charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                        {member.name}
+                      </div>
+                    </td>
+                    <td className="py-2 pr-4 text-gray-500">{member.email}</td>
+                    <td className="py-2 pr-4 text-gray-500">{member.checkinPin ?? '—'}</td>
+                    <td className="py-2 pr-4">
+                      <span className={status === 'NONE' ? 'text-gray-400' : statusColorClass(status)}>
+                        {status === 'NONE' ? 'No plan' : statusLabel(status)}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-4 text-gray-500">
+                      {lastCheckins[member.id] ? new Date(lastCheckins[member.id]).toLocaleString() : 'Never'}
+                    </td>
+                    <td className="py-2">
+                      <button onClick={() => { setDetailMemberId(member.id); setModalShowExpired(false) }}
+                        className="text-xs text-brand hover:underline">
+                        View/Edit details
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
-          {members.length === 0 && <p className="py-4 text-sm text-gray-400">No members match.</p>}
+          {!membersLoading && members.length === 0 && <p className="py-4 text-sm text-gray-400">No members match.</p>}
           {memberTotalElements > 0 && (
             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
               <span>Page {memberPage + 1} of {memberTotalPages} ({memberTotalElements} total)</span>
@@ -524,8 +551,11 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                         className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
                     </div>
                     <div className="space-x-2">
-                      <button onClick={() => saveMemberInfo(detailMember.id)}
-                        className="text-xs text-green-700 hover:underline">Save</button>
+                      <button onClick={() => saveMemberInfo(detailMember.id)} disabled={savingMemberInfo}
+                        className="flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
+                        {savingMemberInfo && <Spinner className="h-3 w-3" />}
+                        {savingMemberInfo ? 'Saving...' : 'Save'}
+                      </button>
                       <button onClick={() => setEditingMemberInfo(false)}
                         className="text-xs text-gray-500 hover:underline">Cancel</button>
                     </div>
@@ -636,8 +666,8 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                                 </td>
                                 <td className="truncate py-2 pr-4 text-xs text-gray-400">Updates on save</td>
                                 <td className="py-2 space-x-2 whitespace-nowrap">
-                                  <button onClick={() => saveEdit(m.id)} className="text-xs text-green-700 hover:underline">
-                                    Save
+                                  <button onClick={() => saveEdit(m.id)} disabled={savingEdit} className="text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
+                                    {savingEdit ? 'Saving...' : 'Save'}
                                   </button>
                                   <button onClick={cancelEdit} className="text-xs text-gray-500 hover:underline">
                                     Cancel
@@ -795,10 +825,13 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                       ))}
                     </div>
                     <div className="space-x-2">
-                      <button onClick={() => saveMemberBranches(detailMember.id)}
-                        className="text-xs text-green-700 hover:underline">Save</button>
-                      <button onClick={() => setEditingMemberBranches(false)}
-                        className="text-xs text-gray-500 hover:underline">Cancel</button>
+                      <button onClick={() => saveMemberBranches(detailMember.id)} disabled={savingMemberBranches}
+                        className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
+                        {savingMemberBranches && <Spinner className="h-3 w-3" />}
+                        {savingMemberBranches ? 'Saving...' : 'Save'}
+                      </button>
+                      <button onClick={() => setEditingMemberBranches(false)} disabled={savingMemberBranches}
+                        className="text-xs text-gray-500 hover:underline disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
                     </div>
                   </div>
                 ) : (
@@ -820,6 +853,8 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
           </div>
         </div>
       )}
+
+      <ConfirmDialog {...dialogProps} />
     </div>
   )
 }

@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import PhotoUploadButton from '../PhotoUploadButton'
+import Spinner from '../Spinner'
 import type { Branch, StaffSummary, AttendanceLogEntry, AuthUser, RoleHistoryEntry, PageResponse } from '../../types'
+import ConfirmDialog from '../ConfirmDialog'
+import { TableSkeleton } from '../Skeleton'
+import { useConfirm } from '../../hooks/useConfirm'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -27,6 +31,11 @@ const CHANGEABLE_ROLES = ['MEMBER', 'TRAINER', 'MANAGER'] as const
 
 export default function StaffTab({ selectedBranch, allBranches, lastCheckins, user }: Props) {
   const [staff, setStaff] = useState<StaffSummary[]>([])
+  const [staffLoading, setStaffLoading] = useState(true)
+  const [savingStaffInfo, setSavingStaffInfo] = useState(false)
+  const [savingStaffDates, setSavingStaffDates] = useState(false)
+  const [savingStaffBranches, setSavingStaffBranches] = useState(false)
+  const { confirm, dialogProps } = useConfirm()
   const [staffTotalPages, setStaffTotalPages] = useState(1)
   const [staffTotalElements, setStaffTotalElements] = useState(0)
   const [showLeftStaff, setShowLeftStaff] = useState(false)
@@ -66,6 +75,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
 
   function loadStaff(page = 0, roleFilter = staffRoleFilter, includeLeft = showLeftStaff, sort = staffSort) {
     if (!selectedBranch) return
+    setStaffLoading(true)
     api.get<PageResponse<StaffSummary>>('/api/staff', {
       params: { branchId: selectedBranch, role: roleFilter, includeLeft, sort, page, size: PAGE_SIZE },
     }).then((res) => {
@@ -73,7 +83,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       setStaffTotalPages(res.data.totalPages)
       setStaffTotalElements(res.data.totalElements)
       setStaffPage(res.data.page)
-    })
+    }).finally(() => setStaffLoading(false))
   }
 
   useEffect(() => { loadStaff(0) }, [selectedBranch])
@@ -151,6 +161,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   // on the backend), Trainer edits keep using /api/trainers/{id} (Owner or Manager).
   async function saveStaffInfo(s: StaffSummary) {
     const endpoint = s.role === 'MANAGER' ? `/api/managers/${s.id}` : `/api/trainers/${s.id}`
+    setSavingStaffInfo(true)
     try {
       await api.put(endpoint, {
         name: staffEditName, phone: staffEditPhone, address: staffEditAddress, photo: staffEditPhoto ?? '',
@@ -159,6 +170,8 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       loadStaff(staffPage)
     } catch (err: any) {
       setStaffModalMessage(err.response?.data?.error || 'Failed to update staff info')
+    } finally {
+      setSavingStaffInfo(false)
     }
   }
 
@@ -172,6 +185,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   // Same dates endpoint shape for Trainer and Manager now - only the path differs.
   async function saveStaffDates(s: StaffSummary) {
     const endpoint = s.role === 'MANAGER' ? `/api/managers/${s.id}/dates` : `/api/trainers/${s.id}/dates`
+    setSavingStaffDates(true)
     try {
       await api.put(endpoint, {
         joiningDate: joiningDateInput || null,
@@ -181,6 +195,8 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       loadStaff(staffPage)
     } catch (err: any) {
       setStaffModalMessage(err.response?.data?.error || 'Failed to update dates')
+    } finally {
+      setSavingStaffDates(false)
     }
   }
 
@@ -199,6 +215,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       setStaffModalMessage('Select at least one branch.')
       return
     }
+    setSavingStaffBranches(true)
     try {
       await api.put(`/api/branches/assignments/${staffId}`, { branchIds: staffBranchEditIds })
       setEditingStaffBranches(false)
@@ -206,49 +223,59 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       loadStaff(staffPage)
     } catch (err: any) {
       setStaffModalMessage(err.response?.data?.error || 'Failed to update branch assignments')
+    } finally {
+      setSavingStaffBranches(false)
     }
   }
 
   // Deletion already goes through the existing Owner-only /api/owner/users/{id} endpoint
   // for any non-Owner account - works for Manager and Trainer alike.
-  async function deleteStaff(staffId: string, name: string) {
-    if (!confirm(
-      `Permanently delete ${name}'s account? This removes their attendance log and cannot be undone.`
-    )) return
-    try {
-      await api.delete(`/api/owner/users/${staffId}`)
-      setDetailStaffId(null)
-      loadStaff(0)
-    } catch (err: any) {
-      setStaffModalMessage(err.response?.data?.error || 'Failed to delete account')
-    }
+  function deleteStaff(staffId: string, name: string) {
+    confirm({
+      title: 'Delete staff account',
+      message: `Permanently delete ${name}'s account? This removes their attendance log and cannot be undone.`,
+      confirmLabel: 'Delete account',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/api/owner/users/${staffId}`)
+          setDetailStaffId(null)
+          loadStaff(0)
+        } catch (err: any) {
+          setStaffModalMessage(err.response?.data?.error || 'Failed to delete account')
+        }
+      },
+    })
   }
 
   // Owner-only. A role change can move this person out of the Staff directory entirely
   // (e.g. Manager -> Member), so the modal closes and both the branch list and any
   // dependent state get refreshed rather than trying to patch the row in place.
-  async function changeRole(s: StaffSummary) {
+  function changeRole(s: StaffSummary) {
     if (!selectedNewRole) {
       setStaffModalMessage('Select a role to change to.')
       return
     }
-    if (!confirm(
-      `Change ${s.name}'s role from ${roleLabel(s.role)} to ${roleLabel(selectedNewRole)}? ` +
-      `This takes effect immediately for new logins, but anyone already signed in keeps ` +
-      `their current access until their session expires or they log in again.`
-    )) return
-
-    setChangingRole(true)
-    setStaffModalMessage('')
-    try {
-      await api.put(`/api/owner/users/${s.id}/role`, { newRole: selectedNewRole })
-      setDetailStaffId(null)
-      loadStaff(0)
-    } catch (err: any) {
-      setStaffModalMessage(err.response?.data?.error || 'Failed to change role')
-    } finally {
-      setChangingRole(false)
-    }
+    confirm({
+      title: 'Change role',
+      message: `Change ${s.name}'s role from ${roleLabel(s.role)} to ${roleLabel(selectedNewRole)}? ` +
+        `This takes effect immediately for new logins, but anyone already signed in keeps ` +
+        `their current access until their session expires or they log in again.`,
+      confirmLabel: 'Change role',
+      onConfirm: async () => {
+        setChangingRole(true)
+        setStaffModalMessage('')
+        try {
+          await api.put(`/api/owner/users/${s.id}/role`, { newRole: selectedNewRole })
+          setDetailStaffId(null)
+          loadStaff(0)
+        } catch (err: any) {
+          setStaffModalMessage(err.response?.data?.error || 'Failed to change role')
+        } finally {
+          setChangingRole(false)
+        }
+      },
+    })
   }
 
   const detailStaff = staff.find((s) => s.id === detailStaffId) ?? null
@@ -313,7 +340,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {staff.map((s) => (
+              {staffLoading ? (
+                <TableSkeleton rows={6} columns={7} />
+              ) : staff.map((s) => (
                 <tr key={s.id}>
                   <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">
@@ -346,7 +375,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
               ))}
             </tbody>
           </table>
-          {staff.length === 0 && (
+          {!staffLoading && staff.length === 0 && (
             <p className="py-4 text-sm text-gray-400">
               {staff.length === 0 ? 'No staff assigned to this branch yet.' : 'No staff match the current filters.'}
             </p>
@@ -443,10 +472,13 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                         className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
                     </div>
                     <div className="space-x-2">
-                      <button onClick={() => saveStaffInfo(detailStaff)}
-                        className="text-xs text-green-700 hover:underline">Save</button>
-                      <button onClick={() => setEditingStaffInfo(false)}
-                        className="text-xs text-gray-500 hover:underline">Cancel</button>
+                      <button onClick={() => saveStaffInfo(detailStaff)} disabled={savingStaffInfo}
+                        className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
+                        {savingStaffInfo && <Spinner className="h-3 w-3" />}
+                        {savingStaffInfo ? 'Saving...' : 'Save'}
+                      </button>
+                      <button onClick={() => setEditingStaffInfo(false)} disabled={savingStaffInfo}
+                        className="text-xs text-gray-500 hover:underline disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
                     </div>
                   </div>
                 ) : (
@@ -492,10 +524,13 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                             className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
                         </div>
                         <div className="space-x-2">
-                          <button onClick={() => saveStaffDates(detailStaff)}
-                            className="text-xs text-green-700 hover:underline">Save</button>
-                          <button onClick={() => setEditingStaffDates(false)}
-                            className="text-xs text-gray-500 hover:underline">Cancel</button>
+                          <button onClick={() => saveStaffDates(detailStaff)} disabled={savingStaffDates}
+                            className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
+                            {savingStaffDates && <Spinner className="h-3 w-3" />}
+                            {savingStaffDates ? 'Saving...' : 'Save'}
+                          </button>
+                          <button onClick={() => setEditingStaffDates(false)} disabled={savingStaffDates}
+                            className="text-xs text-gray-500 hover:underline disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
                         </div>
                       </div>
                     ) : (
@@ -617,10 +652,13 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                       ))}
                     </div>
                     <div className="space-x-2">
-                      <button onClick={() => saveStaffBranches(detailStaff.id)}
-                        className="text-xs text-green-700 hover:underline">Save</button>
-                      <button onClick={() => setEditingStaffBranches(false)}
-                        className="text-xs text-gray-500 hover:underline">Cancel</button>
+                      <button onClick={() => saveStaffBranches(detailStaff.id)} disabled={savingStaffBranches}
+                        className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
+                        {savingStaffBranches && <Spinner className="h-3 w-3" />}
+                        {savingStaffBranches ? 'Saving...' : 'Save'}
+                      </button>
+                      <button onClick={() => setEditingStaffBranches(false)} disabled={savingStaffBranches}
+                        className="text-xs text-gray-500 hover:underline disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
                     </div>
                   </div>
                 ) : (
@@ -642,6 +680,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
           </div>
         </div>
       )}
+      <ConfirmDialog {...dialogProps} />
     </div>
   )
 }

@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useState, useRef } from 'react'
 import { api } from '../../api/client'
 import type { Plan, Payment, MemberSummary, InvoiceResponse, PageResponse } from '../../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
+import { TableSkeleton } from '../Skeleton'
+import Spinner from '../Spinner'
 
 const PAGE_SIZE = 10
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
@@ -17,6 +19,7 @@ export default function PaymentsTab({ selectedBranch }: Props) {
   const [selectedMember, setSelectedMember] = useState<MemberSummary | null>(null)
 
   const [payments, setPayments] = useState<Payment[]>([])
+  const [paymentsLoading, setPaymentsLoading] = useState(true)
   const [paymentPage, setPaymentPage] = useState(0) // 0-indexed to match Spring's Pageable
   const [paymentTotalPages, setPaymentTotalPages] = useState(1)
   const [paymentTotalElements, setPaymentTotalElements] = useState(0)
@@ -26,6 +29,7 @@ export default function PaymentsTab({ selectedBranch }: Props) {
   const [purchaseMode, setPurchaseMode] = useState('CASH')
   const [purchaseStartDate, setPurchaseStartDate] = useState('')
   const [purchaseMessage, setPurchaseMessage] = useState('')
+  const [purchasing, setPurchasing] = useState(false)
 
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [memberDropdownOpen, setMemberDropdownOpen] = useState(false)
@@ -63,6 +67,7 @@ export default function PaymentsTab({ selectedBranch }: Props) {
 
   function loadPayments(page = 0) {
     if (!selectedBranch) return
+    setPaymentsLoading(true)
     api.get<PageResponse<Payment>>(`/api/payments/branch/${selectedBranch}`, {
       params: { page, size: PAGE_SIZE },
     }).then((res) => {
@@ -70,14 +75,8 @@ export default function PaymentsTab({ selectedBranch }: Props) {
       setPaymentTotalPages(res.data.totalPages)
       setPaymentTotalElements(res.data.totalElements)
       setPaymentPage(res.data.page)
-    })
+    }).finally(() => setPaymentsLoading(false))
   }
-
-  useEffect(() => {
-    if (!selectedBranch) return
-    api.get<MemberSummary[]>('/api/members', { params: { branchId: selectedBranch } }).then((res) => setMembers(res.data))
-    loadPayments(0)
-  }, [selectedBranch])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -100,6 +99,7 @@ export default function PaymentsTab({ selectedBranch }: Props) {
       setPurchaseMessage('No branch selected.')
       return
     }
+    setPurchasing(true)
     try {
       const { data } = await api.post(
         '/api/memberships/purchase',
@@ -117,6 +117,8 @@ export default function PaymentsTab({ selectedBranch }: Props) {
       loadPayments(0)
     } catch (err: any) {
       setPurchaseMessage(err.response?.data?.error || 'Failed to record purchase')
+    } finally {
+      setPurchasing(false)
     }
   }
 
@@ -205,8 +207,10 @@ export default function PaymentsTab({ selectedBranch }: Props) {
               <input type="date" value={purchaseStartDate} onChange={(e) => setPurchaseStartDate(e.target.value)}
                 className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
             </div>
-            <button className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
-              Record purchase
+            <button disabled={purchasing}
+              className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
+              {purchasing && <Spinner className="h-4 w-4" />}
+              {purchasing ? 'Recording...' : 'Record purchase'}
             </button>
             {purchaseMessage && <p className="text-sm text-gray-700">{purchaseMessage}</p>}
           </form>
@@ -244,7 +248,9 @@ export default function PaymentsTab({ selectedBranch }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {payments.map((p) => (
+              {paymentsLoading ? (
+                <TableSkeleton rows={6} columns={7} />
+              ) : payments.map((p) => (
                 <tr key={p.id}>
                   <td className="py-2 pr-4 text-gray-500">{new Date(p.createdAt).toLocaleString()}</td>
                   <td className="py-2 pr-4">{p.memberName}</td>
@@ -265,7 +271,7 @@ export default function PaymentsTab({ selectedBranch }: Props) {
           </table>
           {invoiceError && <p className="mt-2 text-sm text-red-600">{invoiceError}</p>}
           {sendMessage && <p className="mt-2 text-sm text-green-700">{sendMessage}</p>}
-          {payments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
+          {!paymentsLoading && payments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
           {paymentTotalElements > 0 && (
             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
               <span>Page {paymentPage + 1} of {paymentTotalPages} ({paymentTotalElements} total)</span>

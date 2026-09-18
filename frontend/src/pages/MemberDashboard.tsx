@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import { getEffectiveStatus } from '../utils/membership'
 import HourlyCrowdChart from '../components/HourlyCrowdChart'
+import { CardSkeleton } from '../components/Skeleton'
 import type { Membership, Plan, Payment, Branch, AttendanceLogEntry, HourlyCount, PageResponse } from '../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../utils/invoice'
 import type { InvoiceResponse } from '../types'
@@ -13,7 +14,9 @@ const PAGE_SIZE = 5
 export default function MemberDashboard() {
   const user = useAuthStore((s) => s.user)
   const [memberships, setMemberships] = useState<Membership[]>([])
+  const [membershipLoading, setMembershipLoading] = useState(true)
   const [plans, setPlans] = useState<Plan[]>([])
+  const [plansLoading, setPlansLoading] = useState(true)
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranch, setSelectedBranch] = useState('')
   const [summary, setSummary] = useState<HourlyCount[]>([])
@@ -21,17 +24,20 @@ export default function MemberDashboard() {
   const [loadError, setLoadError] = useState('')
 
   const [payments, setPayments] = useState<Payment[]>([])
+  const [paymentsLoading, setPaymentsLoading] = useState(true)
   const [paymentPage, setPaymentPage] = useState(0)
   const [paymentTotalPages, setPaymentTotalPages] = useState(1)
   const [paymentTotalElements, setPaymentTotalElements] = useState(0)
 
   const [attendance, setAttendance] = useState<AttendanceLogEntry[]>([])
+  const [attendanceLoading, setAttendanceLoading] = useState(true)
   const [attendancePage, setAttendancePage] = useState(0)
   const [attendanceTotalPages, setAttendanceTotalPages] = useState(1)
   const [attendanceTotalElements, setAttendanceTotalElements] = useState(0)
 
   function loadPayments(page = 0) {
     if (!user) return
+    setPaymentsLoading(true)
     api.get<PageResponse<Payment>>('/api/payments/mine', { params: { memberId: user.userId, page, size: PAGE_SIZE } })
       .then((res) => {
         setPayments(res.data.content)
@@ -40,10 +46,12 @@ export default function MemberDashboard() {
         setPaymentPage(res.data.page)
       })
       .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your payment history'))
+      .finally(() => setPaymentsLoading(false))
   }
   
   function loadAttendance(page = 0) {
     if (!user) return
+    setAttendanceLoading(true)
     api.get<PageResponse<AttendanceLogEntry>>('/api/attendance/mine', { params: { page, size: PAGE_SIZE } })
       .then((res) => {
         setAttendance(res.data.content)
@@ -52,13 +60,16 @@ export default function MemberDashboard() {
         setAttendancePage(res.data.page)
       })
       .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your attendance log'))
+      .finally(() => setAttendanceLoading(false))
   }
 
   function loadMembershipData() {
     if (!user) return
+    setMembershipLoading(true)
     api.get<Membership[]>('/api/memberships/mine', { params: { memberId: user.userId } })
       .then((res) => setMemberships(res.data))
       .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your memberships'))
+      .finally(() => setMembershipLoading(false))
     loadPayments(0)
     loadAttendance(0)
   }
@@ -85,9 +96,11 @@ export default function MemberDashboard() {
     window.addEventListener('focus', onFocus)
 
     // Plans are chain-wide now, not tied to the member's branch(es) - a single call covers it.
+    setPlansLoading(true)
     api.get<Plan[]>('/api/plans')
       .then((res) => setPlans(res.data))
       .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load plans'))
+      .finally(() => setPlansLoading(false))
 
     api.get<Branch[]>('/api/branches/mine', { params: { userId: user.userId } })
       .then((res) => {
@@ -137,7 +150,12 @@ export default function MemberDashboard() {
 
         <div className="rounded-lg border border-gray-200 p-6">
           <h2 className="font-medium">Membership status</h2>
-          {activeMembership ? (
+          {membershipLoading ? (
+            <div className="mt-3 space-y-2">
+              <div className="h-4 w-24 animate-pulse rounded bg-gray-200" />
+              <div className="h-3 w-40 animate-pulse rounded bg-gray-200" />
+            </div>
+          ) : activeMembership ? (
             <div className="mt-3 text-sm">
               <p className="font-medium text-green-700">Active</p>
               <p className="mt-1 text-gray-500">Valid until {activeMembership.endDate}</p>
@@ -167,14 +185,24 @@ export default function MemberDashboard() {
           Memberships are activated at the front desk against cash payment - show your QR code or tell the manager your PIN.
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          {plans.map((p) => (
-            <div key={p.id} className="rounded-md border border-gray-200 p-4 text-center">
-              <p className="font-medium">{p.name}</p>
-              <p className="mt-1 text-2xl font-semibold">₹{p.price}</p>
-              <p className="mt-1 text-xs text-gray-400">{p.durationMonths} month{p.durationMonths > 1 ? 's' : ''}</p>
-            </div>
-          ))}
-          {plans.length === 0 && <p className="text-sm text-gray-400">No plans published yet.</p>}
+          {plansLoading ? (
+            <>
+              <CardSkeleton />
+              <CardSkeleton />
+              <CardSkeleton />
+            </>
+          ) : (
+            <>
+              {plans.map((p) => (
+                <div key={p.id} className="rounded-md border border-gray-200 p-4 text-center">
+                  <p className="font-medium">{p.name}</p>
+                  <p className="mt-1 text-2xl font-semibold">₹{p.price}</p>
+                  <p className="mt-1 text-xs text-gray-400">{p.durationMonths} month{p.durationMonths > 1 ? 's' : ''}</p>
+                </div>
+              ))}
+              {plans.length === 0 && <p className="text-sm text-gray-400">No plans published yet.</p>}
+            </>
+          )}
         </div>
         {message && <p className="mt-4 text-sm text-gray-700">{message}</p>}
       </div>
@@ -198,6 +226,13 @@ export default function MemberDashboard() {
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">Your attendance log</h2>
         <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
+        {attendanceLoading ? (
+          <div className="mt-4 space-y-3">
+            <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
+            <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
+            <div className="h-4 w-2/3 animate-pulse rounded bg-gray-200" />
+          </div>
+        ) : (
         <ul className="mt-4 divide-y divide-gray-100 text-sm">
           {attendance.map((a) => (
             <li key={a.id} className="py-2">
@@ -217,7 +252,8 @@ export default function MemberDashboard() {
           ))}
           {attendance.length === 0 && <li className="py-2 text-gray-400">No visits logged yet.</li>}
         </ul>
-        {attendance.length > 0 && (
+        )}
+        {!attendanceLoading && attendance.length > 0 && (
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
             <span>Page {attendancePage + 1} of {attendanceTotalPages} ({attendanceTotalElements} total)</span>
             <div className="space-x-2">
@@ -232,6 +268,13 @@ export default function MemberDashboard() {
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">Your payment history</h2>
+        {paymentsLoading ? (
+          <div className="mt-4 space-y-3">
+            <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
+            <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
+            <div className="h-4 w-2/3 animate-pulse rounded bg-gray-200" />
+          </div>
+        ) : (
         <ul className="mt-4 divide-y divide-gray-100 text-sm">
           {payments.map((p) => (
             <li key={p.id} className="py-2">
@@ -248,7 +291,8 @@ export default function MemberDashboard() {
           ))}
           {payments.length === 0 && <li className="py-2 text-gray-400">No payments recorded yet.</li>}
         </ul>
-        {payments.length > 0 && (
+        )}
+        {!paymentsLoading && payments.length > 0 && (
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
             <span>Page {paymentPage + 1} of {paymentTotalPages} ({paymentTotalElements} total)</span>
             <div className="space-x-2">

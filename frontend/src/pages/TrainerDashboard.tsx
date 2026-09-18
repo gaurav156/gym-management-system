@@ -15,11 +15,13 @@ export default function TrainerDashboard() {
   const [loadError, setLoadError] = useState('')
 
   const [attendance, setAttendance] = useState<AttendanceLogEntry[]>([])
+  const [attendanceLoading, setAttendanceLoading] = useState(true)
   const [attendancePage, setAttendancePage] = useState(0)
   const [attendanceTotalPages, setAttendanceTotalPages] = useState(1)
   const [attendanceTotalElements, setAttendanceTotalElements] = useState(0)
 
   function loadAttendance(page = 0) {
+    setAttendanceLoading(true)
     api.get<PageResponse<AttendanceLogEntry>>('/api/attendance/mine', { params: { page, size: PAGE_SIZE } })
       .then((res) => {
         setAttendance(res.data.content)
@@ -28,6 +30,7 @@ export default function TrainerDashboard() {
         setAttendancePage(res.data.page)
       })
       .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your attendance log'))
+      .finally(() => setAttendanceLoading(false))
   }
 
   useEffect(() => {
@@ -88,6 +91,13 @@ export default function TrainerDashboard() {
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">Your attendance log</h2>
         <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
+        {attendanceLoading ? (
+          <div className="mt-4 space-y-3">
+            <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
+            <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
+            <div className="h-4 w-2/3 animate-pulse rounded bg-gray-200" />
+          </div>
+        ) : (
         <ul className="mt-4 divide-y divide-gray-100 text-sm">
           {attendance.map((a) => (
             <li key={a.id} className="py-2">
@@ -107,7 +117,8 @@ export default function TrainerDashboard() {
           ))}
           {attendance.length === 0 && <li className="py-2 text-gray-400">No visits logged yet.</li>}
         </ul>
-        {attendance.length > 0 && (
+        )}
+        {!attendanceLoading && attendance.length > 0 && (
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
             <span>Page {attendancePage + 1} of {attendanceTotalPages} ({attendanceTotalElements} total)</span>
             <div className="space-x-2">

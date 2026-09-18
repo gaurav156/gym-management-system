@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import QrScanner from '../QrScanner'
 import HourlyCrowdChart from '../HourlyCrowdChart'
+import Spinner from '../Spinner'
+import { TableSkeleton } from '../Skeleton'
 import type { HourlyCount, TodayAttendanceEntry } from '../../types'
 
 const PAGE_SIZE = 10
@@ -16,8 +18,10 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
   const [checkinPin, setCheckinPin] = useState('')
   const [summary, setSummary] = useState<HourlyCount[]>([])
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendanceEntry[]>([])
+  const [todayAttendanceLoading, setTodayAttendanceLoading] = useState(true)
   const [attendanceTab, setAttendanceTab] = useState<'MEMBERS' | 'STAFF'>('MEMBERS')
   const [todayAttendancePage, setTodayAttendancePage] = useState(1)
+  const [checkingIn, setCheckingIn] = useState(false)
 
   const [checkinMode, setCheckinMode] = useState<'PIN' | 'QR'>('PIN')
   const [scanActive, setScanActive] = useState(false)
@@ -37,7 +41,10 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
 
   function loadTodayAttendance() {
     if (!selectedBranch) return
-    api.get<TodayAttendanceEntry[]>(`/api/attendance/today/${selectedBranch}`).then((res) => setTodayAttendance(res.data))
+    setTodayAttendanceLoading(true)
+    api.get<TodayAttendanceEntry[]>(`/api/attendance/today/${selectedBranch}`)
+      .then((res) => setTodayAttendance(res.data))
+      .finally(() => setTodayAttendanceLoading(false))
   }
 
   useEffect(() => {
@@ -61,6 +68,7 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
   async function kioskCheckin(e: FormEvent) {
     e.preventDefault()
     setResultMessage('')
+    setCheckingIn(true)
     try {
       const { data } = await api.post('/api/attendance/checkin', {
         pin: checkinPin, branchId: selectedBranch, method: 'PIN',
@@ -74,6 +82,8 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
     } catch (err: any) {
       setResultOk(false)
       setResultMessage(err.response?.data?.error || 'Check-in failed')
+    } finally {
+      setCheckingIn(false)
     }
   }
 
@@ -142,11 +152,13 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
             <>
               <p className="mt-1 text-xs text-gray-500">Enter the 4-digit PIN to log a visit - works for members and staff alike.</p>
               <form onSubmit={kioskCheckin} className="mt-4 flex gap-2">
-                <input placeholder="1234" maxLength={4} required value={checkinPin}
+                <input placeholder="1234" maxLength={4} required disabled={checkingIn} value={checkinPin}
                   onChange={(e) => setCheckinPin(e.target.value.replace(/\D/g, ''))}
-                  className="w-24 rounded-md border border-gray-300 px-3 py-2 text-sm tracking-widest" />
-                <button className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
-                  Check in
+                  className="w-24 rounded-md border border-gray-300 px-3 py-2 text-sm tracking-widest disabled:bg-gray-50" />
+                <button disabled={checkingIn}
+                  className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
+                  {checkingIn && <Spinner className="h-4 w-4" />}
+                  {checkingIn ? 'Checking...' : 'Check in'}
                 </button>
               </form>
             </>
@@ -215,20 +227,22 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {pagedTodayAttendance.map((a, i) => (
-                  <tr key={`${a.personId}-${i}`}>
-                    <td className="py-2 pr-4">{a.personName} <span className="text-xs text-gray-400">({a.role})</span></td>
-                    <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleTimeString()}</td>
-                    <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleTimeString() : '—'}</td>
-                    <td className="py-2">{a.method}</td>
-                  </tr>
-                ))}
+              {todayAttendanceLoading ? (
+                <TableSkeleton rows={5} columns={4} />
+              ) : pagedTodayAttendance.map((a, i) => (
+                <tr key={`${a.personId}-${i}`}>
+                  <td className="py-2 pr-4">{a.personName} <span className="text-xs text-gray-400">({a.role})</span></td>
+                  <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleTimeString()}</td>
+                  <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleTimeString() : '—'}</td>
+                  <td className="py-2">{a.method}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
-          {filteredTodayAttendance.length === 0 && (
+          {!todayAttendanceLoading && filteredTodayAttendance.length === 0 && (
             <p className="py-4 text-sm text-gray-400">No check-ins yet today.</p>
           )}
-          {filteredTodayAttendance.length > 0 && (
+          {!todayAttendanceLoading && filteredTodayAttendance.length > 0 && (
             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
               <span>Page {todayAttendancePage} of {todayAttendanceTotalPages} ({filteredTodayAttendance.length} total)</span>
               <div className="space-x-2">
