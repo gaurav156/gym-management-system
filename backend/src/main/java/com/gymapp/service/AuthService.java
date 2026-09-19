@@ -156,57 +156,38 @@ public class AuthService {
         return new AuthResponse(token, member.getId().toString(), member.getName(), member.getEmail(), member.getRole().name());
     }
 
-    // Manager now also gets a check-in PIN/QR token, same as Trainer - Managers can
-    // check in/out at reception like everyone else on staff.
+    // Replaces createManager()/createTrainer(). Every role gets a check-in PIN/QR token
+    // and at least one branch assignment (members need one to check in). Managers and
+    // Trainers also get a joining date, since both can later leave/rejoin; Members get
+    // their enrollmentDate on first purchase instead.
     @Transactional
-    public AuthResponse createManager(CreateManagerRequest req) {
-        if (userRepository.existsByEmail(req.email())) {
+    public CreateAccountResponse createAccount(CreateAccountRequest req) {
+        if (req.role() == Role.OWNER) {
+            throw new IllegalArgumentException(
+                    "Owner accounts can't be created directly - create the account first, then promote it to Owner (requires email verification).");
+        }
+        String email = req.email().trim().toLowerCase();
+        if (userRepository.existsByEmail(email)) {
             throw new IllegalArgumentException("An account with this email already exists");
         }
         List<Branch> branches = resolveBranches(req.branchIds());
 
-        User manager = User.builder()
-                .name(req.name())
-                .email(req.email())
-                .phone(req.phone())
+        User user = User.builder()
+                .name(req.name().trim())
+                .email(email)
+                .phone(req.phone() == null || req.phone().isBlank() ? null : req.phone().trim())
                 .passwordHash(passwordEncoder.encode(req.password()))
-                .role(Role.MANAGER)
+                .role(req.role())
                 .checkinPin(generatePin())
                 .qrToken(UUID.randomUUID().toString())
+                .joiningDate(req.role() == Role.MEMBER ? null : LocalDate.now())
                 .active(true)
                 .build();
-        manager = userRepository.save(manager);
-        assignToBranches(manager, branches);
+        user = userRepository.save(user);
+        assignToBranches(user, branches);
 
-        String token = jwtUtil.generateToken(manager.getEmail(), manager.getRole().name(), manager.getId().toString());
-        return new AuthResponse(token, manager.getId().toString(), manager.getName(), manager.getEmail(), manager.getRole().name());
-    }
-
-    // Trainers get a checkin PIN/QR token just like members - they're staff, but their
-    // attendance still needs to be logged via the same PIN/QR kiosk flow.
-    @Transactional
-    public AuthResponse createTrainer(CreateTrainerRequest req) {
-        if (userRepository.existsByEmail(req.email())) {
-            throw new IllegalArgumentException("An account with this email already exists");
-        }
-        List<Branch> branches = resolveBranches(req.branchIds());
-
-        User trainer = User.builder()
-                .name(req.name())
-                .email(req.email())
-                .phone(req.phone())
-                .passwordHash(passwordEncoder.encode(req.password()))
-                .role(Role.TRAINER)
-                .checkinPin(generatePin())
-                .qrToken(UUID.randomUUID().toString())
-                .joiningDate(LocalDate.now())
-                .active(true)
-                .build();
-        trainer = userRepository.save(trainer);
-        assignToBranches(trainer, branches);
-
-        String token = jwtUtil.generateToken(trainer.getEmail(), trainer.getRole().name(), trainer.getId().toString());
-        return new AuthResponse(token, trainer.getId().toString(), trainer.getName(), trainer.getEmail(), trainer.getRole().name());
+        return new CreateAccountResponse(user.getId(), user.getName(), user.getEmail(),
+                user.getRole().name(), user.getCheckinPin());
     }
 
     private List<Branch> resolveBranches(List<UUID> branchIds) {

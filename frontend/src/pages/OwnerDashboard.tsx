@@ -2,10 +2,16 @@ import { FormEvent, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import Spinner from '../components/Spinner'
-import ConfirmDialog from '../components/ConfirmDialog'
-import { TableSkeleton, CardSkeleton } from '../components/Skeleton'
-import { useConfirm } from '../hooks/useConfirm'
-import type { Branch, PersonSummary, Plan } from '../types'
+import { CardSkeleton } from '../components/Skeleton'
+import type { Branch, Plan } from '../types'
+
+type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
+
+const ACCOUNT_ROLES: { value: AccountRole; label: string }[] = [
+  { value: 'MEMBER', label: 'Member' },
+  { value: 'TRAINER', label: 'Trainer' },
+  { value: 'MANAGER', label: 'Manager' },
+]
 
 function BranchCheckboxes({ branches, selected, onChange }: {
   branches: Branch[]
@@ -44,26 +50,14 @@ export default function OwnerDashboard() {
   const [branchEditMessage, setBranchEditMessage] = useState('')
   const [savingBranchEdit, setSavingBranchEdit] = useState(false)
 
-  const [managerName, setManagerName] = useState('')
-  const [managerEmail, setManagerEmail] = useState('')
-  const [managerPassword, setManagerPassword] = useState('')
-  const [managerBranchIds, setManagerBranchIds] = useState<string[]>([])
-  const [managerMessage, setManagerMessage] = useState('')
-  const [creatingManager, setCreatingManager] = useState(false)
-
-  const [trainerName, setTrainerName] = useState('')
-  const [trainerEmail, setTrainerEmail] = useState('')
-  const [trainerPassword, setTrainerPassword] = useState('')
-  const [trainerBranchIds, setTrainerBranchIds] = useState<string[]>([])
-  const [trainerMessage, setTrainerMessage] = useState('')
-  const [creatingTrainer, setCreatingTrainer] = useState(false)
-
-  const [assignPeople, setAssignPeople] = useState<PersonSummary[]>([])
-  const [assignPeopleLoading, setAssignPeopleLoading] = useState(true)
-  const [assignPersonId, setAssignPersonId] = useState('')
-  const [assignBranchIds, setAssignBranchIds] = useState<string[]>([])
-  const [assignMessage, setAssignMessage] = useState('')
-  const [savingAssignments, setSavingAssignments] = useState(false)
+  const [accountRole, setAccountRole] = useState<AccountRole>('MEMBER')
+  const [accountName, setAccountName] = useState('')
+  const [accountEmail, setAccountEmail] = useState('')
+  const [accountPhone, setAccountPhone] = useState('')
+  const [accountPassword, setAccountPassword] = useState('')
+  const [accountBranchIds, setAccountBranchIds] = useState<string[]>([])
+  const [accountMessage, setAccountMessage] = useState('')
+  const [creatingAccount, setCreatingAccount] = useState(false)
 
   const [plans, setPlans] = useState<Plan[]>([])
   const [plansLoading, setPlansLoading] = useState(true)
@@ -72,9 +66,6 @@ export default function OwnerDashboard() {
   const [planPrice, setPlanPrice] = useState('')
   const [planError, setPlanError] = useState('')
   const [creatingPlan, setCreatingPlan] = useState(false)
-
-  const [managerDeleteMessage, setManagerDeleteMessage] = useState('')
-  const { confirm, dialogProps } = useConfirm()
 
   function loadBranches() {
     setBranchesLoading(true)
@@ -125,54 +116,32 @@ export default function OwnerDashboard() {
     }
   }
 
-  async function createManager(e: FormEvent) {
+  async function createAccount(e: FormEvent) {
     e.preventDefault()
-    setManagerMessage('')
-    if (managerBranchIds.length === 0) {
-      setManagerMessage('Select at least one branch.')
+    setAccountMessage('')
+    if (accountBranchIds.length === 0) {
+      setAccountMessage('Select at least one branch.')
       return
     }
-    setCreatingManager(true)
+    setCreatingAccount(true)
     try {
-      await api.post('/api/auth/owner/create-manager', {
-        name: managerName, email: managerEmail, password: managerPassword, branchIds: managerBranchIds,
+      const { data } = await api.post<{ checkinPin: string }>('/api/auth/owner/create-account', {
+        role: accountRole,
+        name: accountName,
+        email: accountEmail,
+        phone: accountPhone || null,
+        password: accountPassword,
+        branchIds: accountBranchIds,
       })
-      setManagerMessage(`Manager account created for ${managerName}`)
-      setManagerName(''); setManagerEmail(''); setManagerPassword(''); setManagerBranchIds([])
+      const label = ACCOUNT_ROLES.find((r) => r.value === accountRole)?.label ?? accountRole
+      setAccountMessage(`${label} account created for ${accountName} - check-in PIN ${data.checkinPin}`)
+      setAccountName(''); setAccountEmail(''); setAccountPhone(''); setAccountPassword(''); setAccountBranchIds([])
     } catch (err: any) {
-      setManagerMessage(err.response?.data?.error || 'Failed to create manager')
+      setAccountMessage(err.response?.data?.error || 'Failed to create account')
     } finally {
-      setCreatingManager(false)
+      setCreatingAccount(false)
     }
   }
-
-  async function createTrainer(e: FormEvent) {
-    e.preventDefault()
-    setTrainerMessage('')
-    if (trainerBranchIds.length === 0) {
-      setTrainerMessage('Select at least one branch.')
-      return
-    }
-    setCreatingTrainer(true)
-    try {
-      await api.post('/api/auth/owner/create-trainer', {
-        name: trainerName, email: trainerEmail, password: trainerPassword, branchIds: trainerBranchIds,
-      })
-      setTrainerMessage(`Trainer account created for ${trainerName}`)
-      setTrainerName(''); setTrainerEmail(''); setTrainerPassword(''); setTrainerBranchIds([])
-    } catch (err: any) {
-      setTrainerMessage(err.response?.data?.error || 'Failed to create trainer')
-    } finally {
-      setCreatingTrainer(false)
-    }
-  }
-
-  useEffect(() => {
-    setAssignPeopleLoading(true)
-    api.get<PersonSummary[]>('/api/branches/people', { params: { role: 'MANAGER' } })
-      .then((res) => setAssignPeople(res.data))
-      .finally(() => setAssignPeopleLoading(false))
-  }, [])
 
   function loadPlans() {
     setPlansLoading(true)
@@ -202,65 +171,10 @@ export default function OwnerDashboard() {
     }
   }
 
-  function selectAssignPerson(personId: string) {
-    setAssignPersonId(personId)
-    setAssignMessage('')
-    if (!personId) {
-      setAssignBranchIds([])
-      return
-    }
-    api.get<Branch[]>('/api/branches/mine', { params: { userId: personId } })
-      .then((res) => setAssignBranchIds(res.data.map((b) => b.id)))
-  }
-
-  async function saveAssignments(e: FormEvent) {
-    e.preventDefault()
-    setAssignMessage('')
-    if (!assignPersonId) {
-      setAssignMessage('Select a person first.')
-      return
-    }
-    if (assignBranchIds.length === 0) {
-      setAssignMessage('Select at least one branch.')
-      return
-    }
-    setSavingAssignments(true)
-    try {
-      await api.put(`/api/branches/assignments/${assignPersonId}`, { branchIds: assignBranchIds })
-      setAssignMessage('Branch assignments updated.')
-    } catch (err: any) {
-      setAssignMessage(err.response?.data?.error || 'Failed to update branch assignments')
-    } finally {
-      setSavingAssignments(false)
-    }
-  }
-
-  function deleteManager(personId: string, name: string) {
-    confirm({
-      title: 'Delete manager account',
-      message: `Permanently delete ${name}'s manager account? This cannot be undone.`,
-      confirmLabel: 'Delete account',
-      danger: true,
-      onConfirm: async () => {
-        setManagerDeleteMessage('')
-        try {
-          await api.delete(`/api/owner/users/${personId}`)
-          setAssignPeople((prev) => prev.filter((p) => p.id !== personId))
-          if (assignPersonId === personId) {
-            setAssignPersonId('')
-            setAssignBranchIds([])
-          }
-        } catch (err: any) {
-          setManagerDeleteMessage(err.response?.data?.error || 'Failed to delete manager account')
-        }
-      },
-    })
-  }
-
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-2xl font-semibold">Owner dashboard</h1>
-      <p className="mt-1 text-sm text-gray-600">Manage branches, manager, and trainer accounts across your gym chain.</p>
+      <p className="mt-1 text-sm text-gray-600">Manage branches, accounts, and plans across your gym chain.</p>
       <Link to="/manager" className="mt-3 inline-block text-sm font-medium text-brand hover:text-brand-dark">
         Go to branch operations (check-in, plans, purchases, attendance, crowd report) →
       </Link>
@@ -284,42 +198,32 @@ export default function OwnerDashboard() {
         </div>
 
         <div className="rounded-lg border border-gray-200 p-6">
-          <h2 className="font-medium">Create a manager account</h2>
-          <form onSubmit={createManager} className="mt-4 space-y-3">
-            <input placeholder="Full name" required value={managerName} onChange={(e) => setManagerName(e.target.value)}
+          <h2 className="font-medium">Create an account</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Owner accounts can't be created directly - create the account, then promote it from
+            the Staff or Members tab (requires email verification).
+          </p>
+          <form onSubmit={createAccount} className="mt-4 space-y-3">
+            <select value={accountRole} onChange={(e) => setAccountRole(e.target.value as AccountRole)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              {ACCOUNT_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+            <input placeholder="Full name" required value={accountName} onChange={(e) => setAccountName(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <input placeholder="Email" type="email" required value={managerEmail} onChange={(e) => setManagerEmail(e.target.value)}
+            <input placeholder="Email" type="email" required value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <input placeholder="Temporary password" type="password" required minLength={6} value={managerPassword}
-              onChange={(e) => setManagerPassword(e.target.value)}
+            <input placeholder="Phone (optional)" value={accountPhone} onChange={(e) => setAccountPhone(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <BranchCheckboxes branches={branches} selected={managerBranchIds} onChange={setManagerBranchIds} />
-            <button disabled={creatingManager}
+            <input placeholder="Temporary password" type="password" required minLength={6} value={accountPassword}
+              onChange={(e) => setAccountPassword(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            <BranchCheckboxes branches={branches} selected={accountBranchIds} onChange={setAccountBranchIds} />
+            <button disabled={creatingAccount}
               className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
-              {creatingManager && <Spinner className="h-4 w-4" />}
-              {creatingManager ? 'Creating...' : 'Create manager'}
+              {creatingAccount && <Spinner className="h-4 w-4" />}
+              {creatingAccount ? 'Creating...' : 'Create account'}
             </button>
-            {managerMessage && <p className="text-sm text-gray-600">{managerMessage}</p>}
-          </form>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 p-6">
-          <h2 className="font-medium">Create a trainer account</h2>
-          <form onSubmit={createTrainer} className="mt-4 space-y-3">
-            <input placeholder="Full name" required value={trainerName} onChange={(e) => setTrainerName(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <input placeholder="Email" type="email" required value={trainerEmail} onChange={(e) => setTrainerEmail(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <input placeholder="Temporary password" type="password" required minLength={6} value={trainerPassword}
-              onChange={(e) => setTrainerPassword(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <BranchCheckboxes branches={branches} selected={trainerBranchIds} onChange={setTrainerBranchIds} />
-            <button disabled={creatingTrainer}
-              className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
-              {creatingTrainer && <Spinner className="h-4 w-4" />}
-              {creatingTrainer ? 'Creating...' : 'Create trainer'}
-            </button>
-            {trainerMessage && <p className="text-sm text-gray-600">{trainerMessage}</p>}
+            {accountMessage && <p className="text-sm text-gray-600">{accountMessage}</p>}
           </form>
         </div>
 
@@ -360,60 +264,6 @@ export default function OwnerDashboard() {
             </ul>
           )}
         </div>
-      </div>
-
-      <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">Manager branch assignments</h2>
-        <p className="mt-1 text-xs text-gray-500">
-          For Members and Trainers, use "View/Edit details" on their row in Branch
-          operations instead - it's easier to find someone in a long list there.
-        </p>
-        <form onSubmit={saveAssignments} className="mt-4 space-y-3">
-          <select value={assignPersonId} onChange={(e) => selectAssignPerson(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
-            <option value="">Select a manager</option>
-            {assignPeople.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.email})</option>)}
-          </select>
-          {assignPersonId && (
-            <BranchCheckboxes branches={branches} selected={assignBranchIds} onChange={setAssignBranchIds} />
-          )}
-          <button disabled={!assignPersonId || savingAssignments}
-            className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-40">
-            {savingAssignments && <Spinner className="h-4 w-4" />}
-            {savingAssignments ? 'Saving...' : 'Save branch assignments'}
-          </button>
-          {assignMessage && <p className="text-sm text-gray-600">{assignMessage}</p>}
-        </form>
-      </div>
-
-      <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">Manager accounts</h2>
-        <p className="mt-1 text-xs text-gray-500">
-          Permanently removes the account. If a manager has recorded payments for other
-          members, deletion is blocked to protect their invoice history.
-        </p>
-        {managerDeleteMessage && <p className="mt-2 text-sm text-red-600">{managerDeleteMessage}</p>}
-        {assignPeopleLoading ? (
-          <div className="mt-3 space-y-2">
-            <div className="h-5 w-full animate-pulse rounded bg-gray-200" />
-            <div className="h-5 w-full animate-pulse rounded bg-gray-200" />
-          </div>
-        ) : (
-          <ul className="mt-3 divide-y divide-gray-100 text-sm">
-            {assignPeople.map((p) => (
-              <li key={p.id} className="flex items-center justify-between py-2">
-                <div>
-                  <p>{p.name}</p>
-                  <p className="text-xs text-gray-500">{p.email}</p>
-                </div>
-                <button onClick={() => deleteManager(p.id, p.name)} className="text-xs text-red-600 hover:underline">
-                  Delete account
-                </button>
-              </li>
-            ))}
-            {assignPeople.length === 0 && <li className="py-2 text-gray-400">No manager accounts yet.</li>}
-          </ul>
-        )}
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
@@ -462,13 +312,11 @@ export default function OwnerDashboard() {
                 </div>
               )}
             </li>
-          ))
-          }
+          ))}
           {branches.length === 0 && <li className="py-2 text-gray-400">No branches yet - add one above.</li>}
         </ul>
         )}
       </div>
-      <ConfirmDialog {...dialogProps} />
     </div>
   )
 }

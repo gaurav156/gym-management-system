@@ -8,6 +8,7 @@ import ConfirmDialog from '../ConfirmDialog'
 import { TableSkeleton } from '../Skeleton'
 import { useConfirm } from '../../hooks/useConfirm'
 import Spinner from '../Spinner'
+import OwnerPromotionDialog from '../OwnerPromotionDialog'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -41,6 +42,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [roleHistory, setRoleHistory] = useState<RoleHistoryEntry[]>([])
   const [selectedNewRole, setSelectedNewRole] = useState('')
   const [changingRole, setChangingRole] = useState(false)
+  const [promotionTarget, setPromotionTarget] = useState<{ id: string; name: string } | null>(null)
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editStartDate, setEditStartDate] = useState('')
@@ -326,6 +328,12 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       setMemberModalMessage('Select a role to change to.'); 
       return 
     }
+
+    if (selectedNewRole === 'OWNER') {
+      setPromotionTarget({ id: member.id, name: member.name })
+      return
+    }
+
     confirm({
       title: 'Change role',
       message: `Change ${member.name}'s role from Member to ${selectedNewRole === 'TRAINER' ? 'Trainer' : 'Manager'}? ` +
@@ -591,7 +599,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                         <div className="rounded-md border border-gray-200 p-3">
                           <p className="text-xs font-medium text-gray-700">Change role</p>
                           <p className="mt-1 text-xs text-gray-500">
-                            Promotes this Member to staff. Today becomes their joining date as
+                            Promotes this Member to staff or Owner. Today becomes their joining date as
                             Trainer/Manager; their membership history stays intact either way.
                           </p>
                           <div className="mt-2 flex items-center gap-2">
@@ -600,6 +608,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                               <option value="">Select new role...</option>
                               <option value="TRAINER">Trainer</option>
                               <option value="MANAGER">Manager</option>
+                              <option value="OWNER">Owner</option>
                             </select>
                             <button onClick={() => changeMemberRole(detailMember)} disabled={!selectedNewRole || changingRole}
                               className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-60">
@@ -861,6 +870,16 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       )}
 
       <ConfirmDialog {...dialogProps} />
+      <OwnerPromotionDialog
+        target={promotionTarget}
+        onClose={() => setPromotionTarget(null)}
+        onPromoted={() => {
+          setPromotionTarget(null)
+          setDetailMemberId(null)
+          loadMembers(0, memberSearch, memberStatusFilter, memberSort)
+          loadMemberships()
+        }}
+      />
     </div>
   )
 }

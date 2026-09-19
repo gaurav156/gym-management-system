@@ -1,6 +1,7 @@
 package com.gymapp.config;
 
 import com.gymapp.repository.ChangePasswordOtpRepository;
+import com.gymapp.repository.OwnerPromotionOtpRepository;
 import com.gymapp.repository.PasswordResetOtpRepository;
 import com.gymapp.repository.RegistrationOtpRepository;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -9,26 +10,25 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
-// Keeps password_reset_otp from growing forever. A row is safe to delete once it's
-// either been consumed (successfully used - no longer needed for anything) or expired
-// (can never be verified again regardless of consumed state) - see
-// PasswordResetOtpRepository.deleteConsumedOrExpired(). Runs once a day; OTP volume for a
-// single gym is low enough that this never needs to be more frequent, and a stray
-// leftover row for at most ~24h is harmless (PasswordResetService already rejects
-// expired OTPs on verify regardless of whether this job has run yet).
+// Keeps the OTP tables from growing forever. A row is safe to delete once it's either been
+// consumed or expired. Runs once a day; a stray leftover row for at most ~24h is harmless
+// since every verify step already rejects expired OTPs on its own.
 @Component
 public class OtpCleanupJob {
 
     private final PasswordResetOtpRepository otpRepository;
     private final ChangePasswordOtpRepository changePasswordOtpRepository;
     private final RegistrationOtpRepository registrationOtpRepository;
+    private final OwnerPromotionOtpRepository ownerPromotionOtpRepository;
 
     public OtpCleanupJob(PasswordResetOtpRepository otpRepository,
                          ChangePasswordOtpRepository changePasswordOtpRepository,
-                         RegistrationOtpRepository registrationOtpRepository) {
+                         RegistrationOtpRepository registrationOtpRepository,
+                         OwnerPromotionOtpRepository ownerPromotionOtpRepository) {
         this.otpRepository = otpRepository;
         this.changePasswordOtpRepository = changePasswordOtpRepository;
         this.registrationOtpRepository = registrationOtpRepository;
+        this.ownerPromotionOtpRepository = ownerPromotionOtpRepository;
     }
 
     @Scheduled(cron = "0 0 3 * * *") // 3:00 AM server time, daily
@@ -45,6 +45,10 @@ public class OtpCleanupJob {
         int deletedRegistrations = registrationOtpRepository.deleteConsumedOrExpired(LocalDateTime.now());
         if (deletedRegistrations > 0) {
             System.out.println("OtpCleanupJob: removed " + deletedRegistrations + " consumed/expired registration OTP row(s)");
+        }
+        int deletedPromotions = ownerPromotionOtpRepository.deleteConsumedOrExpired(LocalDateTime.now());
+        if (deletedPromotions > 0) {
+            System.out.println("OtpCleanupJob: removed " + deletedPromotions + " consumed/expired owner-promotion OTP row(s)");
         }
     }
 }

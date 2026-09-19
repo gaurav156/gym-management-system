@@ -82,18 +82,12 @@ public class AuthController {
         }
     }
 
-    // Owner-only: create a manager account, assigned to one or more branches
-    @PostMapping("/owner/create-manager")
+    // Owner-only: create an account for any non-Owner role (Manager, Trainer, or Member),
+    // assigned to one or more branches.
+    @PostMapping("/owner/create-account")
     @PreAuthorize("hasRole('OWNER')")
-    public AuthResponse createManager(@Valid @RequestBody CreateManagerRequest req) {
-        return authService.createManager(req);
-    }
-
-    // Owner-only: create a trainer account, assigned to one or more branches
-    @PostMapping("/owner/create-trainer")
-    @PreAuthorize("hasRole('OWNER')")
-    public AuthResponse createTrainer(@Valid @RequestBody CreateTrainerRequest req) {
-        return authService.createTrainer(req);
+    public CreateAccountResponse createAccount(@Valid @RequestBody CreateAccountRequest req) {
+        return authService.createAccount(req);
     }
 
     // Shared by login() and register() - throws before the real service call runs at all

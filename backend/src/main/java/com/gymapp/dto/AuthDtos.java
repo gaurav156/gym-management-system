@@ -1,5 +1,6 @@
 package com.gymapp.dto;
 
+import com.gymapp.entity.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -57,21 +58,26 @@ public class AuthDtos {
             String role
     ) {}
 
-    // Manager/Trainer creation now supports multiple initial branch assignments in one go,
-    // rather than needing separate transfer calls afterward.
-    public record CreateManagerRequest(
+    // Owner-only. One request shape for every creatable role. OWNER is deliberately not
+    // creatable here - Owners come from promoting an existing account, which requires
+    // OTP verification (see RoleChangeService).
+    public record CreateAccountRequest(
             @NotBlank String name,
             @NotBlank @Email String email,
             String phone,
             @NotBlank @Size(min = 6) String password,
+            @NotNull Role role,
             @NotEmpty List<UUID> branchIds
     ) {}
 
-    public record CreateTrainerRequest(
-            @NotBlank String name,
-            @NotBlank @Email String email,
-            String phone,
-            @NotBlank @Size(min = 6) String password,
-            @NotEmpty List<UUID> branchIds
+    // No JWT here (the old create-manager/create-trainer responses handed the Owner a live
+    // token for the new account, which nothing used). The PIN is what the Owner needs to
+    // hand over.
+    public record CreateAccountResponse(
+            UUID userId,
+            String name,
+            String email,
+            String role,
+            String checkinPin
     ) {}
 }

@@ -7,5 +7,6 @@ package com.gymapp.otp;
 public enum OtpPurpose {
     PASSWORD_RESET,
     CHANGE_PASSWORD,
-    REGISTRATION
+    REGISTRATION,
+    OWNER_PROMOTION
 }

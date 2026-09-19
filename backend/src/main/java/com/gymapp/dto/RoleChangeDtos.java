@@ -8,16 +8,21 @@ import java.util.UUID;
 
 public class RoleChangeDtos {
 
-    // OWNER is deliberately not a valid target here - promoting/demoting to Owner isn't
-    // supported through this endpoint (see RoleChangeService for the enforced rules).
+    // otp is only required (and only checked) when newRole is OWNER - see
+    // RoleChangeService / OwnerPromotionOtpService. Null is fine for every other role.
     public record ChangeRoleRequest(
-            @NotNull Role newRole
+            @NotNull Role newRole,
+            String otp
     ) {}
 
     public record ChangeRoleResponse(
             UUID userId,
             String previousRole,
             String newRole,
+            String message
+    ) {}
+
+    public record RequestOwnerPromotionOtpResponse(
             String message
     ) {}
 

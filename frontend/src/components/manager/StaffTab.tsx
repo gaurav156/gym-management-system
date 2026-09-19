@@ -6,6 +6,7 @@ import type { Branch, StaffSummary, AttendanceLogEntry, AuthUser, RoleHistoryEnt
 import ConfirmDialog from '../ConfirmDialog'
 import { TableSkeleton } from '../Skeleton'
 import { useConfirm } from '../../hooks/useConfirm'
+import OwnerPromotionDialog from '../OwnerPromotionDialog'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -27,7 +28,7 @@ const ROLE_SORT_ORDER: Record<string, number> = { OWNER: 0, MANAGER: 1, TRAINER:
 
 // Every role a person could be changed TO from this screen - OWNER is deliberately
 // excluded, matching the backend's refusal to promote/demote anyone to Owner.
-const CHANGEABLE_ROLES = ['MEMBER', 'TRAINER', 'MANAGER'] as const
+const CHANGEABLE_ROLES = ['MEMBER', 'TRAINER', 'MANAGER', 'OWNER'] as const
 
 export default function StaffTab({ selectedBranch, allBranches, lastCheckins, user }: Props) {
   const [staff, setStaff] = useState<StaffSummary[]>([])
@@ -72,6 +73,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const [roleHistory, setRoleHistory] = useState<RoleHistoryEntry[]>([])
   const [selectedNewRole, setSelectedNewRole] = useState('')
   const [changingRole, setChangingRole] = useState(false)
+  const [promotionTarget, setPromotionTarget] = useState<{ id: string; name: string } | null>(null)
 
   function loadStaff(page = 0, roleFilter = staffRoleFilter, includeLeft = showLeftStaff, sort = staffSort) {
     if (!selectedBranch) return
@@ -256,11 +258,19 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       setStaffModalMessage('Select a role to change to.')
       return
     }
+
+    if (selectedNewRole === 'OWNER') {
+      // Owner promotion has its own OTP-gated dialog instead of the plain confirm
+      setPromotionTarget({ id: s.id, name: s.name })
+      return
+    }
+
     confirm({
       title: 'Change role',
       message: `Change ${s.name}'s role from ${roleLabel(s.role)} to ${roleLabel(selectedNewRole)}? ` +
         `This takes effect immediately for new logins, but anyone already signed in keeps ` +
-        `their current access until their session expires or they log in again.`,
+        `their current access until their session expires or they log in again. ` +
+        `Choosing Owner requires a verification code emailed to you.`,
       confirmLabel: 'Change role',
       onConfirm: async () => {
         setChangingRole(true)
@@ -681,6 +691,11 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
         </div>
       )}
       <ConfirmDialog {...dialogProps} />
+      <OwnerPromotionDialog
+        target={promotionTarget}
+        onClose={() => setPromotionTarget(null)}
+        onPromoted={() => { setPromotionTarget(null); setDetailStaffId(null); loadStaff(0) }}
+      />
     </div>
   )
 }

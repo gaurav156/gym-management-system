@@ -17,6 +17,9 @@ import java.util.UUID;
 // "change someone's role" - into one action with automatic joiningDate/leftDate side
 // effects, so the two can never drift out of sync with each other.
 //
+// Promoting to OWNER is a one-way door (an Owner's role can't be changed afterward) and
+// requires a fresh email OTP sent to the acting Owner - see OwnerPromotionOtpService.
+//
 // IMPORTANT CAVEAT: this updates the User row, but an already-issued JWT keeps whatever
 // role it was signed with until it expires (see app.jwt.expiration-ms) or the person
 // logs in again. This is not instant revocation - if that's ever needed, it requires a
@@ -26,31 +29,40 @@ public class RoleChangeService {
 
     private final UserRepository userRepository;
     private final RoleChangeHistoryRepository roleChangeHistoryRepository;
+    private final OwnerPromotionOtpService ownerPromotionOtpService;
 
     public RoleChangeService(UserRepository userRepository,
-                             RoleChangeHistoryRepository roleChangeHistoryRepository) {
+                             RoleChangeHistoryRepository roleChangeHistoryRepository,
+                             OwnerPromotionOtpService ownerPromotionOtpService) {
         this.userRepository = userRepository;
         this.roleChangeHistoryRepository = roleChangeHistoryRepository;
+        this.ownerPromotionOtpService = ownerPromotionOtpService;
     }
 
-    @Transactional
-    public ChangeRoleResponse changeRole(UUID userId, Role newRole, UUID callerId) {
+    // noRollbackFor: every validation below throws BEFORE any write, so this only changes
+    // one thing - a wrong OTP guess throws IllegalArgumentException after
+    // OwnerPromotionOtpService has bumped the attempt counter, and that increment must
+    // survive. Once the OTP is verified, nothing else in this method throws
+    // IllegalArgumentException, so it can never commit a consumed OTP without the role change.
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
+    public ChangeRoleResponse changeRole(UUID userId, Role newRole, UUID callerId, String otp) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         User caller = userRepository.findById(callerId)
                 .orElseThrow(() -> new IllegalArgumentException("Caller not found"));
 
         if (user.getRole() == Role.OWNER) {
-            throw new IllegalArgumentException("The Owner's role cannot be changed");
-        }
-        if (newRole == Role.OWNER) {
-            throw new IllegalArgumentException("Cannot change anyone's role to Owner");
+            throw new IllegalArgumentException("An Owner's role cannot be changed");
         }
         if (user.getId().equals(callerId)) {
             throw new IllegalArgumentException("You cannot change your own role");
         }
         if (user.getRole() == newRole) {
             throw new IllegalArgumentException(user.getName() + " already has that role");
+        }
+
+        if (newRole == Role.OWNER) {
+            ownerPromotionOtpService.verifyAndConsume(callerId, userId, otp);
         }
 
         Role previousRole = user.getRole();
@@ -62,26 +74,33 @@ public class RoleChangeService {
                 .changedBy(caller)
                 .build());
 
-        boolean wasStaff = previousRole == Role.TRAINER || previousRole == Role.MANAGER;
-        boolean becomingStaff = newRole == Role.TRAINER || newRole == Role.MANAGER;
-
-        if (becomingStaff && !wasStaff) {
-            // (Re)joining staff - fresh joining date, clear any old leave date so they
-            // don't show up as "left" the moment they're promoted.
-            user.setJoiningDate(LocalDate.now());
+        if (newRole == Role.OWNER) {
+            // Owners aren't "staff" for joining/left-date purposes (they can't leave via
+            // this system) - just make sure a promoted ex-staff member doesn't carry a
+            // stale left date. joiningDate is left untouched.
             user.setLeftDate(null);
-        } else if (wasStaff && !becomingStaff) {
-            // Leaving staff - record when, but only if this is the first time (don't
-            // overwrite an existing leftDate if one was already set some other way).
-            if (user.getLeftDate() == null) {
-                user.setLeftDate(LocalDate.now());
+        } else {
+            boolean wasStaff = previousRole == Role.TRAINER || previousRole == Role.MANAGER;
+            boolean becomingStaff = newRole == Role.TRAINER || newRole == Role.MANAGER;
+
+            if (becomingStaff && !wasStaff) {
+                // (Re)joining staff - fresh joining date, clear any old leave date so they
+                // don't show up as "left" the moment they're promoted.
+                user.setJoiningDate(LocalDate.now());
+                user.setLeftDate(null);
+            } else if (wasStaff && !becomingStaff) {
+                // Leaving staff - record when, but only if this is the first time (don't
+                // overwrite an existing leftDate if one was already set some other way).
+                if (user.getLeftDate() == null) {
+                    user.setLeftDate(LocalDate.now());
+                }
+                if (newRole == Role.MEMBER && user.getEnrollmentDate() == null) {
+                    user.setEnrollmentDate(LocalDate.now());
+                }
             }
-            if (newRole == Role.MEMBER && user.getEnrollmentDate() == null) {
-                user.setEnrollmentDate(LocalDate.now());
-            }
+            // TRAINER <-> MANAGER (staff to staff) intentionally leaves joiningDate/leftDate
+            // untouched - they never stopped being staff.
         }
-        // TRAINER <-> MANAGER (staff to staff) intentionally leaves joiningDate/leftDate
-        // untouched - they never stopped being staff.
 
         user.setRole(newRole);
         userRepository.save(user);
