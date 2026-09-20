@@ -9,6 +9,8 @@ import com.gymapp.otp.OtpDeliveryRouter;
 import com.gymapp.otp.OtpPurpose;
 import com.gymapp.repository.ChangePasswordOtpRepository;
 import com.gymapp.repository.UserRepository;
+import com.gymapp.storage.ImagePurpose;
+import com.gymapp.storage.ImageRefs;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ public class ProfileService {
     private final PasswordEncoder passwordEncoder;
     private final ChangePasswordOtpRepository changePasswordOtpRepository;
     private final OtpDeliveryRouter otpDeliveryRouter;
+    private final ImageRefs imageRefs;
 
     @Value("${app.otp.expiry-minutes}")
     private int expiryMinutes;
@@ -39,11 +42,13 @@ public class ProfileService {
     public ProfileService(UserRepository userRepository,
                           PasswordEncoder passwordEncoder,
                           ChangePasswordOtpRepository changePasswordOtpRepository,
-                          OtpDeliveryRouter otpDeliveryRouter) {
+                          OtpDeliveryRouter otpDeliveryRouter,
+                          ImageRefs imageRefs) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.changePasswordOtpRepository = changePasswordOtpRepository;
         this.otpDeliveryRouter = otpDeliveryRouter;
+        this.imageRefs = imageRefs;
     }
 
     public ProfileResponse getProfile(UUID userId) {
@@ -60,10 +65,10 @@ public class ProfileService {
         if (req.name() != null && !req.name().isBlank()) u.setName(req.name());
         if (req.phone() != null) u.setPhone(req.phone());
         if (req.address() != null) u.setAddress(req.address().isBlank() ? null : req.address());
-        if (req.photo() != null) u.setPhoto(req.photo().isBlank() ? null : req.photo());
+        u.setPhoto(imageRefs.resolveForSave(u.getPhoto(), req.photo(), ImagePurpose.PHOTO));
 
-        if (req.signature() != null && (u.getRole() == Role.OWNER || u.getRole() == Role.MANAGER)) {
-            u.setSignature(req.signature().isBlank() ? null : req.signature());
+        if (u.getRole() == Role.OWNER || u.getRole() == Role.MANAGER) {
+            u.setSignature(imageRefs.resolveForSave(u.getSignature(), req.signature(), ImagePurpose.SIGNATURE));
         }
 
         u = userRepository.save(u);
@@ -159,6 +164,6 @@ public class ProfileService {
 
     private ProfileResponse toResponse(User u) {
         return new ProfileResponse(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(),
-                u.getPhoto(), u.getSignature(), u.getRole().name(), u.getEnrollmentDate(), u.getJoiningDate());
+                imageRefs.toUrl(u.getPhoto()), imageRefs.toUrl(u.getSignature()), u.getRole().name(), u.getEnrollmentDate(), u.getJoiningDate());
     }
 }

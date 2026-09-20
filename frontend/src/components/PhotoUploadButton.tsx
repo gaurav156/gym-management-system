@@ -1,5 +1,6 @@
-import { ChangeEvent, useId } from 'react'
-import { handleEditPhotoChange } from '../utils/photo'
+import { ChangeEvent, useId, useState } from 'react'
+import { handleEditPhotoChange, type ImagePurpose } from '../utils/photo'
+import Spinner from './Spinner'
 
 function UploadIcon() {
   return (
@@ -12,23 +13,26 @@ function UploadIcon() {
 }
 
 interface Props {
-  onLoaded: (dataUrl: string) => void
+  onLoaded: (url: string) => void
   onError: (msg: string) => void
   label?: string
   size?: 'sm' | 'md'
+  purpose?: ImagePurpose
 }
 
-// Replaces the native <input type="file"> button (which renders as the browser's own
-// unstyled "Choose file" control, inconsistent across browsers/OSes) with a button that
-// matches the rest of the UI. The actual file input is visually hidden but still present
-// and functional - clicking the styled button just forwards the click to it, so this
-// keeps native file-picker behavior (mobile camera/gallery prompt, keyboard accessibility
-// via the underlying <label>) with none of it visible.
-export default function PhotoUploadButton({ onLoaded, onError, label = 'Upload photo', size = 'md' }: Props) {
+// The file is uploaded as soon as it's picked; onLoaded receives the resulting URL, which
+// is what gets submitted with the surrounding form (the form itself never carries image bytes).
+export default function PhotoUploadButton({ onLoaded, onError, label = 'Upload photo', size = 'md', purpose = 'PHOTO' }: Props) {
   const inputId = useId()
+  const [uploading, setUploading] = useState(false)
 
-  function handleChange(e: ChangeEvent<HTMLInputElement>) {
-    handleEditPhotoChange(e, onLoaded, onError)
+  async function handleChange(e: ChangeEvent<HTMLInputElement>) {
+    setUploading(true)
+    try {
+      await handleEditPhotoChange(e, onLoaded, onError, purpose)
+    } finally {
+      setUploading(false)
+    }
   }
 
   const sizeClasses = size === 'sm'
@@ -38,17 +42,13 @@ export default function PhotoUploadButton({ onLoaded, onError, label = 'Upload p
   return (
     <label
       htmlFor={inputId}
-      className={`inline-flex cursor-pointer items-center rounded-md border border-gray-300 bg-white font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100 ${sizeClasses}`}
+      className={`inline-flex cursor-pointer items-center rounded-md border border-gray-300 bg-white font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100 ${sizeClasses} ${
+        uploading ? 'pointer-events-none opacity-70' : ''
+      }`}
     >
-      <UploadIcon />
-      {label}
-      <input
-        id={inputId}
-        type="file"
-        accept="image/*"
-        onChange={handleChange}
-        className="sr-only"
-      />
+      {uploading ? <Spinner className="h-4 w-4" /> : <UploadIcon />}
+      {uploading ? 'Uploading...' : label}
+      <input id={inputId} type="file" accept="image/*" disabled={uploading} onChange={handleChange} className="sr-only" />
     </label>
   )
 }

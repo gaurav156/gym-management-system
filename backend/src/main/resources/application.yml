@@ -44,6 +44,10 @@ spring:
           auth: true
           starttls:
             enable: true
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
 
 app:
   jwt:
@@ -69,3 +73,17 @@ app:
     turnstile:
       secret-key: ${TURNSTILE_SECRET_KEY:1x0000000000000000000000000000000AA}
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  storage:
+    provider: ${STORAGE_PROVIDER:s3}
+    # What browsers use to load images. Can differ from the endpoint the backend talks to
+    # (e.g. LAN IP for phone testing, CDN domain in production).
+    public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:9000/gym-media}
+    # One-shot: converts existing base64 photos/signatures into bucket objects on startup.
+    migrate-legacy: ${STORAGE_MIGRATE_LEGACY:false}
+    s3:
+      endpoint: ${STORAGE_S3_ENDPOINT:http://localhost:9000}   # blank for real AWS S3
+      region: ${STORAGE_S3_REGION:us-east-1}
+      bucket: ${STORAGE_S3_BUCKET:gym-media}
+      access-key: ${STORAGE_S3_ACCESS_KEY:minioadmin}
+      secret-key: ${STORAGE_S3_SECRET_KEY:minioadmin}
+      path-style: ${STORAGE_S3_PATH_STYLE:true}                # true for MinIO/Supabase, false for AWS/R2

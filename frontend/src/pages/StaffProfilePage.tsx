@@ -72,7 +72,7 @@ export default function StaffProfilePage() {
         setMessage(''); setError('')
         setSaving(true)
         try {
-            const { data } = await api.put<Profile>('/api/profile/me', { name, phone, address, photo, signature })
+            const { data } = await api.put<Profile>('/api/profile/me', { name, phone, address, photo: photo ?? '', signature: signature ?? '' })
             setProfile(data)
             setMessage('Profile updated.')
         } catch (err: any) {
@@ -172,7 +172,7 @@ export default function StaffProfilePage() {
                                         No signature yet
                                     </div>
                                 )}
-                                <PhotoUploadButton onLoaded={setSignature} onError={setError} label="Upload signature" size="sm" />
+                                <PhotoUploadButton onLoaded={setSignature} onError={setError} label="Upload signature" size="sm" purpose="SIGNATURE" />
                                 {signature && (
                                     <button type="button" onClick={() => setSignature(null)} className="text-xs text-red-600 hover:underline">
                                         Remove signature

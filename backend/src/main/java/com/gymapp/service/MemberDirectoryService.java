@@ -6,6 +6,8 @@ import com.gymapp.dto.ProfileDtos.UpdateProfileRequest;
 import com.gymapp.entity.Role;
 import com.gymapp.entity.User;
 import com.gymapp.repository.UserRepository;
+import com.gymapp.storage.ImagePurpose;
+import com.gymapp.storage.ImageRefs;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -19,9 +21,11 @@ import java.util.UUID;
 public class MemberDirectoryService {
 
     private final UserRepository userRepository;
+    private final ImageRefs imageRefs;
 
-    public MemberDirectoryService(UserRepository userRepository) {
+    public MemberDirectoryService(UserRepository userRepository, ImageRefs imageRefs) {
         this.userRepository = userRepository;
+        this.imageRefs = imageRefs;
     }
 
     @Transactional(readOnly = true)
@@ -53,14 +57,14 @@ public class MemberDirectoryService {
         if (req.name() != null && !req.name().isBlank()) u.setName(req.name());
         if (req.phone() != null) u.setPhone(req.phone());
         if (req.address() != null) u.setAddress(req.address().isBlank() ? null : req.address());
-        if (req.photo() != null) u.setPhoto(req.photo().isBlank() ? null : req.photo());
+        u.setPhoto(imageRefs.resolveForSave(u.getPhoto(), req.photo(), ImagePurpose.PHOTO));
 
         u = userRepository.save(u);
         return toSummary(u);
     }
 
     private MemberSummary toSummary(User u) {
-        return new MemberSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getPhoto(),
+        return new MemberSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), imageRefs.toUrl(u.getPhoto()),
                 u.getAddress(), u.getCheckinPin(), u.getEnrollmentDate());
     }
 }

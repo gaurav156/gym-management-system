@@ -4,6 +4,7 @@ import com.gymapp.dto.PageDtos.PageResponse;
 import com.gymapp.dto.StaffDtos.StaffSummary;
 import com.gymapp.entity.User;
 import com.gymapp.repository.UserRepository;
+import com.gymapp.storage.ImageRefs;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -17,9 +18,11 @@ import java.util.UUID;
 public class StaffDirectoryService {
 
     private final UserRepository userRepository;
+    private final ImageRefs imageRefs;
 
-    public StaffDirectoryService(UserRepository userRepository) {
+    public StaffDirectoryService(UserRepository userRepository, ImageRefs imageRefs) {
         this.userRepository = userRepository;
+        this.imageRefs = imageRefs;
     }
 
     // The Owner has no branch_assignments row of their own (implicit access to every
@@ -40,7 +43,7 @@ public class StaffDirectoryService {
     }
 
     private StaffSummary toSummary(User u) {
-        return new StaffSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(), u.getPhoto(),
+        return new StaffSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(), imageRefs.toUrl(u.getPhoto()),
                 u.getCheckinPin(), u.getRole().name(), u.getJoiningDate(), u.getLeftDate());
     }
 }

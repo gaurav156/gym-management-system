@@ -4,6 +4,7 @@ import com.gymapp.entity.Role;
 import com.gymapp.entity.User;
 import com.gymapp.repository.PaymentRepository;
 import com.gymapp.repository.UserRepository;
+import com.gymapp.storage.ImageRefs;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,13 +27,16 @@ public class UserManagementService {
     private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
     private final OwnerSafeguards ownerSafeguards;
+    private final ImageRefs imageRefs;
 
     public UserManagementService(UserRepository userRepository,
                                  PaymentRepository paymentRepository,
-                                 OwnerSafeguards ownerSafeguards) {
+                                 OwnerSafeguards ownerSafeguards,
+                                 ImageRefs imageRefs) {
         this.userRepository = userRepository;
         this.paymentRepository = paymentRepository;
         this.ownerSafeguards = ownerSafeguards;
+        this.imageRefs = imageRefs;
     }
 
     @Transactional
@@ -59,6 +63,10 @@ public class UserManagementService {
                             "their invoice history. Deactivate the account instead if they should no longer have access.");
         }
 
+        String photo = user.getPhoto();
+        String signature = user.getSignature();
         userRepository.delete(user);
+        imageRefs.deleteAfterCommit(photo);
+        imageRefs.deleteAfterCommit(signature);
     }
 }

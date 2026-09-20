@@ -214,3 +214,156 @@ A few rules of thumb:
   run every migration from `V1` in order — no baselining needed for a genuinely empty
   database, that only kicks in for a non-empty one with no Flyway history yet (which was
   the one-time situation this project's dev database was in when Flyway was introduced).
+
+---
+
+## 6. Image storage (profile photos & signatures)
+
+Images are stored in an **S3-compatible object store**, not in Postgres. The database holds
+only an object *key* (e.g. `avatars/3f2c….jpg`); the API turns it into a URL using
+`STORAGE_PUBLIC_BASE_URL`. Because no URL is ever stored, changing provider or domain needs
+**no database migration**.
+
+The same code talks to MinIO, Cloudflare R2, AWS S3, Supabase Storage and Backblaze B2 - only
+environment variables differ.
+
+### 6.1 Environment variables (backend)
+
+| Variable | Meaning |
+|---|---|
+| `STORAGE_PROVIDER` | `s3` (default). Other values need a new `StorageService` implementation (§6.5) |
+| `STORAGE_S3_ENDPOINT` | S3 API endpoint the **backend** talks to. Blank for real AWS S3 |
+| `STORAGE_S3_REGION` | Region (`auto` for R2) |
+| `STORAGE_S3_BUCKET` | Bucket name |
+| `STORAGE_S3_ACCESS_KEY` / `STORAGE_S3_SECRET_KEY` | Credentials with read/write on the bucket |
+| `STORAGE_S3_PATH_STYLE` | `true` for MinIO/Supabase, `false` for AWS S3/R2 |
+| `STORAGE_PUBLIC_BASE_URL` | Base URL **browsers** use to load images. Absolute URL, or `/media` in local dev |
+| `STORAGE_MIGRATE_LEGACY` | `true` for one startup to convert old base64 photos, then back to `false` |
+
+The endpoint (backend → storage) and the public base URL (browser → storage) are deliberately
+separate settings - they are usually different addresses.
+
+### 6.2 Local development with MinIO
+
+MinIO's Docker Hub images were removed and its community edition is archived, so use the
+`quay.io/minio/*` images (already set in `docker-compose.yml`). Dev use only - never expose it.
+
+```bash
+docker compose up -d          # starts MinIO, creates the public bucket `gym-media`
+```
+
+Console: http://localhost:9001 (`minioadmin` / `minioadmin`). Backend variables:
+
+```bash
+export STORAGE_S3_ENDPOINT=http://localhost:9000
+export STORAGE_S3_REGION=us-east-1
+export STORAGE_S3_BUCKET=gym-media
+export STORAGE_S3_ACCESS_KEY=minioadmin
+export STORAGE_S3_SECRET_KEY=minioadmin
+export STORAGE_S3_PATH_STYLE=true
+export STORAGE_PUBLIC_BASE_URL=/media
+```
+
+`vite.config.ts` proxies `/media/*` to MinIO, so images load over the same HTTPS origin as
+the app - no mixed-content errors on your phone (§4) and no extra certificates. Because the
+base URL is relative, it works from `localhost` and your LAN IP without changes.
+
+**Alternative - MinIO over HTTPS directly:** mount the mkcert files as `/certs/public.crt` and
+`/certs/private.key`, start MinIO with `--certs-dir /certs`, set
+`STORAGE_S3_ENDPOINT=https://localhost:9000` and
+`STORAGE_PUBLIC_BASE_URL=https://<lan-ip>:9000/gym-media`, and make the JVM trust the mkcert
+root CA (run `mkcert -install` with `JAVA_HOME` set, or import `rootCA.pem` into the JDK's
+`cacerts` with `keytool`). 
+
+```bash
+keytool -importcert -trustcacerts -alias mkcert-local -file "$(mkcert -CAROOT)/rootCA.pem" -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit -noprompt
+```
+Do not replace the whole truststore via `-Djavax.net.ssl.trustStore`, that breaks Gmail SMTP and Turnstile.
+
+### 6.3 Production providers
+
+The bucket must allow **public read** (objects have unguessable UUID names) and, because the
+invoice PDF fetches the signature image from the browser, a **CORS rule allowing `GET`** from
+your frontend origin(s).
+
+**Cloudflare R2** (recommended: generous free tier, no egress fees; may ask for a card)
+1. R2 → *Create bucket*.
+2. Bucket → *Settings* → *Public access*: attach a **custom domain** (e.g.
+   `media.yourdomain.com`). The `r2.dev` subdomain is rate-limited and meant for testing only.
+3. R2 → *Manage API tokens* → create a token with *Object Read & Write* scoped to the bucket;
+   copy the Access Key ID and Secret.
+4. Bucket → *Settings* → *CORS policy*:
+```json
+   [{
+     "AllowedOrigins": ["https://your-app.netlify.app", "https://localhost:5173"],
+     "AllowedMethods": ["GET"],
+     "AllowedHeaders": ["*"],
+     "MaxAgeSeconds": 3600
+   }]
+```
+5. Set on the backend host (e.g. Render):
+```
+   STORAGE_S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+   STORAGE_S3_REGION=auto
+   STORAGE_S3_BUCKET=<bucket>
+   STORAGE_S3_ACCESS_KEY=<key>
+   STORAGE_S3_SECRET_KEY=<secret>
+   STORAGE_S3_PATH_STYLE=false
+   STORAGE_PUBLIC_BASE_URL=https://media.yourdomain.com
+```
+
+**Supabase Storage** (1 GB free): Storage → create a **public** bucket → *S3 Connection* →
+enable it and create S3 access keys. Use the endpoint and region shown there, `PATH_STYLE=true`,
+and `STORAGE_PUBLIC_BASE_URL=https://<project-ref>.supabase.co/storage/v1/object/public/<bucket>`.
+
+**AWS S3**: create a bucket, turn off "Block public access" for it, add a bucket policy
+allowing `s3:GetObject` on `arn:aws:s3:::<bucket>/*` to `*`, add a CORS rule, and create an IAM
+user limited to that bucket. Leave `STORAGE_S3_ENDPOINT` blank, set the bucket's region,
+`PATH_STYLE=false`, and `STORAGE_PUBLIC_BASE_URL` to the bucket URL (or a CloudFront domain).
+
+### 6.4 Switching provider later (checklist)
+
+Existing objects are addressed by key, so switching means copying the objects and changing env
+vars. Nothing in the database changes.
+
+1. **Create** the new bucket (public read + CORS, see §6.3) and credentials.
+2. **Copy** existing objects with the same keys, e.g. with [rclone](https://rclone.org):
+```bash
+   # ~/.config/rclone/rclone.conf defines two remotes, `old` and `new` (type = s3, with
+   # provider/endpoint/keys for each)
+   rclone sync old:gym-media new:gym-media --progress
+```
+3. **Deploy** the new `STORAGE_*` variables and restart the backend.
+4. **Verify**: open a profile with a photo, upload a new one, then view an invoice PDF that has
+   a signature.
+5. **Keep the old bucket** for a few days as a rollback (rollback = restore the old env vars),
+   then delete it.
+
+Uploads made during the switch land in whichever bucket was active. Do step 2 again right
+before the cut-over, or briefly put the app in maintenance.
+
+### 6.5 Adding a non-S3 provider (e.g. Cloudinary, GCS)
+
+Implement `com.gymapp.storage.StorageService` (`put`, `delete`, `publicUrl`, `keyFromUrl`) as a
+new `@Component` annotated with
+`@ConditionalOnProperty(name = "app.storage.provider", havingValue = "<name>")`, then set
+`STORAGE_PROVIDER=<name>`. Services and controllers only depend on the interface. Providers
+that generate their own IDs (Cloudinary) should use our key as their public ID so the stored
+keys stay valid.
+
+### 6.6 Migrating old base64 images
+
+Back up the database, set `STORAGE_MIGRATE_LEGACY=true`, start the backend once, watch the log
+for `Legacy image migration done`, then set it back to `false`. Un-migrated rows keep
+displaying in the meantime.
+
+### 6.7 Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| `pull access denied for minio/minio` | Image removed from Docker Hub - use `quay.io/minio/minio` |
+| Upload returns 500 / `PKIX path building failed` | JVM doesn't trust the HTTPS certificate of the endpoint (MinIO-over-HTTPS only; see §6.2) |
+| Upload works but image shows broken | `STORAGE_PUBLIC_BASE_URL` wrong, or bucket isn't public-read |
+| Images blocked on phone | `http://` image on an `https://` page - use the Vite `/media` proxy or HTTPS |
+| Invoice PDF has no signature | Bucket CORS doesn't allow `GET` from the frontend origin |
+| `403 SignatureDoesNotMatch` / `InvalidArgument` on upload | Wrong `PATH_STYLE`, region, or credentials for this provider |

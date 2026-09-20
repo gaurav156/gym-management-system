@@ -29,7 +29,7 @@ export default function ProfilePage() {
     e.preventDefault()
     setMessage(''); setError('')
     try {
-      const { data } = await api.put<Profile>('/api/profile/me', { name, phone, address, photo })
+      const { data } = await api.put<Profile>('/api/profile/me', { name, phone, address, photo: photo ?? '' })
       setProfile(data)
       setMessage('Profile updated.')
     } catch (err: any) {

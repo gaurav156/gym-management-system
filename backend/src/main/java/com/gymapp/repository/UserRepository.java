@@ -109,4 +109,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     // Used by OwnerSafeguards - counts Owners who can actually still log in, excluding the
     // one being demoted.
     long countByRoleAndActiveTrueAndIdNot(Role role, UUID id);
+
+    // Used only by the one-shot legacy migrator - IDs only so we don't load every base64 blob at once.
+    @Query("SELECT u.id FROM User u WHERE u.photo LIKE 'data:%' OR u.signature LIKE 'data:%'")
+    List<UUID> findIdsWithLegacyImages();
 }

@@ -6,6 +6,8 @@ import com.gymapp.dto.TrainerDtos.UpdateTrainerDatesRequest;
 import com.gymapp.entity.Role;
 import com.gymapp.entity.User;
 import com.gymapp.repository.UserRepository;
+import com.gymapp.storage.ImagePurpose;
+import com.gymapp.storage.ImageRefs;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,9 +21,11 @@ import java.util.UUID;
 public class ManagerDirectoryService {
 
     private final UserRepository userRepository;
+    private final ImageRefs imageRefs;
 
-    public ManagerDirectoryService(UserRepository userRepository) {
+    public ManagerDirectoryService(UserRepository userRepository, ImageRefs imageRefs) {
         this.userRepository = userRepository;
+        this.imageRefs = imageRefs;
     }
 
     // Reuses TrainerSummary's shape (name/email/phone/address/photo/checkinPin +
@@ -38,14 +42,14 @@ public class ManagerDirectoryService {
         if (req.name() != null && !req.name().isBlank()) manager.setName(req.name());
         if (req.phone() != null) manager.setPhone(req.phone());
         if (req.address() != null) manager.setAddress(req.address().isBlank() ? null : req.address());
-        if (req.photo() != null) manager.setPhoto(req.photo().isBlank() ? null : req.photo());
+        manager.setPhoto(imageRefs.resolveForSave(manager.getPhoto(), req.photo(), ImagePurpose.PHOTO));
 
         manager = userRepository.save(manager);
         return toSummary(manager);
     }
 
     private TrainerSummary toSummary(User u) {
-        return new TrainerSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(), u.getPhoto(),
+        return new TrainerSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(), imageRefs.toUrl(u.getPhoto()),
                 u.getCheckinPin(), u.getJoiningDate(), u.getLeftDate());
     }
 

@@ -1,0 +1,39 @@
+services:
+  minio:
+    # MinIO removed its images from Docker Hub - quay.io is their own registry.
+    # The community edition is archived, so `latest` no longer moves. Dev use only.
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001" --certs-dir /certs
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"            # LAN-reachable (phone testing) - set a real password, see below
+      - "127.0.0.1:9001:9001"  # console stays on localhost
+    volumes:
+      - minio-data:/data
+      # mkcert certificate reused from the frontend - MinIO requires these exact file names
+      - ./frontend/.cert/cert.pem:/certs/public.crt:ro
+      - ./frontend/.cert/key.pem:/certs/private.key:ro
+
+  # Creates the bucket and makes objects publicly readable, then exits.
+  minio-init:
+    image: quay.io/minio/mc:latest
+    depends_on: [minio]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    # --insecure on EVERY command: this container reaches MinIO as `minio:9000`, a hostname
+    # the mkcert cert doesn't cover (and the container doesn't trust mkcert's CA anyway).
+    # Acceptable here - it only talks to MinIO over the private compose network.
+    # `$$` stops compose interpolating; the shell inside the container expands them.
+    entrypoint: >
+      /bin/sh -c "
+      until mc --insecure alias set local https://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}; do sleep 1; done;
+      mc --insecure mb --ignore-existing local/gym-media &&
+      mc --insecure anonymous set download local/gym-media &&
+      echo 'gym-media ready';
+      exit 0;"
+
+volumes:
+  minio-data:

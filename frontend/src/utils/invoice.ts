@@ -45,8 +45,8 @@ async function svgUrlToPngDataUrl(url: string, size = 240): Promise<string> {
   }
 }
 
-async function fetchAsDataUrl(url: string): Promise<string> {
-  const res = await fetch(url)
+async function fetchAsDataUrl(url: string, init?: RequestInit): Promise<string> {
+  const res = await fetch(url, init)
   const blob = await res.blob()
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -180,8 +180,20 @@ async function buildInvoiceDoc(inv: InvoiceResponse): Promise<jsPDF> {
   y += 30
 
   const sigX = pageWidth - margin - 120
+
+  let signature: string | null = null
   if (inv.recordedBySignature) {
-    try { doc.addImage(inv.recordedBySignature, dataUrlFormat(inv.recordedBySignature), sigX, y - 34, 120, 40) } catch { /* skip */ }
+    try {
+      signature = inv.recordedBySignature.startsWith('data:')
+        ? inv.recordedBySignature
+        // no-store: an <img> load of the same URL may be cached without CORS headers,
+        // which makes a later cors fetch fail in Chrome.
+        : await fetchAsDataUrl(inv.recordedBySignature, { mode: 'cors', cache: 'no-store' })
+    } catch { signature = null } // invoice still renders, just unsigned
+  }
+
+  if (signature) {
+    try { doc.addImage(signature, dataUrlFormat(signature), sigX, y - 34, 120, 40) } catch { /* skip */ }
   }
   y += 10
   doc.setDrawColor(180)

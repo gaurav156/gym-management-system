@@ -8,6 +8,8 @@ import com.gymapp.entity.Role;
 import com.gymapp.entity.User;
 import com.gymapp.repository.BranchAssignmentRepository;
 import com.gymapp.repository.UserRepository;
+import com.gymapp.storage.ImagePurpose;
+import com.gymapp.storage.ImageRefs;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,11 +21,14 @@ public class TrainerDirectoryService {
 
     private final BranchAssignmentRepository branchAssignmentRepository;
     private final UserRepository userRepository;
+    private final ImageRefs imageRefs;
 
     public TrainerDirectoryService(BranchAssignmentRepository branchAssignmentRepository,
-                                   UserRepository userRepository) {
+                                   UserRepository userRepository,
+                                   ImageRefs imageRefs) {
         this.branchAssignmentRepository = branchAssignmentRepository;
         this.userRepository = userRepository;
+        this.imageRefs = imageRefs;
     }
 
     @Transactional(readOnly = true)
@@ -65,14 +70,14 @@ public class TrainerDirectoryService {
         if (req.name() != null && !req.name().isBlank()) trainer.setName(req.name());
         if (req.phone() != null) trainer.setPhone(req.phone());
         if (req.address() != null) trainer.setAddress(req.address().isBlank() ? null : req.address());
-        if (req.photo() != null) trainer.setPhoto(req.photo().isBlank() ? null : req.photo());
+        trainer.setPhoto(imageRefs.resolveForSave(trainer.getPhoto(), req.photo(), ImagePurpose.PHOTO));
 
         trainer = userRepository.save(trainer);
         return toSummary(trainer);
     }
 
     private TrainerSummary toSummary(User u) {
-        return new TrainerSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(), u.getPhoto(),
+        return new TrainerSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(), imageRefs.toUrl(u.getPhoto()),
                 u.getCheckinPin(), u.getJoiningDate(), u.getLeftDate());
     }
 }

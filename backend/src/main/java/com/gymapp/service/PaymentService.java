@@ -8,6 +8,7 @@ import com.gymapp.entity.Payment;
 import com.gymapp.invoice.InvoiceEmailService;
 import com.gymapp.invoice.InvoiceWhatsAppService;
 import com.gymapp.repository.PaymentRepository;
+import com.gymapp.storage.ImageRefs;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,13 +21,16 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final InvoiceEmailService invoiceEmailService;
     private final InvoiceWhatsAppService invoiceWhatsAppService;
+    private final ImageRefs imageRefs;
 
     public PaymentService(PaymentRepository paymentRepository,
                           InvoiceEmailService invoiceEmailService,
-                          InvoiceWhatsAppService invoiceWhatsAppService) {
+                          InvoiceWhatsAppService invoiceWhatsAppService,
+                          ImageRefs imageRefs) {
         this.paymentRepository = paymentRepository;
         this.invoiceEmailService = invoiceEmailService;
         this.invoiceWhatsAppService = invoiceWhatsAppService;
+        this.imageRefs = imageRefs;
     }
 
     // PaymentService.java
@@ -108,7 +112,7 @@ public class PaymentService {
                 p.getAmount(),
                 p.getMode().name(),
                 p.getRecordedBy().getName(),
-                p.getRecordedBy().getSignature()
+                imageRefs.toUrl(p.getRecordedBy().getSignature())
         );
     }
 
