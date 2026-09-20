@@ -1,7 +1,6 @@
 package com.gymapp.controller;
 
 import com.gymapp.dto.RoleChangeDtos.*;
-import com.gymapp.service.OwnerPromotionOtpService;
 import com.gymapp.service.RoleChangeService;
 import com.gymapp.service.UserManagementService;
 import jakarta.validation.Valid;
@@ -22,14 +21,11 @@ public class UserManagementController {
 
     private final UserManagementService userManagementService;
     private final RoleChangeService roleChangeService;
-    private final OwnerPromotionOtpService ownerPromotionOtpService;
 
     public UserManagementController(UserManagementService userManagementService,
-                                    RoleChangeService roleChangeService,
-                                    OwnerPromotionOtpService ownerPromotionOtpService) {
+                                    RoleChangeService roleChangeService) {
         this.userManagementService = userManagementService;
         this.roleChangeService = roleChangeService;
-        this.ownerPromotionOtpService = ownerPromotionOtpService;
     }
 
     @DeleteMapping("/{userId}")
@@ -40,13 +36,14 @@ public class UserManagementController {
         userManagementService.deleteUser(userId, callerId);
     }
 
-    // Step 1 of promoting someone to OWNER: emails a code to the calling Owner.
+    // Step 1 of any change that crosses the Owner boundary. If the target is currently an
+    // Owner (demotion) the code goes to OWNER_EMAIL; otherwise (promotion) to the caller.
     @PostMapping("/{userId}/role/request-otp")
     @PreAuthorize("hasRole('OWNER')")
-    public RequestOwnerPromotionOtpResponse requestOwnerPromotionOtp(@PathVariable UUID userId,
-                                                                     Authentication authentication) {
+    public RequestOwnerPromotionOtpResponse requestRoleChangeOtp(@PathVariable UUID userId,
+                                                                 Authentication authentication) {
         UUID callerId = UUID.fromString((String) authentication.getDetails());
-        return ownerPromotionOtpService.requestOtp(callerId, userId);
+        return roleChangeService.requestOtp(callerId, userId);
     }
 
     @PutMapping("/{userId}/role")
@@ -54,7 +51,7 @@ public class UserManagementController {
     public ChangeRoleResponse changeRole(@PathVariable UUID userId, @Valid @RequestBody ChangeRoleRequest req,
                                          Authentication authentication) {
         UUID callerId = UUID.fromString((String) authentication.getDetails());
-        return roleChangeService.changeRole(userId, req.newRole(), callerId, req.otp());
+        return roleChangeService.changeRole(userId, req.newRole(), callerId, req.otp(), req.branchIds());
     }
 
     @GetMapping("/{userId}/role-history")

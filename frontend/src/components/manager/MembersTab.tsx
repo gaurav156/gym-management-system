@@ -8,7 +8,7 @@ import ConfirmDialog from '../ConfirmDialog'
 import { TableSkeleton } from '../Skeleton'
 import { useConfirm } from '../../hooks/useConfirm'
 import Spinner from '../Spinner'
-import OwnerPromotionDialog from '../OwnerPromotionDialog'
+import RoleChangeOtpDialog, { type RoleChangeOtpTarget } from '../RoleChangeOtpDialog'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -42,7 +42,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [roleHistory, setRoleHistory] = useState<RoleHistoryEntry[]>([])
   const [selectedNewRole, setSelectedNewRole] = useState('')
   const [changingRole, setChangingRole] = useState(false)
-  const [promotionTarget, setPromotionTarget] = useState<{ id: string; name: string } | null>(null)
+  const [promotionTarget, setPromotionTarget] = useState<RoleChangeOtpTarget | null>(null)
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editStartDate, setEditStartDate] = useState('')
@@ -330,7 +330,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     }
 
     if (selectedNewRole === 'OWNER') {
-      setPromotionTarget({ id: member.id, name: member.name })
+      setPromotionTarget({ id: member.id, name: member.name, newRole: 'OWNER' })
       return
     }
 
@@ -870,10 +870,10 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       )}
 
       <ConfirmDialog {...dialogProps} />
-      <OwnerPromotionDialog
+      <RoleChangeOtpDialog
         target={promotionTarget}
         onClose={() => setPromotionTarget(null)}
-        onPromoted={() => {
+        onDone={() => {
           setPromotionTarget(null)
           setDetailMemberId(null)
           loadMembers(0, memberSearch, memberStatusFilter, memberSort)

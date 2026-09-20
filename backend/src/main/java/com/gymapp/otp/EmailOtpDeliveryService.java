@@ -73,6 +73,7 @@ public class EmailOtpDeliveryService implements OtpDeliveryService {
             case CHANGE_PASSWORD -> "Your " + gymName + " password change code";
             case REGISTRATION -> "Your " + gymName + " verification code";
             case OWNER_PROMOTION -> "Your " + gymName + " Owner access confirmation code";
+            case OWNER_DEMOTION -> "Your " + gymName + " Owner demotion confirmation code";
         };
     }
 
@@ -83,6 +84,7 @@ public class EmailOtpDeliveryService implements OtpDeliveryService {
             case CHANGE_PASSWORD -> "Use the code below to confirm your password change.";
             case REGISTRATION -> "Use the code below to verify your email and finish creating your account.";
             case OWNER_PROMOTION -> "Use the code below to confirm granting Owner access to another account.";
+            case OWNER_DEMOTION -> "Use the code below to confirm removing Owner access from another account.";
         };
     }
 
@@ -98,6 +100,9 @@ public class EmailOtpDeliveryService implements OtpDeliveryService {
             case OWNER_PROMOTION ->
                     "Didn't request this? Ignore this email - nobody gets Owner access without this code. "
                             + "If you didn't start this, consider changing your password.";
+            case OWNER_DEMOTION ->
+                    "Didn't expect this? Ignore this email - no Owner is demoted without this code. "
+                            + "If you didn't expect it, consider changing your password.";
         };
     }
 

@@ -6,7 +6,7 @@ import type { Branch, StaffSummary, AttendanceLogEntry, AuthUser, RoleHistoryEnt
 import ConfirmDialog from '../ConfirmDialog'
 import { TableSkeleton } from '../Skeleton'
 import { useConfirm } from '../../hooks/useConfirm'
-import OwnerPromotionDialog from '../OwnerPromotionDialog'
+import RoleChangeOtpDialog, { type RoleChangeOtpTarget } from '../RoleChangeOtpDialog'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -73,7 +73,8 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const [roleHistory, setRoleHistory] = useState<RoleHistoryEntry[]>([])
   const [selectedNewRole, setSelectedNewRole] = useState('')
   const [changingRole, setChangingRole] = useState(false)
-  const [promotionTarget, setPromotionTarget] = useState<{ id: string; name: string } | null>(null)
+  const [otpTarget, setOtpTarget] = useState<RoleChangeOtpTarget | null>(null)
+  const [demotionBranchIds, setDemotionBranchIds] = useState<string[]>([])
 
   function loadStaff(page = 0, roleFilter = staffRoleFilter, includeLeft = showLeftStaff, sort = staffSort) {
     if (!selectedBranch) return
@@ -132,6 +133,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     setEditingStaffBranches(false)
     setEditingStaffDates(false)
     setSelectedNewRole('')
+    setDemotionBranchIds([])
     setRoleHistory([])
     if (detailStaffId) {
       const s = staff.find((x) => x.id === detailStaffId)
@@ -253,15 +255,26 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   // Owner-only. A role change can move this person out of the Staff directory entirely
   // (e.g. Manager -> Member), so the modal closes and both the branch list and any
   // dependent state get refreshed rather than trying to patch the row in place.
+  // Anything crossing the Owner boundary goes through the OTP dialog instead of the plain
+  // confirm: promoting TO Owner, and demoting FROM Owner (which also needs branches, since
+  // an Owner may have none and would otherwise disappear from this list).
   function changeRole(s: StaffSummary) {
     if (!selectedNewRole) {
       setStaffModalMessage('Select a role to change to.')
       return
     }
 
+    if (s.role === 'OWNER') {
+      if (demotionBranchIds.length === 0) {
+        setStaffModalMessage('Select at least one branch to assign them to.')
+        return
+      }
+      setOtpTarget({ id: s.id, name: s.name, newRole: selectedNewRole, branchIds: demotionBranchIds })
+      return
+    }
+
     if (selectedNewRole === 'OWNER') {
-      // Owner promotion has its own OTP-gated dialog instead of the plain confirm
-      setPromotionTarget({ id: s.id, name: s.name })
+      setOtpTarget({ id: s.id, name: s.name, newRole: 'OWNER' })
       return
     }
 
@@ -269,8 +282,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       title: 'Change role',
       message: `Change ${s.name}'s role from ${roleLabel(s.role)} to ${roleLabel(selectedNewRole)}? ` +
         `This takes effect immediately for new logins, but anyone already signed in keeps ` +
-        `their current access until their session expires or they log in again. ` +
-        `Choosing Owner requires a verification code emailed to you.`,
+        `their current access until their session expires or they log in again.`,
       confirmLabel: 'Change role',
       onConfirm: async () => {
         setChangingRole(true)
@@ -300,7 +312,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
 
   // Delete and Change Role are both Owner-only, and never for the Owner's own account.
   const canDelete = detailStaff && detailStaff.role !== 'OWNER' && user?.role === 'OWNER'
-  const canChangeRole = detailStaff && detailStaff.role !== 'OWNER' && user?.role === 'OWNER'
+  const canChangeRole = detailStaff && user?.role === 'OWNER' && detailStaff.id !== user.userId
 
   const roleOptions = detailStaff ? CHANGEABLE_ROLES.filter((r) => r !== detailStaff.role) : []
 
@@ -513,7 +525,12 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                       </button>
                     )}
                     {detailStaff.role === 'OWNER' && user?.role === 'OWNER' && (
-                      <p className="text-xs text-gray-400">Owner info is edited from the Profile page.</p>
+                      <>
+                        <p className="text-xs text-gray-400">Owner info is edited from the Profile page.</p>
+                        <p className="text-xs text-gray-400">
+                          To delete an Owner account, first change their role (below), then delete it.
+                        </p>
+                      </>
                     )}
                   </>
                 )}
@@ -573,8 +590,11 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                     <div className="rounded-md border border-gray-200 p-3">
                       <p className="text-xs font-medium text-gray-700">Change role</p>
                       <p className="mt-1 text-xs text-gray-500">
-                        Moving this person off staff (e.g. to Member) automatically sets today as their
-                        left date. Moving someone onto staff sets today as their joining date.
+                        {detailStaff.role === 'OWNER'
+                          ? "Demoting an Owner needs a code emailed to the primary Owner's address (OWNER_EMAIL), " +
+                            'and at least one other active Owner must exist. Once demoted you can delete the account.'
+                          : 'Moving this person off staff (e.g. to Member) automatically sets today as their ' +
+                            'left date. Moving someone onto staff sets today as their joining date.'}
                       </p>
                       <div className="mt-2 flex items-center gap-2">
                         <select value={selectedNewRole} onChange={(e) => setSelectedNewRole(e.target.value)}
@@ -587,6 +607,21 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                           {changingRole ? 'Changing...' : 'Change role'}
                         </button>
                       </div>
+                      {detailStaff.role === 'OWNER' && selectedNewRole && (
+                        <div className="mt-3 rounded-md border border-gray-300 p-2 text-sm">
+                          <p className="mb-1 text-xs text-gray-500">
+                            Owners have access everywhere - pick the branch(es) they should belong to after demotion.
+                          </p>
+                          {allBranches.map((b) => (
+                            <label key={b.id} className="flex items-center gap-2 py-1">
+                              <input type="checkbox" checked={demotionBranchIds.includes(b.id)}
+                                onChange={() => setDemotionBranchIds((ids) =>
+                                  ids.includes(b.id) ? ids.filter((x) => x !== b.id) : [...ids, b.id])} />
+                              {b.name}
+                            </label>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {roleHistory.length > 0 && (
@@ -691,10 +726,10 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
         </div>
       )}
       <ConfirmDialog {...dialogProps} />
-      <OwnerPromotionDialog
-        target={promotionTarget}
-        onClose={() => setPromotionTarget(null)}
-        onPromoted={() => { setPromotionTarget(null); setDetailStaffId(null); loadStaff(0) }}
+      <RoleChangeOtpDialog
+        target={otpTarget}
+        onClose={() => setOtpTarget(null)}
+        onDone={() => { setOtpTarget(null); setDetailStaffId(null); loadStaff(0) }}
       />
     </div>
   )

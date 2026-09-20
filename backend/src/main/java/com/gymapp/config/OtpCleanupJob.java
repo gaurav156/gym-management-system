@@ -1,6 +1,7 @@
 package com.gymapp.config;
 
 import com.gymapp.repository.ChangePasswordOtpRepository;
+import com.gymapp.repository.OwnerDemotionOtpRepository;
 import com.gymapp.repository.OwnerPromotionOtpRepository;
 import com.gymapp.repository.PasswordResetOtpRepository;
 import com.gymapp.repository.RegistrationOtpRepository;
@@ -20,15 +21,18 @@ public class OtpCleanupJob {
     private final ChangePasswordOtpRepository changePasswordOtpRepository;
     private final RegistrationOtpRepository registrationOtpRepository;
     private final OwnerPromotionOtpRepository ownerPromotionOtpRepository;
+    private final OwnerDemotionOtpRepository ownerDemotionOtpRepository;
 
     public OtpCleanupJob(PasswordResetOtpRepository otpRepository,
                          ChangePasswordOtpRepository changePasswordOtpRepository,
                          RegistrationOtpRepository registrationOtpRepository,
-                         OwnerPromotionOtpRepository ownerPromotionOtpRepository) {
+                         OwnerPromotionOtpRepository ownerPromotionOtpRepository,
+                         OwnerDemotionOtpRepository ownerDemotionOtpRepository) {
         this.otpRepository = otpRepository;
         this.changePasswordOtpRepository = changePasswordOtpRepository;
         this.registrationOtpRepository = registrationOtpRepository;
         this.ownerPromotionOtpRepository = ownerPromotionOtpRepository;
+        this.ownerDemotionOtpRepository = ownerDemotionOtpRepository;
     }
 
     @Scheduled(cron = "0 0 3 * * *") // 3:00 AM server time, daily
@@ -49,6 +53,10 @@ public class OtpCleanupJob {
         int deletedPromotions = ownerPromotionOtpRepository.deleteConsumedOrExpired(LocalDateTime.now());
         if (deletedPromotions > 0) {
             System.out.println("OtpCleanupJob: removed " + deletedPromotions + " consumed/expired owner-promotion OTP row(s)");
+        }
+        int deletedDemotions = ownerDemotionOtpRepository.deleteConsumedOrExpired(LocalDateTime.now());
+        if (deletedDemotions > 0) {
+            System.out.println("OtpCleanupJob: removed " + deletedDemotions + " consumed/expired owner-demotion OTP row(s)");
         }
     }
 }

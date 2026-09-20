@@ -105,4 +105,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             nativeQuery = true)
     Page<User> findStaffForBranch(@Param("branchId") UUID branchId, @Param("role") String role,
                                   @Param("includeLeft") boolean includeLeft, @Param("sort") String sort, Pageable pageable);
+
+    // Used by OwnerSafeguards - counts Owners who can actually still log in, excluding the
+    // one being demoted.
+    long countByRoleAndActiveTrueAndIdNot(Role role, UUID id);
 }

@@ -4,16 +4,29 @@ import Spinner from './Spinner'
 
 const RESEND_COOLDOWN_SECONDS = 60
 
-interface Props {
-  target: { id: string; name: string } | null
-  onClose: () => void
-  onPromoted: () => void
+export interface RoleChangeOtpTarget {
+  id: string
+  name: string
+  newRole: string
+  // Only sent when demoting an Owner - where the demoted person should be assigned.
+  branchIds?: string[]
 }
 
-// Two-step confirmation for granting Owner access: (1) emails a code to the CURRENT
-// Owner's own address, (2) that code + the role change go to the backend together. The
-// backend enforces the OTP - this is just the UI for it.
-export default function OwnerPromotionDialog({ target, onClose, onPromoted }: Props) {
+interface Props {
+  target: RoleChangeOtpTarget | null
+  onClose: () => void
+  onDone: () => void
+}
+
+function roleLabel(role: string): string {
+  return role === 'OWNER' ? 'Owner' : role === 'MANAGER' ? 'Manager' : role === 'TRAINER' ? 'Trainer' : 'Member'
+}
+
+// Two-step confirmation for role changes that cross the Owner boundary. Promotion to Owner:
+// the code is emailed to the acting Owner. Demotion of an Owner: it's emailed to the
+// primary Owner address (OWNER_EMAIL). The backend picks the recipient from the target's
+// current role and enforces the OTP - this is just the UI for it.
+export default function RoleChangeOtpDialog({ target, onClose, onDone }: Props) {
   const [step, setStep] = useState<'INTRO' | 'OTP'>('INTRO')
   const [otp, setOtp] = useState('')
   const [error, setError] = useState('')
@@ -31,7 +44,7 @@ export default function OwnerPromotionDialog({ target, onClose, onPromoted }: Pr
   useEffect(() => {
     setStep('INTRO'); setOtp(''); setError(''); setMessage(''); setResendCooldown(0)
     stopCooldown()
-  }, [target?.id])
+  }, [target?.id, target?.newRole])
 
   useEffect(() => stopCooldown, [])
 
@@ -48,6 +61,7 @@ export default function OwnerPromotionDialog({ target, onClose, onPromoted }: Pr
 
   if (!target) return null
 
+  const isPromotion = target.newRole === 'OWNER'
   const busy = sending || submitting
 
   async function sendCode() {
@@ -66,15 +80,17 @@ export default function OwnerPromotionDialog({ target, onClose, onPromoted }: Pr
     }
   }
 
-  async function confirmPromotion(e: FormEvent) {
+  async function confirm(e: FormEvent) {
     e.preventDefault()
     if (!target || submitting) return
     setError(''); setSubmitting(true)
     try {
-      await api.put(`/api/owner/users/${target.id}/role`, { newRole: 'OWNER', otp })
-      onPromoted()
+      await api.put(`/api/owner/users/${target.id}/role`, {
+        newRole: target.newRole, otp, branchIds: target.branchIds,
+      })
+      onDone()
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to grant Owner access')
+      setError(err.response?.data?.error || 'Failed to change role')
     } finally {
       setSubmitting(false)
     }
@@ -84,12 +100,20 @@ export default function OwnerPromotionDialog({ target, onClose, onPromoted }: Pr
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
       onClick={() => !busy && onClose()} role="dialog" aria-modal="true">
       <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-base font-semibold text-gray-900">Make {target.name} an Owner</h3>
-        <p className="mt-2 text-sm text-gray-600">
-          Owners have full access to every branch, all accounts, and all payments. An Owner's
-          role can't be changed afterwards, and Owner accounts can't be deleted. Confirm with a
-          code we'll email to <em>you</em>.
-        </p>
+        <h3 className="text-base font-semibold text-gray-900">
+          {isPromotion ? `Make ${target.name} an Owner` : `Change ${target.name}'s role to ${roleLabel(target.newRole)}`}
+        </h3>
+        {isPromotion ? (
+          <p className="mt-2 text-sm text-gray-600">
+            Owners have full access to every branch, all accounts, and all payments. Confirm with a
+            code we'll email to <em>you</em>.
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-gray-600">
+            This removes {target.name}'s Owner access. Confirm with a code we'll email to the
+            <em> primary Owner's address</em> (the OWNER_EMAIL set on the server).
+          </p>
+        )}
 
         {message && <p className="mt-3 text-sm text-green-700">{message}</p>}
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
@@ -107,7 +131,7 @@ export default function OwnerPromotionDialog({ target, onClose, onPromoted }: Pr
             </button>
           </div>
         ) : (
-          <form onSubmit={confirmPromotion} className="mt-4 space-y-3">
+          <form onSubmit={confirm} className="mt-4 space-y-3">
             <div>
               <label className="block text-xs text-gray-500">6-digit code</label>
               <input required disabled={submitting} maxLength={6} value={otp}
@@ -127,7 +151,7 @@ export default function OwnerPromotionDialog({ target, onClose, onPromoted }: Pr
                 <button type="submit" disabled={submitting || otp.length !== 6}
                   className="flex items-center gap-2 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70">
                   {submitting && <Spinner className="h-3.5 w-3.5" />}
-                  {submitting ? 'Granting...' : 'Make Owner'}
+                  {submitting ? 'Working...' : isPromotion ? 'Make Owner' : 'Change role'}
                 </button>
               </div>
             </div>
