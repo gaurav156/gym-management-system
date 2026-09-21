@@ -87,3 +87,9 @@ app:
       access-key: ${STORAGE_S3_ACCESS_KEY:minioadmin}
       secret-key: ${STORAGE_S3_SECRET_KEY:minioadmin}
       path-style: ${STORAGE_S3_PATH_STYLE:true}                # true for MinIO/Supabase, false for AWS/R2
+    cleanup:
+      enabled: ${STORAGE_CLEANUP_ENABLED:true}
+      cron: ${STORAGE_CLEANUP_CRON:0 30 3 * * *}        # 3:30 AM server time, daily
+      min-age-hours: ${STORAGE_CLEANUP_MIN_AGE_HOURS:24}
+      max-delete: ${STORAGE_CLEANUP_MAX_DELETE:200}
+      dry-run: ${STORAGE_CLEANUP_DRY_RUN:false}

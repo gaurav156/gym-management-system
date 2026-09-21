@@ -113,4 +113,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     // Used only by the one-shot legacy migrator - IDs only so we don't load every base64 blob at once.
     @Query("SELECT u.id FROM User u WHERE u.photo LIKE 'data:%' OR u.signature LIKE 'data:%'")
     List<UUID> findIdsWithLegacyImages();
+
+    // Used by OrphanImageCleanupJob. Legacy base64 rows are excluded so we never load those blobs.
+    @Query("SELECT u.photo FROM User u WHERE u.photo IS NOT NULL AND u.photo NOT LIKE 'data:%'")
+    List<String> findAllPhotoKeys();
+
+    @Query("SELECT u.signature FROM User u WHERE u.signature IS NOT NULL AND u.signature NOT LIKE 'data:%'")
+    List<String> findAllSignatureKeys();
 }

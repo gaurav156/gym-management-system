@@ -183,6 +183,7 @@ run on HTTPS together locally and mobile browsers don't hit "Mixed Content" erro
 calling the API. Set `SSL_ENABLED=true` and point `VITE_API_URL` at `https://` when you
 need this (e.g. testing QR camera scan on a phone); leave `SSL_ENABLED=false` for normal
 HTTP-only local dev.
+
 ---
 
 ## 5. Database Migrations (Flyway)
@@ -229,16 +230,20 @@ environment variables differ.
 
 ### 6.1 Environment variables (backend)
 
-| Variable | Meaning |
-|---|---|
-| `STORAGE_PROVIDER` | `s3` (default). Other values need a new `StorageService` implementation (§6.5) |
-| `STORAGE_S3_ENDPOINT` | S3 API endpoint the **backend** talks to. Blank for real AWS S3 |
-| `STORAGE_S3_REGION` | Region (`auto` for R2) |
-| `STORAGE_S3_BUCKET` | Bucket name |
-| `STORAGE_S3_ACCESS_KEY` / `STORAGE_S3_SECRET_KEY` | Credentials with read/write on the bucket |
-| `STORAGE_S3_PATH_STYLE` | `true` for MinIO/Supabase, `false` for AWS S3/R2 |
-| `STORAGE_PUBLIC_BASE_URL` | Base URL **browsers** use to load images. Absolute URL, or `/media` in local dev |
-| `STORAGE_MIGRATE_LEGACY` | `true` for one startup to convert old base64 photos, then back to `false` |
+| Variable                                                 | Meaning                                                                                                                                                   |
+|----------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `STORAGE_PROVIDER`                                       | `s3` (default). Other values need a new `StorageService` implementation ([§6.5 Adding a non-S3 provider](#65-adding-a-non-s3-provider-eg-cloudinary-gcs)) |
+| `STORAGE_S3_ENDPOINT`                                    | S3 API endpoint the **backend** talks to. Blank for real AWS S3                                                                                           |
+| `STORAGE_S3_REGION`                                      | Region (`auto` for R2)                                                                                                                                    |
+| `STORAGE_S3_BUCKET`                                      | Bucket name                                                                                                                                               |
+| `STORAGE_S3_ACCESS_KEY` / `STORAGE_S3_SECRET_KEY`        | Credentials with read/write on the bucket                                                                                                                 |
+| `STORAGE_S3_PATH_STYLE`                                  | `true` for MinIO/Supabase, `false` for AWS S3/R2                                                                                                          |
+| `STORAGE_PUBLIC_BASE_URL`                                | Base URL **browsers** use to load images. Absolute URL, or `/media` in local dev                                                                          |
+| `STORAGE_MIGRATE_LEGACY`                                 | `true` for one startup to convert old base64 photos, then back to `false`                                                                                 |
+| `STORAGE_CLEANUP_ENABLED`                                | `true` (default). Daily job deleting stored images no user references                                                                                     |
+| `STORAGE_CLEANUP_CRON` / `STORAGE_CLEANUP_MIN_AGE_HOURS` | Schedule (default 3:30 AM) / minimum object age before it's eligible (default 24)                                                                         |
+| `STORAGE_CLEANUP_MAX_DELETE`                             | Safety brake: abort if more than this many orphans are found (default 200)                                                                                |
+| `STORAGE_CLEANUP_DRY_RUN`                                | `true` = log only, delete nothing                                                                                                                         |
 
 The endpoint (backend → storage) and the public base URL (browser → storage) are deliberately
 separate settings - they are usually different addresses.
@@ -265,7 +270,7 @@ export STORAGE_PUBLIC_BASE_URL=/media
 ```
 
 `vite.config.ts` proxies `/media/*` to MinIO, so images load over the same HTTPS origin as
-the app - no mixed-content errors on your phone (§4) and no extra certificates. Because the
+the app - no mixed-content errors on your phone ([§4](#4-https-for-local-mobile-testing-mkcert)) and no extra certificates. Because the
 base URL is relative, it works from `localhost` and your LAN IP without changes.
 
 **Alternative - MinIO over HTTPS directly:** mount the mkcert files as `/certs/public.crt` and
@@ -326,7 +331,7 @@ user limited to that bucket. Leave `STORAGE_S3_ENDPOINT` blank, set the bucket's
 Existing objects are addressed by key, so switching means copying the objects and changing env
 vars. Nothing in the database changes.
 
-1. **Create** the new bucket (public read + CORS, see §6.3) and credentials.
+1. **Create** the new bucket (public read + CORS, see [§6.3](#63-production-providers)) and credentials.
 2. **Copy** existing objects with the same keys, e.g. with [rclone](https://rclone.org):
 ```bash
    # ~/.config/rclone/rclone.conf defines two remotes, `old` and `new` (type = s3, with
@@ -359,11 +364,25 @@ displaying in the meantime.
 
 ### 6.7 Troubleshooting
 
-| Symptom | Cause / fix |
-|---|---|
-| `pull access denied for minio/minio` | Image removed from Docker Hub - use `quay.io/minio/minio` |
-| Upload returns 500 / `PKIX path building failed` | JVM doesn't trust the HTTPS certificate of the endpoint (MinIO-over-HTTPS only; see §6.2) |
-| Upload works but image shows broken | `STORAGE_PUBLIC_BASE_URL` wrong, or bucket isn't public-read |
-| Images blocked on phone | `http://` image on an `https://` page - use the Vite `/media` proxy or HTTPS |
-| Invoice PDF has no signature | Bucket CORS doesn't allow `GET` from the frontend origin |
-| `403 SignatureDoesNotMatch` / `InvalidArgument` on upload | Wrong `PATH_STYLE`, region, or credentials for this provider |
+| Symptom                                                   | Cause / fix                                                                                                                   |
+|-----------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| `pull access denied for minio/minio`                      | Image removed from Docker Hub - use `quay.io/minio/minio`                                                                     |
+| Upload returns 500 / `PKIX path building failed`          | JVM doesn't trust the HTTPS certificate of the endpoint (MinIO-over-HTTPS only; see [§6.2](#62-local-development-with-minio)) |
+| Upload works but image shows broken                       | `STORAGE_PUBLIC_BASE_URL` wrong, or bucket isn't public-read                                                                  |
+| Images blocked on phone                                   | `http://` image on an `https://` page - use the Vite `/media` proxy or HTTPS                                                  |
+| Invoice PDF has no signature                              | Bucket CORS doesn't allow `GET` from the frontend origin                                                                      |
+| `403 SignatureDoesNotMatch` / `InvalidArgument` on upload | Wrong `PATH_STYLE`, region, or credentials for this provider                                                                  |
+
+### 6.8 Orphaned image cleanup
+
+An image is uploaded the moment it's picked, before the form is saved, so abandoning the form
+leaves an unreferenced object in the bucket. `OrphanImageCleanupJob` deletes these daily: it
+compares the objects under `avatars/` and `signatures/` with `users.photo`/`users.signature`
+and removes unreferenced ones older than `STORAGE_CLEANUP_MIN_AGE_HOURS`.
+
+- Run it with `STORAGE_CLEANUP_DRY_RUN=true` once in a new environment and check the log first.
+- **Never share one bucket between two environments' databases** (e.g. dev DB + prod bucket) -
+  each would treat the other's images as orphans. Use one bucket per environment.
+- The bucket credentials need list permission (`s3:ListBucket` on AWS).
+- A form left open longer than the age threshold and saved afterwards would reference a
+  deleted image - keep the threshold well above how long an edit dialog stays open.

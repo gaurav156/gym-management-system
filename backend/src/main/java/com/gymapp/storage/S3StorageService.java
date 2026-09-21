@@ -14,9 +14,12 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 // One implementation covers MinIO, Cloudflare R2, AWS S3, Backblaze B2, Supabase Storage -
@@ -79,6 +82,15 @@ public class S3StorageService implements StorageService {
     public Optional<String> keyFromUrl(String url) {
         String prefix = publicBaseUrl + "/";
         return url.startsWith(prefix) ? Optional.of(url.substring(prefix.length())) : Optional.empty();
+    }
+
+    @Override
+    public List<StoredObject> list(String prefix) {
+           List<StoredObject> out = new ArrayList<>();
+           s3.listObjectsV2Paginator(ListObjectsV2Request.builder().bucket(bucket).prefix(prefix).build())
+               .contents()
+               .forEach(o -> out.add(new StoredObject(o.key(), o.lastModified())));
+           return out;
     }
 
     @PreDestroy
