@@ -6,6 +6,7 @@ import PhotoUploadButton from '../components/PhotoUploadButton'
 import ChangePasswordSection from '../components/ChangePasswordSection'
 import Spinner from '../components/Spinner'
 import type { Profile, AttendanceLogEntry, PageResponse } from '../types'
+import Avatar from '../components/Avatar'
 
 const PAGE_SIZE = 5
 
@@ -125,13 +126,7 @@ export default function StaffProfilePage() {
                 <div className="mt-6">
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="flex flex-col items-center gap-3">
-                            {photo ? (
-                                <img src={photo} alt="Profile" className="h-24 w-24 flex-shrink-0 rounded-full object-cover" />
-                            ) : (
-                                <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-2xl font-medium text-gray-500">
-                                    {profile.name.charAt(0).toUpperCase()}
-                                </div>
-                            )}
+                            <Avatar src={photo} name={profile.name} className="h-24 w-24" textClassName="text-2xl" />
                             <PhotoUploadButton onLoaded={setPhoto} onError={setError} label="Upload photo" />
                             {photo && (
                                 <button type="button" onClick={() => setPhoto(null)} className="text-xs text-red-600 hover:underline">

@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import PhotoUploadButton from '../components/PhotoUploadButton'
 import ChangePasswordSection from '../components/ChangePasswordSection'
 import type { Profile } from '../types'
+import Avatar from '../components/Avatar'
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -45,13 +46,7 @@ export default function ProfilePage() {
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div className="flex flex-col items-center gap-3">
-          {photo ? (
-            <img src={photo} alt="Profile" className="h-24 w-24 flex-shrink-0 rounded-full object-cover" />
-          ) : (
-            <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-2xl font-medium text-gray-500">
-              {profile.name.charAt(0).toUpperCase()}
-            </div>
-          )}
+          <Avatar src={photo} name={profile.name} className="h-24 w-24" textClassName="text-2xl" />
           <PhotoUploadButton onLoaded={setPhoto} onError={setError} label="Upload photo" />
           {photo && (
             <button type="button" onClick={() => setPhoto(null)} className="text-xs text-red-600 hover:underline">

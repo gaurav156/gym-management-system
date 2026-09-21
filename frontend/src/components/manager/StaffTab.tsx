@@ -7,6 +7,7 @@ import ConfirmDialog from '../ConfirmDialog'
 import { TableSkeleton } from '../Skeleton'
 import { useConfirm } from '../../hooks/useConfirm'
 import RoleChangeOtpDialog, { type RoleChangeOtpTarget } from '../RoleChangeOtpDialog'
+import Avatar from '../Avatar'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -368,13 +369,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                 <tr key={s.id}>
                   <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">
-                      {s.photo ? (
-                        <img src={s.photo} alt="" className="h-6 w-6 flex-shrink-0 rounded-full object-cover" />
-                      ) : (
-                        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] text-gray-500">
-                          {s.name.charAt(0).toUpperCase()}
-                        </span>
-                      )}
+                      <Avatar src={s.photo} name={s.name} className="h-6 w-6" textClassName="text-[10px]" />
                       {s.name}
                       {s.leftDate && (s.role === 'TRAINER' || s.role === 'MANAGER') && (
                         <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">Left</span>
@@ -423,13 +418,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                {detailStaff.photo ? (
-                  <img src={detailStaff.photo} alt="" className="h-12 w-12 flex-shrink-0 rounded-full object-cover" />
-                ) : (
-                  <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
-                    {detailStaff.name.charAt(0).toUpperCase()}
-                  </span>
-                )}
+                <Avatar src={detailStaff.photo} name={detailStaff.name} className="h-12 w-12" textClassName="text-lg" />
                 <div>
                   <h3 className="text-lg font-medium">{detailStaff.name}</h3>
                   <p className="text-xs text-gray-500">
@@ -463,13 +452,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                 {editingStaffInfo ? (
                   <div className="space-y-3 rounded-md border border-gray-200 p-3">
                     <div className="flex items-center gap-3">
-                      {staffEditPhoto ? (
-                        <img src={staffEditPhoto} alt="" className="h-14 w-14 flex-shrink-0 rounded-full object-cover" />
-                      ) : (
-                        <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
-                          {staffEditName.charAt(0).toUpperCase()}
-                        </span>
-                      )}
+                      <Avatar src={staffEditPhoto} name={staffEditName} className="h-14 w-14" textClassName="text-lg" />
                       <div className="flex flex-col items-start gap-1.5">
                         <PhotoUploadButton onLoaded={setStaffEditPhoto} onError={setStaffModalMessage} label="Change photo" size="sm" />
                         {staffEditPhoto && (

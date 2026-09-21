@@ -9,6 +9,7 @@ import { TableSkeleton } from '../Skeleton'
 import { useConfirm } from '../../hooks/useConfirm'
 import Spinner from '../Spinner'
 import RoleChangeOtpDialog, { type RoleChangeOtpTarget } from '../RoleChangeOtpDialog'
+import Avatar from '../Avatar'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -445,13 +446,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                   <tr key={member.id}>
                     <td className="py-2 pr-4">
                       <div className="flex items-center gap-2">
-                        {member.photo ? (
-                          <img src={member.photo} alt="" className="h-6 w-6 flex-shrink-0 rounded-full object-cover" />
-                        ) : (
-                          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] text-gray-500">
-                            {member.name.charAt(0).toUpperCase()}
-                          </span>
-                        )}
+                        <Avatar src={member.photo} name={member.name} className="h-6 w-6" textClassName="text-[10px]" />
                         {member.name}
                       </div>
                     </td>
@@ -498,13 +493,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                {detailMember.photo ? (
-                  <img src={detailMember.photo} alt="" className="h-12 w-12 flex-shrink-0 rounded-full object-cover" />
-                ) : (
-                  <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
-                    {detailMember.name.charAt(0).toUpperCase()}
-                  </span>
-                )}
+                <Avatar src={detailMember.photo} name={detailMember.name} className="h-12 w-12" textClassName="text-lg" />
                 <div>
                   <h3 className="text-lg font-medium">{detailMember.name}</h3>
                   <p className="text-xs text-gray-500">{detailMember.email} · PIN {detailMember.checkinPin ?? '—'}</p>
@@ -534,13 +523,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                 {editingMemberInfo ? (
                   <div className="space-y-3 rounded-md border border-gray-200 p-3">
                     <div className="flex items-center gap-3">
-                      {memberEditPhoto ? (
-                        <img src={memberEditPhoto} alt="" className="h-14 w-14 flex-shrink-0 rounded-full object-cover" />
-                      ) : (
-                        <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-gray-200 text-lg text-gray-500">
-                          {memberEditName.charAt(0).toUpperCase()}
-                        </span>
-                      )}
+                      <Avatar src={memberEditPhoto} name={memberEditName} className="h-14 w-14" textClassName="text-lg" />
                       <div className="flex flex-col items-start gap-1.5">
                         <PhotoUploadButton onLoaded={setMemberEditPhoto} onError={setMemberModalMessage} label="Change photo" size="sm" />
                         {memberEditPhoto && (
