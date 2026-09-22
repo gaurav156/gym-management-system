@@ -145,7 +145,7 @@ async function buildInvoiceDoc(inv: InvoiceResponse): Promise<jsPDF> {
   doc.line(margin, y, pageWidth - margin, y)
   y += 24
 
-  const col1 = margin, col2 = margin + 260, col3 = margin + 380, col4 = pageWidth - margin
+  const col1 = margin, col2 = margin + 200, col3 = margin + 360, col4 = pageWidth - margin
 
   doc.setFont('helvetica', 'bold')
   doc.text('Description', col1, y)
