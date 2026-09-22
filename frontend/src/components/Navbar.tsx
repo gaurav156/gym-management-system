@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { getDashboardPath } from '../utils/navigation'
+import ConfirmDialog from './ConfirmDialog'
+import { useConfirm } from '../hooks/useConfirm'
 
 const GYM_NAME = import.meta.env.VITE_GYM_NAME || 'FitZone Gym'
 const GYM_LOGO_URL = import.meta.env.VITE_GYM_LOGO_URL || '/logo.svg'
@@ -62,6 +64,7 @@ export default function Navbar() {
   const logout = useAuthStore((s) => s.logout)
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
+  const { confirm, dialogProps } = useConfirm()
 
   // Tracks whether the page has been scrolled past the top, purely to swap in a subtle
   // shadow/translucent-blur treatment once content is passing underneath the docked bar -
@@ -95,9 +98,17 @@ export default function Navbar() {
   }
 
   function handleLogout() {
-    logout()
-    closeMenu()
-    navigate('/')
+    confirm({
+      title: 'Log out',
+      message: 'Are you sure you want to log out?',
+      confirmLabel: 'Log out',
+      danger: true,
+      onConfirm: () => {
+        logout()
+        closeMenu()
+        navigate('/')
+      },
+    })
   }
 
   return (
@@ -203,6 +214,7 @@ export default function Navbar() {
           </div>
         </div>
       )}
+      <ConfirmDialog {...dialogProps} />
     </>
   )
 }
