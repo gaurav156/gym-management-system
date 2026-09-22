@@ -1,5 +1,6 @@
 package com.gymapp.service;
 
+import com.gymapp.account.AccountCreatedEvent;
 import com.gymapp.dto.AuthDtos.*;
 import com.gymapp.entity.*;
 import com.gymapp.otp.OtpDeliveryRouter;
@@ -10,6 +11,7 @@ import com.gymapp.repository.RegistrationOtpRepository;
 import com.gymapp.repository.UserRepository;
 import com.gymapp.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +38,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final RegistrationOtpRepository registrationOtpRepository;
     private final OtpDeliveryRouter otpDeliveryRouter;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${app.otp.expiry-minutes}")
     private int expiryMinutes;
@@ -55,7 +58,8 @@ public class AuthService {
                        PasswordEncoder passwordEncoder,
                        JwtUtil jwtUtil,
                        RegistrationOtpRepository registrationOtpRepository,
-                       OtpDeliveryRouter otpDeliveryRouter) {
+                       OtpDeliveryRouter otpDeliveryRouter,
+                       ApplicationEventPublisher eventPublisher) {
         this.userRepository = userRepository;
         this.branchRepository = branchRepository;
         this.branchAssignmentRepository = branchAssignmentRepository;
@@ -63,6 +67,7 @@ public class AuthService {
         this.jwtUtil = jwtUtil;
         this.registrationOtpRepository = registrationOtpRepository;
         this.otpDeliveryRouter = otpDeliveryRouter;
+        this.eventPublisher = eventPublisher;
     }
 
     // Step 1 of self-registration. Unlike PasswordResetService's request-otp (which
@@ -152,6 +157,10 @@ public class AuthService {
                 .branch(branch)
                 .build());
 
+        // Fires after this transaction commits - self-registration is the only way a
+        // member's PIN would otherwise stay invisible to them (see MemberDashboard).
+        eventPublisher.publishEvent(new AccountCreatedEvent(member.getId()));
+
         String token = jwtUtil.generateToken(member.getEmail(), member.getRole().name(), member.getId().toString());
         return new AuthResponse(token, member.getId().toString(), member.getName(), member.getEmail(), member.getRole().name());
     }
@@ -185,6 +194,10 @@ public class AuthService {
                 .build();
         user = userRepository.save(user);
         assignToBranches(user, branches);
+
+        // Fires after this transaction commits - lets the new person learn their PIN by
+        // email instead of relying entirely on the Owner relaying it verbally/in person.
+        eventPublisher.publishEvent(new AccountCreatedEvent(user.getId()));
 
         return new CreateAccountResponse(user.getId(), user.getName(), user.getEmail(),
                 user.getRole().name(), user.getCheckinPin());
