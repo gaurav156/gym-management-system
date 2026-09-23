@@ -3,11 +3,12 @@ import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import AttendanceTab from '../components/manager/AttendanceTab'
 import PaymentsTab from '../components/manager/PaymentsTab'
+import ExpensesTab from '../components/manager/ExpensesTab'
 import MembersTab from '../components/manager/MembersTab'
 import StaffTab from '../components/manager/StaffTab'
 import type { Branch, LastCheckinEntry } from '../types'
 
-type Tab = 'ATTENDANCE' | 'PAYMENTS' | 'MEMBERS' | 'STAFF'
+type Tab = 'ATTENDANCE' | 'PAYMENTS' | 'EXPENSES' | 'MEMBERS' | 'STAFF'
 
 export default function ManagerDashboard() {
   const user = useAuthStore((s) => s.user)
@@ -62,6 +63,7 @@ export default function ManagerDashboard() {
   const TABS: { key: Tab; label: string }[] = [
     { key: 'ATTENDANCE', label: 'Attendance' },
     { key: 'PAYMENTS', label: 'Payments' },
+    { key: 'EXPENSES', label: 'Expenses' },
     { key: 'MEMBERS', label: 'Members' },
     { key: 'STAFF', label: 'Staff' },
   ]
@@ -103,6 +105,9 @@ export default function ManagerDashboard() {
         {activeTab === 'MEMBERS' && (
           <MembersTab selectedBranch={selectedBranch} allBranches={allBranches} lastCheckins={lastCheckins} user={user} />
         )}
+        {activeTab === 'EXPENSES' && (
+          <ExpensesTab selectedBranch={selectedBranch} user={user} />
+        )}        
         {activeTab === 'STAFF' && (
           <StaffTab selectedBranch={selectedBranch} allBranches={allBranches} lastCheckins={lastCheckins} user={user} />
         )}

@@ -30,10 +30,10 @@ public class FileController {
     public UploadResponse uploadImage(@RequestParam("file") MultipartFile file,
                                       @RequestParam(defaultValue = "PHOTO") ImagePurpose purpose,
                                       Authentication authentication) throws IOException {
-        if (purpose == ImagePurpose.SIGNATURE) {
+        if (purpose == ImagePurpose.SIGNATURE || purpose == ImagePurpose.BILL) {
             boolean isStaff = authentication.getAuthorities().stream()
                     .anyMatch(a -> a.getAuthority().equals("ROLE_OWNER") || a.getAuthority().equals("ROLE_MANAGER"));
-            if (!isStaff) throw new IllegalArgumentException("Only an Owner or Manager can upload a signature");
+            if (!isStaff) throw new IllegalArgumentException("Only an Owner or Manager can upload this file");
         }
         String key = imageUploadService.upload(file, purpose);
         return new UploadResponse(imageRefs.toUrl(key));

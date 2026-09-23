@@ -2,6 +2,7 @@ package com.gymapp.service;
 
 import com.gymapp.entity.Role;
 import com.gymapp.entity.User;
+import com.gymapp.repository.ExpenseRepository;
 import com.gymapp.repository.PaymentRepository;
 import com.gymapp.repository.UserRepository;
 import com.gymapp.storage.ImageRefs;
@@ -26,15 +27,18 @@ public class UserManagementService {
 
     private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
+    private final ExpenseRepository expenseRepository;
     private final OwnerSafeguards ownerSafeguards;
     private final ImageRefs imageRefs;
 
     public UserManagementService(UserRepository userRepository,
                                  PaymentRepository paymentRepository,
+                                 ExpenseRepository expenseRepository,
                                  OwnerSafeguards ownerSafeguards,
                                  ImageRefs imageRefs) {
         this.userRepository = userRepository;
         this.paymentRepository = paymentRepository;
+        this.expenseRepository = expenseRepository;
         this.ownerSafeguards = ownerSafeguards;
         this.imageRefs = imageRefs;
     }
@@ -57,10 +61,10 @@ public class UserManagementService {
         if (user.getId().equals(callerId)) {
             throw new IllegalArgumentException("You cannot delete your own account");
         }
-        if (paymentRepository.existsByRecordedById(userId)) {
+        if (paymentRepository.existsByRecordedById(userId) || expenseRepository.existsByRecordedById(userId)) {
             throw new IllegalArgumentException(
-                    "This account has recorded payments for other members - deleting it would break " +
-                            "their invoice history. Deactivate the account instead if they should no longer have access.");
+                    "This account has recorded payments or expenses - deleting it would break that " +
+                            "invoice/expense history. Deactivate the account instead if they should no longer have access.");
         }
 
         String photo = user.getPhoto();

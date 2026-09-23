@@ -18,11 +18,12 @@ interface Props {
   label?: string
   size?: 'sm' | 'md'
   purpose?: ImagePurpose
+  accept?: string
 }
 
 // The file is uploaded as soon as it's picked; onLoaded receives the resulting URL, which
 // is what gets submitted with the surrounding form (the form itself never carries image bytes).
-export default function PhotoUploadButton({ onLoaded, onError, label = 'Upload photo', size = 'md', purpose = 'PHOTO' }: Props) {
+export default function PhotoUploadButton({ onLoaded, onError, label = 'Upload photo', size = 'md', purpose = 'PHOTO', accept = 'image/*' }: Props) {
   const inputId = useId()
   const [uploading, setUploading] = useState(false)
 
@@ -48,7 +49,7 @@ export default function PhotoUploadButton({ onLoaded, onError, label = 'Upload p
     >
       {uploading ? <Spinner className="h-4 w-4" /> : <UploadIcon />}
       {uploading ? 'Uploading...' : label}
-      <input id={inputId} type="file" accept="image/*" disabled={uploading} onChange={handleChange} className="sr-only" />
+      <input id={inputId} type="file" accept={accept} disabled={uploading} onChange={handleChange} className="sr-only" />
     </label>
   )
 }

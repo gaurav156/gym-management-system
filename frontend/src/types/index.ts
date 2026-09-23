@@ -1,5 +1,6 @@
 export type Role = 'OWNER' | 'MANAGER' | 'MEMBER' | 'TRAINER'
 export type OtpChannel = 'EMAIL' | 'SMS' | 'WHATSAPP'
+export type ExpenseCategory = 'SALARY' | 'UTILITY' | 'RENT' | 'EQUIPMENT' | 'MAINTENANCE' | 'OTHER'
 
 export interface AuthUser {
   token: string
@@ -172,4 +173,17 @@ export interface PageResponse<T> {
   totalElements: number
   totalPages: number
   last: boolean
+}
+
+export interface Expense {
+  id: string
+  branchId: string
+  branchName: string
+  category: ExpenseCategory
+  amount: number
+  expenseDate: string
+  remark: string | null
+  billUrl: string | null
+  recordedByName: string
+  createdAt: string
 }

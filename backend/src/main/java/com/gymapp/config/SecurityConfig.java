@@ -83,6 +83,10 @@ public class SecurityConfig {
                 // Owner + Manager + Trainer combined "Staff" directory for a branch.
                 .requestMatchers("/api/staff/**").hasAnyRole("OWNER", "MANAGER")
 
+                // Expense tracker - branch-scoped Owner/Manager records. Delete is
+                // further narrowed to Owner-only via @PreAuthorize on the controller.
+                .requestMatchers("/api/expenses/**").hasAnyRole("OWNER", "MANAGER")
+
                 // Owner-only: editing a Manager's basic info. Deletion reuses /api/owner/users/**.
                 .requestMatchers("/api/managers/**").hasRole("OWNER")
 
