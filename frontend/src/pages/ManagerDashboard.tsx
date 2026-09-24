@@ -6,9 +6,10 @@ import PaymentsTab from '../components/manager/PaymentsTab'
 import ExpensesTab from '../components/manager/ExpensesTab'
 import MembersTab from '../components/manager/MembersTab'
 import StaffTab from '../components/manager/StaffTab'
+import StoreTab from '../components/manager/StoreTab'
 import type { Branch, LastCheckinEntry } from '../types'
 
-type Tab = 'ATTENDANCE' | 'PAYMENTS' | 'EXPENSES' | 'MEMBERS' | 'STAFF'
+type Tab = 'ATTENDANCE' | 'PAYMENTS' | 'STORE' | 'EXPENSES' | 'MEMBERS' | 'STAFF'
 
 export default function ManagerDashboard() {
   const user = useAuthStore((s) => s.user)
@@ -63,6 +64,7 @@ export default function ManagerDashboard() {
   const TABS: { key: Tab; label: string }[] = [
     { key: 'ATTENDANCE', label: 'Attendance' },
     { key: 'PAYMENTS', label: 'Payments' },
+    { key: 'STORE', label: 'Store' },
     { key: 'EXPENSES', label: 'Expenses' },
     { key: 'MEMBERS', label: 'Members' },
     { key: 'STAFF', label: 'Staff' },
@@ -110,6 +112,9 @@ export default function ManagerDashboard() {
         )}        
         {activeTab === 'STAFF' && (
           <StaffTab selectedBranch={selectedBranch} allBranches={allBranches} lastCheckins={lastCheckins} user={user} />
+        )}
+        {activeTab === 'STORE' && (
+          <StoreTab selectedBranch={selectedBranch} />
         )}
       </div>
     </div>

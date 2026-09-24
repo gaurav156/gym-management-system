@@ -1,7 +1,7 @@
 import { ChangeEvent } from 'react'
 import { api } from '../api/client'
 
-export type ImagePurpose = 'PHOTO' | 'SIGNATURE' | 'BILL'
+export type ImagePurpose = 'PHOTO' | 'SIGNATURE' | 'BILL' | 'PRODUCT'
 
 // Raw picked file limit - it gets downscaled before upload, so this can be generous
 // (phone cameras easily produce 5-8MB originals). The server enforces 2MB on what arrives.
@@ -11,7 +11,8 @@ export const MAX_SOURCE_BYTES = 10_000_000
 const TARGETS: Record<ImagePurpose, { maxDim: number; type: 'image/jpeg' | 'image/png' }> = {
   PHOTO: { maxDim: 640, type: 'image/jpeg' },
   SIGNATURE: { maxDim: 600, type: 'image/png' },
-  BILL: { maxDim: 0, type: 'image/jpeg' }
+  BILL: { maxDim: 0, type: 'image/jpeg' },
+  PRODUCT: { maxDim: 640, type: 'image/jpeg' }
 }
 
 async function downscale(file: File, purpose: ImagePurpose): Promise<Blob> {

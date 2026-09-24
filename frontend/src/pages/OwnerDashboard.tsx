@@ -4,6 +4,8 @@ import { api } from '../api/client'
 import Spinner from '../components/Spinner'
 import { CardSkeleton } from '../components/Skeleton'
 import type { Branch, Plan } from '../types'
+import ProductCatalogSection from '../components/owner/ProductCatalogSection'
+import CouponsSection from '../components/owner/CouponsSection'
 
 type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
 
@@ -316,6 +318,12 @@ export default function OwnerDashboard() {
           {branches.length === 0 && <li className="py-2 text-gray-400">No branches yet - add one above.</li>}
         </ul>
         )}
+      </div>
+      <div className="mt-8">
+        <ProductCatalogSection />
+      </div>
+      <div className="mt-8">
+        <CouponsSection />
       </div>
     </div>
   )

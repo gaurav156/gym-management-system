@@ -8,6 +8,7 @@ import { CardSkeleton } from '../components/Skeleton'
 import type { Membership, Plan, Payment, Branch, AttendanceLogEntry, HourlyCount, PageResponse } from '../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../utils/invoice'
 import type { InvoiceResponse } from '../types'
+import StoreSection from '../components/StoreSection'
 
 const PAGE_SIZE = 5
 
@@ -304,6 +305,8 @@ export default function MemberDashboard() {
           </div>
         )}
       </div>
+
+      <StoreSection memberId={user.userId} />
     </div>
   )
 }

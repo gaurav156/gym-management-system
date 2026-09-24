@@ -121,6 +121,20 @@ public class SecurityConfig {
                 .requestMatchers("/api/attendance/history/**", "/api/attendance/today/**",
                         "/api/attendance/last-checkin/**").hasAnyRole("OWNER", "MANAGER")
 
+                // Product catalog - management is Owner-only; plain GET is open to any authenticated
+                // role (Members browse to buy, staff browse to record a sale).
+                .requestMatchers("/api/products/manage/**").hasRole("OWNER")
+                .requestMatchers(HttpMethod.GET, "/api/products/**").authenticated()
+
+                // Coupons - Owner manages, Owner/Manager validate a code at the front desk.
+                            .requestMatchers("/api/coupons/manage/**").hasRole("OWNER")
+                .requestMatchers("/api/coupons/validate").hasAnyRole("OWNER", "MANAGER")
+
+                // Product orders - purchase/complete/cancel/branch-listing are front-desk staff actions;
+                // /mine is the member's own history (ownership checked in the controller).
+                .requestMatchers("/api/product-orders/mine").hasRole("MEMBER")
+                .requestMatchers("/api/product-orders/**").hasAnyRole("OWNER", "MANAGER")
+
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

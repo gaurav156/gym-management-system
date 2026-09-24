@@ -4,6 +4,7 @@ import com.gymapp.entity.Role;
 import com.gymapp.entity.User;
 import com.gymapp.repository.ExpenseRepository;
 import com.gymapp.repository.PaymentRepository;
+import com.gymapp.repository.ProductOrderRepository;
 import com.gymapp.repository.UserRepository;
 import com.gymapp.storage.ImageRefs;
 import org.springframework.stereotype.Service;
@@ -28,17 +29,20 @@ public class UserManagementService {
     private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
     private final ExpenseRepository expenseRepository;
+    private final ProductOrderRepository productOrderRepository;
     private final OwnerSafeguards ownerSafeguards;
     private final ImageRefs imageRefs;
 
     public UserManagementService(UserRepository userRepository,
                                  PaymentRepository paymentRepository,
                                  ExpenseRepository expenseRepository,
+                                 ProductOrderRepository productOrderRepository,
                                  OwnerSafeguards ownerSafeguards,
                                  ImageRefs imageRefs) {
         this.userRepository = userRepository;
         this.paymentRepository = paymentRepository;
         this.expenseRepository = expenseRepository;
+        this.productOrderRepository = productOrderRepository;
         this.ownerSafeguards = ownerSafeguards;
         this.imageRefs = imageRefs;
     }
@@ -61,10 +65,14 @@ public class UserManagementService {
         if (user.getId().equals(callerId)) {
             throw new IllegalArgumentException("You cannot delete your own account");
         }
-        if (paymentRepository.existsByRecordedById(userId) || expenseRepository.existsByRecordedById(userId)) {
+        // UserManagementService: constructor gains ProductOrderRepository productOrderRepository,
+        // and deleteUser()'s existing check becomes:
+        if (paymentRepository.existsByRecordedById(userId)
+                || expenseRepository.existsByRecordedById(userId)
+                || productOrderRepository.existsByRecordedById(userId)) {
             throw new IllegalArgumentException(
-                    "This account has recorded payments or expenses - deleting it would break that " +
-                            "invoice/expense history. Deactivate the account instead if they should no longer have access.");
+                    "This account has recorded payments, expenses, or product sales - deleting it would break that " +
+                            "invoice/expense/order history. Deactivate the account instead if they should no longer have access.");
         }
 
         String photo = user.getPhoto();

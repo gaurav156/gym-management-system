@@ -1,6 +1,8 @@
 export type Role = 'OWNER' | 'MANAGER' | 'MEMBER' | 'TRAINER'
 export type OtpChannel = 'EMAIL' | 'SMS' | 'WHATSAPP'
 export type ExpenseCategory = 'SALARY' | 'UTILITY' | 'RENT' | 'EQUIPMENT' | 'MAINTENANCE' | 'OTHER'
+export type DiscountType = 'PERCENTAGE' | 'FIXED'
+export type ProductOrderStatus = 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'
 
 export interface AuthUser {
   token: string
@@ -186,4 +188,66 @@ export interface Expense {
   billUrl: string | null
   recordedByName: string
   createdAt: string
+}
+
+export interface Product {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  discountPrice: number | null
+  discountStartsAt: string | null
+  discountEndsAt: string | null
+  effectivePrice: number
+  discountActive: boolean
+  stockQuantity: number
+  outOfStock: boolean
+  active: boolean
+  imageUrls: string[]
+}
+
+export interface Coupon {
+  id: string
+  code: string
+  description: string | null
+  discountType: DiscountType
+  discountValue: number
+  startsAt: string | null
+  endsAt: string | null
+  active: boolean
+  firstTimeBuyersOnly: boolean
+  maxRedemptions: number | null
+  timesRedeemed: number
+  currentlyValid: boolean
+}
+
+export interface ProductOrderItem {
+  productId: string
+  productName: string
+  quantity: number
+  unitPrice: number
+  lineTotal: number
+}
+
+export interface ProductOrder {
+  id: string
+  invoiceNumber: string
+  memberId: string
+  memberName: string
+  branchId: string
+  branchName: string
+  items: ProductOrderItem[]
+  subtotal: number
+  discountAmount: number
+  couponCode: string | null
+  totalAmount: number
+  mode: string
+  status: ProductOrderStatus
+  recordedByName: string | null
+  createdAt: string
+  completedAt: string | null
+  cancelledAt: string | null
+  refundAmount: number | null
+  refundedByName: string | null
+  refundNote: string | null
 }

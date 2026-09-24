@@ -5,7 +5,10 @@ public enum ImagePurpose {
     SIGNATURE("signatures/"),
     // Bills/invoices attached to an expense - unlike PHOTO/SIGNATURE this may be a PDF,
     // not just an image (see ImageUploadService.sniff()).
-    BILL("bills/");
+    BILL("bills/"),
+    // Product catalog images - unlike PHOTO/SIGNATURE a product can have several, held as
+    // an ordered list on the entity (see Product.imageKeys) rather than a single field.
+    PRODUCT("products/");
 
     private final String prefix;
 
