@@ -6,6 +6,7 @@ import { CardSkeleton } from '../components/Skeleton'
 import type { Branch, Plan } from '../types'
 import ProductCatalogSection from '../components/owner/ProductCatalogSection'
 import CouponsSection from '../components/owner/CouponsSection'
+import ProductCategoriesSection from '../components/owner/ProductCategoriesSection'
 
 type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
 
@@ -320,7 +321,10 @@ export default function OwnerDashboard() {
         )}
       </div>
       <div className="mt-8">
-        <ProductCatalogSection />
+        <ProductCatalogSection branches={branches} />
+      </div>
+      <div className="mt-8">
+        <ProductCategoriesSection />
       </div>
       <div className="mt-8">
         <CouponsSection />

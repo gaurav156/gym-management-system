@@ -1,6 +1,8 @@
 package com.gymapp.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 
@@ -11,6 +13,10 @@ import java.util.UUID;
 
 public class ProductDtos {
 
+    public record BranchStockRequest(@NotNull UUID branchId, @NotNull @PositiveOrZero Integer stockQuantity) {}
+    public record BranchStockResponse(UUID branchId, String branchName, Integer stockQuantity) {}
+    public record CategoryRef(UUID id, String name) {}
+
     public record CreateProductRequest(
             @NotBlank String name,
             String description,
@@ -18,10 +24,9 @@ public class ProductDtos {
             BigDecimal discountPrice,
             LocalDateTime discountStartsAt,
             LocalDateTime discountEndsAt,
-            @NotNull @PositiveOrZero Integer stockQuantity,
-            // URLs already uploaded via POST /api/files/images?purpose=PRODUCT - same
-            // two-step upload-then-save pattern PhotoUploadButton already uses.
-            List<String> imageUrls
+            List<String> imageUrls,
+            @NotEmpty List<@Valid BranchStockRequest> branchStocks,
+            List<UUID> categoryIds
     ) {}
 
     // All fields optional - null means "leave as is", same convention as
@@ -35,9 +40,15 @@ public class ProductDtos {
             BigDecimal discountPrice,
             LocalDateTime discountStartsAt,
             LocalDateTime discountEndsAt,
-            Integer stockQuantity,
             Boolean active,
-            List<String> imageUrls
+            List<String> imageUrls,
+            List<UUID> categoryIds
+    ) {}
+
+    // Owner-only, kept separate from UpdateProductRequest - stock is edited from its own
+    // per-branch table in the UI, not mixed into the general product-details form.
+    public record UpdateStockRequest(
+            @NotEmpty List<@Valid BranchStockRequest> branchStocks
     ) {}
 
     public record ProductResponse(
@@ -52,10 +63,14 @@ public class ProductDtos {
             // price. This is what a purchase should actually charge.
             BigDecimal effectivePrice,
             boolean discountActive,
+            // stockQuantity/outOfStock are for the branch given in the request's branchId
+            // param - null when no branch was supplied (the Owner's management list uses
+            // branchStocks below instead, which carries every branch's count at once).
             Integer stockQuantity,
-            // Computed: stockQuantity <= 0. Never a stored flag - see Product's class comment.
-            boolean outOfStock,
+            Boolean outOfStock,
             boolean active,
-            List<String> imageUrls
+            List<String> imageUrls,
+            List<CategoryRef> categories,
+            List<BranchStockResponse> branchStocks
     ) {}
 }

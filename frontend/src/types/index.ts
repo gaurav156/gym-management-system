@@ -190,6 +190,20 @@ export interface Expense {
   createdAt: string
 }
 
+export interface ProductBranchStock {
+  branchId: string
+  branchName: string
+  stockQuantity: number
+}
+
+export interface ProductCategory {
+  id: string
+  name: string
+  productCount: number
+}
+
+// Product: stockQuantity/outOfStock become branch-contextual (null when no branchId was
+// passed to the catalog/management call), and branchStocks/categories are added.
 export interface Product {
   id: string
   name: string
@@ -200,10 +214,41 @@ export interface Product {
   discountEndsAt: string | null
   effectivePrice: number
   discountActive: boolean
-  stockQuantity: number
-  outOfStock: boolean
+  stockQuantity: number | null
+  outOfStock: boolean | null
   active: boolean
   imageUrls: string[]
+  categories: { id: string; name: string }[]
+  branchStocks: ProductBranchStock[]
+}
+
+export interface ProductOrderInvoiceItem {
+  productId: string
+  productName: string
+  quantity: number
+  unitPrice: number
+  lineTotal: number
+}
+
+export interface ProductOrderInvoice {
+  orderId: string
+  invoiceNumber: string
+  invoiceDate: string
+  branchName: string
+  branchAddress: string | null
+  branchPhone: string | null
+  memberName: string
+  memberEmail: string
+  memberPhone: string | null
+  memberAddress: string | null
+  items: ProductOrderInvoiceItem[]
+  subtotal: number
+  discountAmount: number
+  couponCode: string | null
+  totalAmount: number
+  mode: string
+  recordedByName: string | null
+  recordedBySignature: string | null
 }
 
 export interface Coupon {

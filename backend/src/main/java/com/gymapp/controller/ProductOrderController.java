@@ -64,4 +64,20 @@ public class ProductOrderController {
         }
         return productOrderService.listForMember(memberId, PageRequest.of(page, size));
     }
+
+    @GetMapping("/{orderId}/invoice")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','MEMBER')")
+    public com.gymapp.dto.ProductOrderDtos.OrderInvoiceResponse invoice(@PathVariable UUID orderId, Authentication authentication) {
+        UUID requesterId = UUID.fromString((String) authentication.getDetails());
+        boolean isStaff = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_OWNER") || a.getAuthority().equals("ROLE_MANAGER"));
+        return productOrderService.getInvoice(orderId, requesterId, isStaff);
+    }
+
+    @PostMapping("/{orderId}/send-email")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public java.util.Map<String, String> sendEmail(@PathVariable UUID orderId) {
+        productOrderService.sendInvoiceEmail(orderId);
+        return java.util.Map.of("message", "Invoice emailed.");
+    }
 }

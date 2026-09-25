@@ -2,7 +2,13 @@ package com.gymapp.service;
 
 import com.gymapp.dto.PageDtos.PageResponse;
 import com.gymapp.dto.ProductDtos.*;
+import com.gymapp.entity.Branch;
 import com.gymapp.entity.Product;
+import com.gymapp.entity.ProductBranchStock;
+import com.gymapp.entity.ProductCategory;
+import com.gymapp.repository.BranchRepository;
+import com.gymapp.repository.ProductBranchStockRepository;
+import com.gymapp.repository.ProductCategoryRepository;
 import com.gymapp.repository.ProductOrderItemRepository;
 import com.gymapp.repository.ProductRepository;
 import com.gymapp.storage.ImagePurpose;
@@ -14,22 +20,29 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class ProductService {
 
     private final ProductRepository productRepository;
     private final ProductOrderItemRepository productOrderItemRepository;
+    private final ProductBranchStockRepository branchStockRepository;
+    private final ProductCategoryRepository categoryRepository;
+    private final BranchRepository branchRepository;
     private final ImageRefs imageRefs;
 
     public ProductService(ProductRepository productRepository,
                           ProductOrderItemRepository productOrderItemRepository,
+                          ProductBranchStockRepository branchStockRepository,
+                          ProductCategoryRepository categoryRepository,
+                          BranchRepository branchRepository,
                           ImageRefs imageRefs) {
         this.productRepository = productRepository;
         this.productOrderItemRepository = productOrderItemRepository;
+        this.branchStockRepository = branchStockRepository;
+        this.categoryRepository = categoryRepository;
+        this.branchRepository = branchRepository;
         this.imageRefs = imageRefs;
     }
 
@@ -43,12 +56,13 @@ public class ProductService {
                 .discountPrice(req.discountPrice())
                 .discountStartsAt(req.discountStartsAt())
                 .discountEndsAt(req.discountEndsAt())
-                .stockQuantity(req.stockQuantity())
                 .active(true)
                 .imageKeys(resolveNewImageKeys(req.imageUrls()))
+                .categories(resolveCategories(req.categoryIds()))
                 .build();
         product = productRepository.save(product);
-        return toResponse(product);
+        upsertStock(product, req.branchStocks());
+        return toResponse(product, null);
     }
 
     @Transactional
@@ -65,8 +79,8 @@ public class ProductService {
         product.setDiscountPrice(req.discountPrice());
         product.setDiscountStartsAt(req.discountStartsAt());
         product.setDiscountEndsAt(req.discountEndsAt());
-        if (req.stockQuantity() != null) product.setStockQuantity(req.stockQuantity());
         if (req.active() != null) product.setActive(req.active());
+        if (req.categoryIds() != null) product.setCategories(resolveCategories(req.categoryIds()));
 
         if (req.imageUrls() != null) {
             List<String> oldKeys = new ArrayList<>(product.getImageKeys());
@@ -79,15 +93,39 @@ public class ProductService {
         }
 
         product = productRepository.save(product);
-        return toResponse(product);
+        return toResponse(product, null);
     }
 
-    // Owner-only (enforced at the controller). A hard delete is only safe when the product
-    // has never been part of an order - product_order_items.product_id has no cascade (see
-    // V16 migration) precisely so a delete here can never silently corrupt a past invoice.
-    // If it HAS been ordered, the Owner is pointed at deactivating instead (already-existing
-    // active=false toggle), same "can't delete, can deactivate" pattern as
-    // UserManagementService.deleteUser() for staff who've recorded payments/expenses.
+    // Owner-only. Stock is branch-specific (see V17 migration) - each row is upserted
+    // independently so the request only needs to include the branches actually changing.
+    @Transactional
+    public ProductResponse updateStock(UUID productId, UpdateStockRequest req) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+        upsertStock(product, req.branchStocks());
+        return toResponse(product, null);
+    }
+
+    private void upsertStock(Product product, List<BranchStockRequest> branchStocks) {
+        for (BranchStockRequest bs : branchStocks) {
+            Branch branch = branchRepository.findById(bs.branchId())
+                    .orElseThrow(() -> new IllegalArgumentException("Branch not found"));
+            ProductBranchStock stock = branchStockRepository.findByProductIdAndBranchId(product.getId(), branch.getId())
+                    .orElseGet(() -> ProductBranchStock.builder().product(product).branch(branch).stockQuantity(0).build());
+            stock.setStockQuantity(bs.stockQuantity());
+            branchStockRepository.save(stock);
+        }
+    }
+
+    private Set<ProductCategory> resolveCategories(List<UUID> categoryIds) {
+        if (categoryIds == null || categoryIds.isEmpty()) return new HashSet<>();
+        List<ProductCategory> found = categoryRepository.findAllById(categoryIds);
+        if (found.size() != new HashSet<>(categoryIds).size()) {
+            throw new IllegalArgumentException("One or more categories not found");
+        }
+        return new HashSet<>(found);
+    }
+
     @Transactional
     public void delete(UUID productId) {
         Product product = productRepository.findById(productId)
@@ -104,22 +142,27 @@ public class ProductService {
         imageKeys.forEach(imageRefs::deleteAfterCommit);
     }
 
+    // branchId computes stockQuantity/outOfStock for that specific branch - Member and
+    // front-desk browsing both always supply one, since they're picking up from a chosen
+    // branch. categoryId is optional; null means "all categories".
     @Transactional(readOnly = true)
-    public PageResponse<ProductResponse> listCatalog(String search, Pageable pageable) {
-        Page<Product> page = productRepository.findActiveCatalog(blankToNull(search), pageable);
-        return PageResponse.from(page.map(this::toResponse));
+    public PageResponse<ProductResponse> listCatalog(String search, UUID categoryId, UUID branchId, Pageable pageable) {
+        Page<Product> page = productRepository.findActiveCatalog(blankToNull(search), categoryId, pageable);
+        return PageResponse.from(page.map(p -> toResponse(p, branchId)));
+    }
+
+    // Management list shows every branch's stock at once via branchStocks, not one
+    // branch's number.
+    @Transactional(readOnly = true)
+    public PageResponse<ProductResponse> listForManagement(String search, UUID categoryId, Pageable pageable) {
+        Page<Product> page = productRepository.findAllForManagement(blankToNull(search), categoryId, pageable);
+        return PageResponse.from(page.map(p -> toResponse(p, null)));
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<ProductResponse> listForManagement(String search, Pageable pageable) {
-        Page<Product> page = productRepository.findAllForManagement(blankToNull(search), pageable);
-        return PageResponse.from(page.map(this::toResponse));
-    }
-
-    @Transactional(readOnly = true)
-    public ProductResponse get(UUID productId) {
+    public ProductResponse get(UUID productId, UUID branchId) {
         return toResponse(productRepository.findById(productId)
-                .orElseThrow(() -> new IllegalArgumentException("Product not found")));
+                .orElseThrow(() -> new IllegalArgumentException("Product not found")), branchId);
     }
 
     private List<String> resolveNewImageKeys(List<String> imageUrls) {
@@ -148,13 +191,31 @@ public class ProductService {
         return isDiscountActive(p) ? p.getDiscountPrice() : p.getPrice();
     }
 
-    private ProductResponse toResponse(Product p) {
+    private ProductResponse toResponse(Product p, UUID branchId) {
         boolean discountActive = isDiscountActive(p);
         List<String> urls = p.getImageKeys().stream().map(imageRefs::toUrl).toList();
+        List<CategoryRef> categories = p.getCategories().stream()
+                .map(c -> new CategoryRef(c.getId(), c.getName()))
+                .sorted(Comparator.comparing(CategoryRef::name))
+                .toList();
+        List<BranchStockResponse> branchStocks = branchStockRepository.findByProductId(p.getId()).stream()
+                .map(bs -> new BranchStockResponse(bs.getBranch().getId(), bs.getBranch().getName(), bs.getStockQuantity()))
+                .sorted(Comparator.comparing(BranchStockResponse::branchName))
+                .toList();
+
+        Integer stockQuantity = null;
+        Boolean outOfStock = null;
+        if (branchId != null) {
+            int qty = branchStockRepository.findByProductIdAndBranchId(p.getId(), branchId)
+                    .map(ProductBranchStock::getStockQuantity).orElse(0);
+            stockQuantity = qty;
+            outOfStock = qty <= 0;
+        }
+
         return new ProductResponse(
                 p.getId(), p.getName(), p.getDescription(), p.getPrice(), p.getDiscountPrice(),
                 p.getDiscountStartsAt(), p.getDiscountEndsAt(), effectivePrice(p), discountActive,
-                p.getStockQuantity(), p.getStockQuantity() <= 0, p.isActive(), urls
+                stockQuantity, outOfStock, p.isActive(), urls, categories, branchStocks
         );
     }
 }

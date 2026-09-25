@@ -62,4 +62,25 @@ public class ProductOrderDtos {
             String refundedByName,
             String refundNote
     ) {}
+
+    public record OrderInvoiceResponse(
+            UUID orderId,
+            String invoiceNumber,
+            java.time.LocalDateTime invoiceDate,
+            String branchName,
+            String branchAddress,
+            String branchPhone,
+            String memberName,
+            String memberEmail,
+            String memberPhone,
+            String memberAddress,
+            List<OrderItemResponse> items,
+            BigDecimal subtotal,
+            BigDecimal discountAmount,
+            String couponCode,
+            BigDecimal totalAmount,
+            String mode,
+            String recordedByName,
+            String recordedBySignature
+    ) {}
 }

@@ -1,3 +1,4 @@
+// backend/src/main/java/com/gymapp/entity/Product.java
 package com.gymapp.entity;
 
 import jakarta.persistence.*;
@@ -10,13 +11,13 @@ import lombok.Builder;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
-// Chain-wide, like MembershipPlan - a product created here is purchasable/pickupable at
-// any branch. "Out of stock" is deliberately NOT a stored flag: it's always
-// stockQuantity <= 0, computed wherever it's displayed, so it can never drift out of sync
-// with the actual count (same reasoning as frontend/utils/membership.ts's effective status).
+// Chain-wide catalog entry - what varies by branch (stock) now lives in
+// ProductBranchStock, not here (see V17/V18 migration).
 @Entity
 @Table(name = "products")
 @Getter
@@ -46,8 +47,9 @@ public class Product {
     private LocalDateTime discountStartsAt;
     private LocalDateTime discountEndsAt;
 
-    @Column(nullable = false)
-    private Integer stockQuantity;
+    // NOTE: no stockQuantity field here anymore - it moved to ProductBranchStock.
+    // If you still see it in your local file, delete it; its presence is exactly what
+    // makes Hibernate expect a products.stock_quantity column that the migration dropped.
 
     // Owner-facing catalog visibility toggle - lets a product be pulled from sale without
     // deleting it (order history references it, so hard delete isn't offered - same
@@ -61,6 +63,13 @@ public class Product {
     @Column(name = "image_key", nullable = false)
     @Builder.Default
     private List<String> imageKeys = new ArrayList<>();
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "product_category_map",
+            joinColumns = @JoinColumn(name = "product_id"),
+            inverseJoinColumns = @JoinColumn(name = "category_id"))
+    @Builder.Default
+    private Set<ProductCategory> categories = new HashSet<>();
 
     @Column(updatable = false)
     private LocalDateTime createdAt;

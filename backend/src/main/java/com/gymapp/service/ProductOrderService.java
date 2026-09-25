@@ -1,14 +1,12 @@
-// backend/src/main/java/com/gymapp/service/ProductOrderService.java
 package com.gymapp.service;
 
 import com.gymapp.dto.PageDtos.PageResponse;
 import com.gymapp.dto.ProductOrderDtos.*;
 import com.gymapp.entity.*;
-import com.gymapp.repository.BranchRepository;
-import com.gymapp.repository.CouponRepository;
-import com.gymapp.repository.ProductOrderRepository;
-import com.gymapp.repository.ProductRepository;
-import com.gymapp.repository.UserRepository;
+import com.gymapp.invoice.ProductOrderRecordedEvent;
+import com.gymapp.repository.*;
+import com.gymapp.storage.ImageRefs;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -38,26 +36,38 @@ public class ProductOrderService {
 
     private final ProductOrderRepository productOrderRepository;
     private final ProductRepository productRepository;
+    private final ProductBranchStockRepository branchStockRepository;
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
     private final CouponRepository couponRepository;
     private final ProductService productService;
     private final CouponService couponService;
+    private final ImageRefs imageRefs;
+    private final ApplicationEventPublisher eventPublisher;
+    private final ProductOrderInvoiceEmailService invoiceEmailService;
 
     public ProductOrderService(ProductOrderRepository productOrderRepository,
                                ProductRepository productRepository,
+                               ProductBranchStockRepository branchStockRepository,
                                BranchRepository branchRepository,
                                UserRepository userRepository,
                                CouponRepository couponRepository,
                                ProductService productService,
-                               CouponService couponService) {
+                               CouponService couponService,
+                               ImageRefs imageRefs,
+                               ApplicationEventPublisher eventPublisher,
+                               ProductOrderInvoiceEmailService invoiceEmailService) {
         this.productOrderRepository = productOrderRepository;
         this.productRepository = productRepository;
+        this.branchStockRepository = branchStockRepository;
         this.branchRepository = branchRepository;
         this.userRepository = userRepository;
         this.couponRepository = couponRepository;
         this.productService = productService;
         this.couponService = couponService;
+        this.imageRefs = imageRefs;
+        this.eventPublisher = eventPublisher;
+        this.invoiceEmailService = invoiceEmailService;
     }
 
     @Transactional
@@ -85,17 +95,23 @@ public class ProductOrderService {
             if (!product.isActive()) {
                 throw new IllegalArgumentException(product.getName() + " is no longer available");
             }
-            if (product.getStockQuantity() < itemReq.quantity()) {
-                throw new IllegalArgumentException("Not enough stock for " + product.getName()
-                        + " (" + product.getStockQuantity() + " available)");
+
+            // Stock is checked and decremented against THIS pickup branch's row only -
+            // never a shared/global count (see V17 migration).
+            ProductBranchStock stock = branchStockRepository.findByProductIdAndBranchId(product.getId(), branch.getId())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            product.getName() + " is not stocked at " + branch.getName()));
+            if (stock.getStockQuantity() < itemReq.quantity()) {
+                throw new IllegalArgumentException("Not enough stock for " + product.getName() + " at " + branch.getName()
+                        + " (" + stock.getStockQuantity() + " available)");
             }
 
             BigDecimal unitPrice = productService.effectivePrice(product);
             BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(itemReq.quantity()));
             subtotal = subtotal.add(lineTotal);
 
-            product.setStockQuantity(product.getStockQuantity() - itemReq.quantity());
-            productRepository.save(product);
+            stock.setStockQuantity(stock.getStockQuantity() - itemReq.quantity());
+            branchStockRepository.save(stock);
 
             order.getItems().add(ProductOrderItem.builder()
                     .order(order)
@@ -126,6 +142,10 @@ public class ProductOrderService {
         order.setTotalAmount(subtotal.subtract(discountAmount));
 
         order = productOrderRepository.save(order);
+
+        // Fires after this transaction commits - never blocks the purchase response.
+        eventPublisher.publishEvent(new ProductOrderRecordedEvent(order.getId()));
+
         return toResponse(order);
     }
 
@@ -157,10 +177,13 @@ public class ProductOrderService {
         User refundedBy = userRepository.findById(refundedByUserId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
+        // Restored to the SAME branch it was taken from - never a different one.
         for (ProductOrderItem item : order.getItems()) {
-            Product product = item.getProduct();
-            product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
-            productRepository.save(product);
+            branchStockRepository.findByProductIdAndBranchId(item.getProduct().getId(), order.getBranch().getId())
+                    .ifPresent(stock -> {
+                        stock.setStockQuantity(stock.getStockQuantity() + item.getQuantity());
+                        branchStockRepository.save(stock);
+                    });
         }
 
         order.setStatus(ProductOrderStatus.CANCELLED);
@@ -184,6 +207,48 @@ public class ProductOrderService {
     public PageResponse<ProductOrderResponse> listForMember(UUID memberId, Pageable pageable) {
         Page<ProductOrder> page = productOrderRepository.findByMemberIdOrderByCreatedAtDesc(memberId, pageable);
         return PageResponse.from(page.map(this::toResponse));
+    }
+
+    // Mirrors PaymentService.getInvoice - isStaff comes from the JWT, never a client flag.
+    @Transactional(readOnly = true)
+    public OrderInvoiceResponse getInvoice(UUID orderId, UUID requesterId, boolean isStaff) {
+        ProductOrder o = productOrderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+        if (!isStaff && !o.getMember().getId().equals(requesterId)) {
+            throw new IllegalArgumentException("You can only view your own invoice");
+        }
+        return toInvoiceResponse(o);
+    }
+
+    @Transactional(readOnly = true)
+    public OrderInvoiceResponse getInvoiceInternal(UUID orderId) {
+        ProductOrder o = productOrderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+        return toInvoiceResponse(o);
+    }
+
+    @Transactional(readOnly = true)
+    public void sendInvoiceEmail(UUID orderId) {
+        invoiceEmailService.sendInvoiceEmail(getInvoiceInternal(orderId));
+    }
+
+    private OrderInvoiceResponse toInvoiceResponse(ProductOrder o) {
+        List<OrderItemResponse> items = o.getItems().stream()
+                .map(i -> new OrderItemResponse(i.getProduct().getId(), i.getProductNameSnapshot(),
+                        i.getQuantity(), i.getUnitPrice(), i.getLineTotal()))
+                .toList();
+        return new OrderInvoiceResponse(
+                o.getId(),
+                String.format("PORD-%d-%06d", o.getCreatedAt().getYear(), o.getInvoiceSeq()),
+                o.getCreatedAt(),
+                o.getBranch().getName(), o.getBranch().getAddress(), o.getBranch().getPhone(),
+                o.getMember().getName(), o.getMember().getEmail(), o.getMember().getPhone(), o.getMember().getAddress(),
+                items, o.getSubtotal(), o.getDiscountAmount(),
+                o.getCoupon() != null ? o.getCoupon().getCode() : null,
+                o.getTotalAmount(), o.getMode().name(),
+                o.getRecordedBy() != null ? o.getRecordedBy().getName() : null,
+                o.getRecordedBy() != null ? imageRefs.toUrl(o.getRecordedBy().getSignature()) : null
+        );
     }
 
     private ProductOrderResponse toResponse(ProductOrder o) {

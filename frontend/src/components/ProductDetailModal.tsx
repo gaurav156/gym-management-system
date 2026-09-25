@@ -1,18 +1,10 @@
 import { PointerEvent, useRef, useState } from 'react'
 import ProductImage from './ProductImage'
+import { renderRichText } from '../utils/richText'
+import type { Product } from '../types'
 
 interface Props {
-  product: {
-    name: string
-    description: string | null
-    price: number
-    discountPrice: number | null
-    discountActive: boolean
-    stockQuantity: number
-    outOfStock: boolean
-    active: boolean
-    imageUrls: string[]
-  }
+  product: Product
   onClose: () => void
   isStaffView: boolean
 }
@@ -52,25 +44,37 @@ export default function ProductDetailModal({ product, onClose, isStaffView }: Pr
     else if (delta < -SWIPE_THRESHOLD_PX) go(1)
   }
 
-  function stockLine(): string | null {
-    if (product.outOfStock) return 'Out of stock'
-    if (isStaffView) return `${product.stockQuantity} in stock`
-    return product.stockQuantity < 5 ? `Only ${product.stockQuantity} left` : null
+  function renderStock() {
+    if (product.stockQuantity != null) {
+      if (product.outOfStock) return <p className="text-sm text-red-600">Out of stock</p>
+      if (isStaffView) return <p className="text-sm text-amber-600">{product.stockQuantity} in stock</p>
+      return product.stockQuantity < 5 ? <p className="text-sm text-amber-600">Only {product.stockQuantity} left</p> : null
+    }
+    // No branchId was supplied (Owner's management view) - show the per-branch breakdown
+    // instead of a single number, since stock now varies by branch.
+    if (isStaffView && product.branchStocks.length > 0) {
+      return (
+        <p className="text-xs text-gray-500">
+          {product.branchStocks.map((s, i) => (
+            <span key={s.branchId}>{i > 0 && ' · '}{s.branchName}: {s.stockQuantity}</span>
+          ))}
+        </p>
+      )
+    }
+    return null
   }
-  const stock = stockLine()
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
       onClick={onClose} role="dialog" aria-modal="true">
-      {/* flex-col + max-h caps the whole dialog; header/footer are flex-shrink-0 (docked),
-          only the middle section scrolls - fixes the "scrollbar looks off with a long
-          description" issue by never letting the title or stock line move. */}
       <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}>
 
         <div className="flex flex-shrink-0 items-start justify-between gap-3 border-b border-gray-100 px-6 py-4">
+          {/* break-words, not truncate - a long product name now wraps onto more than one
+              line instead of being cut off. */}
           <div className="min-w-0">
-            <h3 className="truncate text-lg font-semibold">{product.name}</h3>
+            <h3 className="break-words text-lg font-semibold">{product.name}</h3>
             <p className="mt-0.5">
               {product.discountActive ? (
                 <>
@@ -81,6 +85,13 @@ export default function ProductDetailModal({ product, onClose, isStaffView }: Pr
                 <span className="text-base font-semibold">₹{product.price}</span>
               )}
             </p>
+            {product.categories.length > 0 && (
+              <p className="mt-1 flex flex-wrap gap-1">
+                {product.categories.map((c) => (
+                  <span key={c.id} className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-600">{c.name}</span>
+                ))}
+              </p>
+            )}
           </div>
           <button onClick={onClose} className="flex-shrink-0 text-gray-400 hover:text-gray-600">✕</button>
         </div>
@@ -92,7 +103,6 @@ export default function ProductDetailModal({ product, onClose, isStaffView }: Pr
             onPointerUp={onPointerUp}
           >
             <ProductImage src={images[activeIndex]} alt={product.name} className="h-full w-full" />
-
             {images.length > 1 && (
               <>
                 <button type="button" onClick={() => go(-1)} aria-label="Previous image"
@@ -116,9 +126,7 @@ export default function ProductDetailModal({ product, onClose, isStaffView }: Pr
             <div className="mt-2 flex gap-2 overflow-x-auto">
               {images.map((url, i) => (
                 <button key={url} type="button" onClick={() => setActiveIndex(i)}
-                  className={`h-14 w-14 flex-shrink-0 overflow-hidden rounded border-2 ${
-                    i === activeIndex ? 'border-brand' : 'border-transparent'
-                  }`}>
+                  className={`h-14 w-14 flex-shrink-0 overflow-hidden rounded border-2 ${i === activeIndex ? 'border-brand' : 'border-transparent'}`}>
                   <ProductImage src={url} alt="" className="h-full w-full" />
                 </button>
               ))}
@@ -126,14 +134,12 @@ export default function ProductDetailModal({ product, onClose, isStaffView }: Pr
           )}
 
           {product.description && (
-            <p className="mt-4 whitespace-pre-line text-sm text-gray-600">{product.description}</p>
+            <div className="mt-4 text-sm text-gray-600">{renderRichText(product.description)}</div>
           )}
         </div>
 
-        <div className="flex flex-shrink-0 items-center justify-between border-t border-gray-100 px-6 py-3 text-sm">
-          {stock ? (
-            <span className={product.outOfStock ? 'text-red-600' : 'text-amber-600'}>{stock}</span>
-          ) : <span />}
+        <div className="flex flex-shrink-0 items-center justify-between border-t border-gray-100 px-6 py-3">
+          {renderStock() ?? <span />}
           {isStaffView && !product.active && (
             <span className="text-xs text-gray-400">Inactive - hidden from the member catalog</span>
           )}

@@ -34,27 +34,35 @@ public class ProductController {
         return productService.update(id, req);
     }
 
-    // Any authenticated role (Members browsing to purchase, staff browsing to record a
-    // sale) - active products only.
+    @PutMapping("/manage/{id}/stock")
+    @PreAuthorize("hasRole('OWNER')")
+    public ProductResponse updateStock(@PathVariable UUID id, @Valid @RequestBody UpdateStockRequest req) {
+        return productService.updateStock(id, req);
+    }
+
+    // branchId is required - both Members and staff browse "for pickup at <branch>".
     @GetMapping
-    public PageResponse<ProductResponse> listCatalog(@RequestParam(required = false) String search,
+    public PageResponse<ProductResponse> listCatalog(@RequestParam UUID branchId,
+                                                     @RequestParam(required = false) String search,
+                                                     @RequestParam(required = false) UUID categoryId,
                                                      @RequestParam(defaultValue = "0") int page,
                                                      @RequestParam(defaultValue = "20") int size) {
-        return productService.listCatalog(search, PageRequest.of(page, size));
+        return productService.listCatalog(search, categoryId, branchId, PageRequest.of(page, size));
     }
 
     // Owner-facing management list - includes inactive products.
     @GetMapping("/manage")
     @PreAuthorize("hasRole('OWNER')")
     public PageResponse<ProductResponse> listForManagement(@RequestParam(required = false) String search,
+                                                           @RequestParam(required = false) UUID categoryId,
                                                            @RequestParam(defaultValue = "0") int page,
                                                            @RequestParam(defaultValue = "20") int size) {
-        return productService.listForManagement(search, PageRequest.of(page, size));
+        return productService.listForManagement(search, categoryId, PageRequest.of(page, size));
     }
 
     @GetMapping("/{id}")
-    public ProductResponse get(@PathVariable UUID id) {
-        return productService.get(id);
+    public ProductResponse get(@PathVariable UUID id, @RequestParam(required = false) UUID branchId) {
+        return productService.get(id, branchId);
     }
 
     @DeleteMapping("/manage/{id}")

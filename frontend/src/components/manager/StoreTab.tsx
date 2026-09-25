@@ -3,10 +3,11 @@ import { api } from '../../api/client'
 import ConfirmDialog from '../ConfirmDialog'
 import ProductDetailModal from '../ProductDetailModal'
 import ProductImage from '../ProductImage'
+import { viewProductInvoice, printProductInvoice, downloadProductInvoice } from '../../utils/productInvoice'
 import { useConfirm } from '../../hooks/useConfirm'
 import Spinner from '../Spinner'
 import { TableSkeleton } from '../Skeleton'
-import type { Product, ProductOrder, MemberSummary, PageResponse } from '../../types'
+import type { Product, ProductOrder, ProductCategory, ProductOrderInvoice, MemberSummary, PageResponse } from '../../types'
 
 const ORDER_PAGE_SIZE = 10
 const PRODUCT_PAGE_SIZE = 8
@@ -14,14 +15,13 @@ const MEMBER_SEARCH_SIZE = 20
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
 
 interface CartLine { product: Product; quantity: number }
-
-interface Props {
-  selectedBranch: string
-}
+interface Props { selectedBranch: string }
 
 export default function StoreTab({ selectedBranch }: Props) {
   const [products, setProducts] = useState<Product[]>([])
   const [productSearch, setProductSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [categories, setCategories] = useState<ProductCategory[]>([])
   const [productPage, setProductPage] = useState(0)
   const [productTotalPages, setProductTotalPages] = useState(1)
   const [cart, setCart] = useState<CartLine[]>([])
@@ -46,6 +46,7 @@ export default function StoreTab({ selectedBranch }: Props) {
   const [orderPage, setOrderPage] = useState(0)
   const [orderTotalPages, setOrderTotalPages] = useState(1)
   const [orderTotalElements, setOrderTotalElements] = useState(0)
+  const [invoiceError, setInvoiceError] = useState('')
 
   const [cancelTarget, setCancelTarget] = useState<ProductOrder | null>(null)
   const [refundAmount, setRefundAmount] = useState('')
@@ -56,9 +57,10 @@ export default function StoreTab({ selectedBranch }: Props) {
 
   const { confirm, dialogProps } = useConfirm()
 
-  function loadProducts(page = 0, search = productSearch) {
+  function loadProducts(page = 0, search = productSearch, cat = categoryFilter) {
+    if (!selectedBranch) return
     api.get<PageResponse<Product>>('/api/products', {
-      params: { search: search || undefined, page, size: PRODUCT_PAGE_SIZE },
+      params: { branchId: selectedBranch, search: search || undefined, categoryId: cat || undefined, page, size: PRODUCT_PAGE_SIZE },
     }).then((res) => {
       setProducts(res.data.content)
       setProductTotalPages(res.data.totalPages)
@@ -85,19 +87,21 @@ export default function StoreTab({ selectedBranch }: Props) {
       }).finally(() => setOrdersLoading(false))
   }
 
-  useEffect(() => { loadProducts(0) }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const handle = setTimeout(() => loadProducts(0, productSearch), 300)
-    return () => clearTimeout(handle)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productSearch])
+  useEffect(() => { api.get<ProductCategory[]>('/api/product-categories').then((res) => setCategories(res.data)) }, [])
 
   useEffect(() => {
     if (!selectedBranch) return
+    loadProducts(0)
     loadMemberOptions('')
     loadOrders(0)
   }, [selectedBranch]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!selectedBranch) return
+    const handle = setTimeout(() => loadProducts(0, productSearch, categoryFilter), 300)
+    return () => clearTimeout(handle)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productSearch, categoryFilter])
 
   useEffect(() => {
     if (!memberDropdownOpen) return
@@ -108,9 +112,7 @@ export default function StoreTab({ selectedBranch }: Props) {
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (memberDropdownRef.current && !memberDropdownRef.current.contains(e.target as Node)) {
-        setMemberDropdownOpen(false)
-      }
+      if (memberDropdownRef.current && !memberDropdownRef.current.contains(e.target as Node)) setMemberDropdownOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -119,16 +121,15 @@ export default function StoreTab({ selectedBranch }: Props) {
   function addToCart(product: Product) {
     setCart((lines) => {
       const existing = lines.find((l) => l.product.id === product.id)
+      const stock = product.stockQuantity ?? 0
       if (existing) {
-        if (existing.quantity >= product.stockQuantity) return lines
+        if (existing.quantity >= stock) return lines
         return lines.map((l) => l.product.id === product.id ? { ...l, quantity: l.quantity + 1 } : l)
       }
       return [...lines, { product, quantity: 1 }]
     })
   }
 
-  // Decrementing to zero removes the line instead of getting stuck at 1 - matches how a
-  // modern cart stepper behaves (the "-" button on qty 1 removes the item).
   function decrementLine(productId: string, quantity: number) {
     if (quantity <= 1) { removeFromCart(productId); return }
     setCart((lines) => lines.map((l) => l.product.id === productId ? { ...l, quantity: l.quantity - 1 } : l))
@@ -174,12 +175,8 @@ export default function StoreTab({ selectedBranch }: Props) {
     try {
       const { data } = await api.post<ProductOrder>(
         '/api/product-orders/purchase',
-        {
-          branchId: selectedBranch,
-          mode,
-          couponCode: couponStatus?.valid ? couponCode.trim() : null,
-          items: cart.map((l) => ({ productId: l.product.id, quantity: l.quantity })),
-        },
+        { branchId: selectedBranch, mode, couponCode: couponStatus?.valid ? couponCode.trim() : null,
+          items: cart.map((l) => ({ productId: l.product.id, quantity: l.quantity })) },
         { params: { memberId: selectedMember.id } }
       )
       setPurchaseMessage(`Recorded - invoice ${data.invoiceNumber}, total ₹${data.totalAmount}.`)
@@ -194,20 +191,13 @@ export default function StoreTab({ selectedBranch }: Props) {
   }
 
   function openCancelDialog(order: ProductOrder) {
-    setCancelTarget(order)
-    setRefundAmount(String(order.totalAmount))
-    setRefundMode('CASH')
-    setRefundNote('')
-    setCancelError('')
+    setCancelTarget(order); setRefundAmount(String(order.totalAmount)); setRefundMode('CASH'); setRefundNote(''); setCancelError('')
   }
 
   async function submitCancel() {
     if (!cancelTarget) return
     setCancelError('')
-    if (!refundAmount || Number.isNaN(Number(refundAmount)) || Number(refundAmount) <= 0) {
-      setCancelError('Enter a valid refund amount.')
-      return
-    }
+    if (!refundAmount || Number.isNaN(Number(refundAmount)) || Number(refundAmount) <= 0) { setCancelError('Enter a valid refund amount.'); return }
     setCancelling(true)
     try {
       await api.post(`/api/product-orders/${cancelTarget.id}/cancel`, {
@@ -223,23 +213,36 @@ export default function StoreTab({ selectedBranch }: Props) {
     }
   }
 
+  async function handleInvoiceAction(orderId: string, action: 'view' | 'print' | 'download') {
+    setInvoiceError('')
+    try {
+      const { data } = await api.get<ProductOrderInvoice>(`/api/product-orders/${orderId}/invoice`)
+      if (action === 'view') await viewProductInvoice(data)
+      else if (action === 'print') await printProductInvoice(data)
+      else await downloadProductInvoice(data)
+    } catch (err: any) {
+      setInvoiceError(err.response?.data?.error || 'Failed to load invoice')
+    }
+  }
+
   return (
     <div>
       <div className="grid gap-8 lg:grid-cols-5">
         <div className="rounded-lg border border-gray-200 p-6 lg:col-span-3">
           <h2 className="font-medium">Products</h2>
-          <input placeholder="Search products..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
-            className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-          {/* grid-cols-1 explicit - without it a plain `grid` with no column count falls back
-              to implicit auto-sizing, which let a long name/wide image stretch the row past
-              the container instead of stacking. */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input placeholder="Search products..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
+              className="min-w-[160px] flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm">
+              <option value="">All categories</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {products.map((p) => (
               <div key={p.id} className="flex min-w-0 items-center gap-3 rounded-md border border-gray-200 p-3">
-                {/* min-w-0 on every flex ancestor of the truncated name - a flex item's
-                    default min-width is `auto` (its content size), which silently defeats
-                    `truncate` and pushes the row (and the View button) wider than the card. */}
-                <button type="button" disabled={p.outOfStock} onClick={() => addToCart(p)}
+                <button type="button" disabled={!!p.outOfStock} onClick={() => addToCart(p)}
                   className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-not-allowed disabled:opacity-50">
                   <ProductImage src={p.imageUrls[0]} alt={p.name} className="h-12 w-12 flex-shrink-0 rounded" />
                   <div className="min-w-0">
@@ -273,11 +276,9 @@ export default function StoreTab({ selectedBranch }: Props) {
 
         <div className="rounded-lg border border-gray-200 p-6 lg:col-span-2">
           <h2 className="font-medium">Cart &amp; checkout</h2>
-
           <div className="relative mt-3" ref={memberDropdownRef}>
             <input
-              type="text"
-              required={!selectedMember}
+              type="text" required={!selectedMember}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Search member by name or email..."
               value={memberDropdownOpen ? memberSearchQuery : selectedMember?.name ?? ''}
@@ -302,9 +303,6 @@ export default function StoreTab({ selectedBranch }: Props) {
           <ul className="mt-4 divide-y divide-gray-100 text-sm">
             {cart.map((l) => (
               <li key={l.product.id} className="flex min-w-0 items-center gap-3 py-2">
-                {/* min-w-0 + flex-1 on the name block, flex-shrink-0 on the stepper - this
-                    is the "space between name and counter" fix: the name now truncates
-                    instead of squeezing the +/- controls up against it. */}
                 <div className="min-w-0 flex-1">
                   <p className="truncate">{l.product.name}</p>
                   <p className="text-xs text-gray-500">₹{l.product.effectivePrice} each</p>
@@ -312,16 +310,12 @@ export default function StoreTab({ selectedBranch }: Props) {
                 <div className="flex flex-shrink-0 items-center gap-2">
                   <div className="flex items-center rounded-md border border-gray-300">
                     <button type="button" onClick={() => decrementLine(l.product.id, l.quantity)}
-                      className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-50" aria-label="Decrease quantity">
-                      −
-                    </button>
+                      className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-50" aria-label="Decrease quantity">−</button>
                     <span className="w-7 text-center text-sm tabular-nums">{l.quantity}</span>
-                    <button type="button" disabled={l.quantity >= l.product.stockQuantity}
-                      onClick={() => incrementLine(l.product.id, l.quantity, l.product.stockQuantity)}
+                    <button type="button" disabled={l.quantity >= (l.product.stockQuantity ?? 0)}
+                      onClick={() => incrementLine(l.product.id, l.quantity, l.product.stockQuantity ?? 0)}
                       className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-30"
-                      aria-label="Increase quantity">
-                      +
-                    </button>
+                      aria-label="Increase quantity">+</button>
                   </div>
                   <button onClick={() => removeFromCart(l.product.id)} className="text-xs text-red-600 hover:underline">Remove</button>
                 </div>
@@ -341,9 +335,7 @@ export default function StoreTab({ selectedBranch }: Props) {
                   {checkingCoupon ? 'Checking...' : 'Apply'}
                 </button>
               </div>
-              {couponStatus && (
-                <p className={`text-xs ${couponStatus.valid ? 'text-green-700' : 'text-red-600'}`}>{couponStatus.message}</p>
-              )}
+              {couponStatus && <p className={`text-xs ${couponStatus.valid ? 'text-green-700' : 'text-red-600'}`}>{couponStatus.message}</p>}
 
               <select required value={mode} onChange={(e) => setMode(e.target.value)}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
@@ -365,6 +357,7 @@ export default function StoreTab({ selectedBranch }: Props) {
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">Product order history</h2>
+        {invoiceError && <p className="mt-2 text-sm text-red-600">{invoiceError}</p>}
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -384,27 +377,21 @@ export default function StoreTab({ selectedBranch }: Props) {
                 <tr key={o.id}>
                   <td className="py-2 pr-4 text-gray-500">{o.invoiceNumber}</td>
                   <td className="py-2 pr-4">{o.memberName}</td>
-                  <td className="py-2 pr-4 text-xs text-gray-500">
-                    {o.items.map((it) => `${it.productName} ×${it.quantity}`).join(', ')}
-                  </td>
+                  <td className="py-2 pr-4 text-xs text-gray-500">{o.items.map((it) => `${it.productName} ×${it.quantity}`).join(', ')}</td>
                   <td className="py-2 pr-4">
                     ₹{o.totalAmount}
                     {o.discountAmount > 0 && <span className="ml-1 text-xs text-green-700">(-₹{o.discountAmount})</span>}
                   </td>
                   <td className="py-2 pr-4">
-                    <span className={
-                      o.status === 'CANCELLED' ? 'text-red-600'
-                        : o.status === 'COMPLETED' ? 'text-green-700'
-                        : 'text-blue-600'
-                    }>
+                    <span className={o.status === 'CANCELLED' ? 'text-red-600' : o.status === 'COMPLETED' ? 'text-green-700' : 'text-blue-600'}>
                       {o.status === 'CANCELLED' ? `Cancelled (refunded ₹${o.refundAmount})` : o.status}
                     </span>
                   </td>
-                  <td className="py-2">
+                  <td className="py-2 space-x-2 whitespace-nowrap">
+                    <button onClick={() => handleInvoiceAction(o.id, 'view')} className="text-xs text-brand hover:underline">View</button>
+                    <button onClick={() => handleInvoiceAction(o.id, 'download')} className="text-xs text-brand hover:underline">Download</button>
                     {o.status !== 'CANCELLED' && (
-                      <button onClick={() => openCancelDialog(o)} className="text-xs text-red-600 hover:underline">
-                        Cancel &amp; refund
-                      </button>
+                      <button onClick={() => openCancelDialog(o)} className="text-xs text-red-600 hover:underline">Cancel &amp; refund</button>
                     )}
                   </td>
                 </tr>
@@ -427,13 +414,10 @@ export default function StoreTab({ selectedBranch }: Props) {
       </div>
 
       {cancelTarget && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
-          onClick={() => !cancelling && setCancelTarget(null)}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={() => !cancelling && setCancelTarget(null)}>
           <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-gray-900">Cancel order {cancelTarget.invoiceNumber}</h3>
-            <p className="mt-2 text-sm text-gray-600">
-              Stock will be restored for every item. Record the cash refund given to {cancelTarget.memberName}.
-            </p>
+            <p className="mt-2 text-sm text-gray-600">Stock will be restored for every item. Record the cash refund given to {cancelTarget.memberName}.</p>
             <div className="mt-4 space-y-3">
               <div>
                 <label className="text-xs text-gray-500">Refund amount</label>
@@ -467,9 +451,7 @@ export default function StoreTab({ selectedBranch }: Props) {
         </div>
       )}
 
-      {viewingProduct && (
-        <ProductDetailModal product={viewingProduct} onClose={() => setViewingProduct(null)} isStaffView />
-      )}
+      {viewingProduct && <ProductDetailModal product={viewingProduct} onClose={() => setViewingProduct(null)} isStaffView />}
       <ConfirmDialog {...dialogProps} />
     </div>
   )

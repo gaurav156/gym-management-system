@@ -126,14 +126,24 @@ public class SecurityConfig {
                 .requestMatchers("/api/products/manage/**").hasRole("OWNER")
                 .requestMatchers(HttpMethod.GET, "/api/products/**").authenticated()
 
+                // Product categories - GET open to any authenticated role for browsing/filtering.
+                .requestMatchers(HttpMethod.GET, "/api/product-categories/**").authenticated()
+                .requestMatchers("/api/product-categories/**").hasRole("OWNER")
+
                 // Coupons - Owner manages, Owner/Manager validate a code at the front desk.
-                            .requestMatchers("/api/coupons/manage/**").hasRole("OWNER")
+                .requestMatchers("/api/coupons/manage/**").hasRole("OWNER")
                 .requestMatchers("/api/coupons/validate").hasAnyRole("OWNER", "MANAGER")
 
-                // Product orders - purchase/complete/cancel/branch-listing are front-desk staff actions;
-                // /mine is the member's own history (ownership checked in the controller).
+                // Product orders - purchase/complete/cancel/branch-listing/manual-send are front-desk
+                // staff actions; /mine is the Member's own history. The {id}/invoice endpoint is
+                // deliberately NOT matched here - it falls through to .anyRequest().authenticated() and
+                // is enforced by @PreAuthorize on the controller method instead, same pattern as
+                // PaymentController's own /invoice endpoint - a Member must be able to fetch their own
+                // order's invoice, which a blanket OWNER/MANAGER matcher here would otherwise block.
+                .requestMatchers("/api/product-orders/purchase", "/api/product-orders/*/complete",
+                        "/api/product-orders/*/cancel", "/api/product-orders/branch/**",
+                        "/api/product-orders/*/send-email").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers("/api/product-orders/mine").hasRole("MEMBER")
-                .requestMatchers("/api/product-orders/**").hasAnyRole("OWNER", "MANAGER")
 
                 .anyRequest().authenticated()
             )
