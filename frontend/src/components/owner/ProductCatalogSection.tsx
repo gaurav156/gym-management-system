@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import PhotoUploadButton from '../PhotoUploadButton'
+import ProductDetailModal from '../ProductDetailModal'
 import Spinner from '../Spinner'
 import ConfirmDialog from '../ConfirmDialog'
 import { useConfirm } from '../../hooks/useConfirm'
@@ -14,10 +15,6 @@ const emptyForm = {
   discountStartsAt: '', discountEndsAt: '', stockQuantity: '',
 }
 
-// Mirrors OwnerDashboard's existing "Membership plans" card, but as its own section since
-// products carry a lot more per-item state (images, discount window, stock) than a plan
-// does - a full-width table with an edit-in-place row makes more sense here than the
-// compact list+inline-form OwnerDashboard uses for plans/branches.
 export default function ProductCatalogSection() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,6 +34,9 @@ export default function ProductCatalogSection() {
   const [editImages, setEditImages] = useState<string[]>([])
   const [editError, setEditError] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
+
+  const [viewingProduct, setViewingProduct] = useState<Product | null>(null)
+  const [listMessage, setListMessage] = useState('')
 
   const { confirm, dialogProps } = useConfirm()
 
@@ -152,6 +152,24 @@ export default function ProductCatalogSection() {
     })
   }
 
+  function deleteProduct(p: Product) {
+    setListMessage('')
+    confirm({
+      title: 'Delete product',
+      message: `Permanently delete "${p.name}"? This only works if it's never been ordered - otherwise deactivate it instead. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/api/products/manage/${p.id}`)
+          loadProducts(page)
+        } catch (err: any) {
+          setListMessage(err.response?.data?.error || 'Failed to delete product')
+        }
+      },
+    })
+  }
+
   return (
     <div className="rounded-lg border border-gray-200 p-6">
       <div className="flex items-center justify-between">
@@ -205,8 +223,8 @@ export default function ProductCatalogSection() {
             <label className="text-xs text-gray-500">Images</label>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               {formImages.map((url, i) => (
-                <div key={url} className="relative">
-                  <img src={url} alt="" className="h-16 w-16 rounded object-cover" />
+                <div key={url} className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded border border-gray-200 bg-gray-50">
+                  <img src={url} alt="" className="max-h-full max-w-full object-contain" />
                   <button type="button" onClick={() => setFormImages((imgs) => imgs.filter((_, idx) => idx !== i))}
                     className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white">✕</button>
                 </div>
@@ -229,6 +247,8 @@ export default function ProductCatalogSection() {
 
       <input placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)}
         className="mt-4 w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm" />
+
+      {listMessage && <p className="mt-3 text-sm text-red-600">{listMessage}</p>}
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-left text-sm">
@@ -279,8 +299,8 @@ export default function ProductCatalogSection() {
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                           {editImages.map((url, i) => (
-                            <div key={url} className="relative">
-                              <img src={url} alt="" className="h-14 w-14 rounded object-cover" />
+                            <div key={url} className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded border border-gray-200 bg-gray-50">
+                              <img src={url} alt="" className="max-h-full max-w-full object-contain" />
                               <button type="button" onClick={() => setEditImages((imgs) => imgs.filter((_, idx) => idx !== i))}
                                 className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white">✕</button>
                             </div>
@@ -306,8 +326,15 @@ export default function ProductCatalogSection() {
                     <>
                       <td className="py-2 pr-4">
                         <div className="flex items-center gap-2">
-                          {p.imageUrls[0] && <img src={p.imageUrls[0]} alt="" className="h-8 w-8 rounded object-cover" />}
+                          {p.imageUrls[0] && (
+                            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded bg-gray-50">
+                              <img src={p.imageUrls[0]} alt="" className="max-h-full max-w-full object-contain" />
+                            </div>
+                          )}
                           <span className={p.active ? '' : 'text-gray-400'}>{p.name}</span>
+                          {p.imageUrls.length > 1 && (
+                            <span className="text-[10px] text-gray-400">+{p.imageUrls.length - 1}</span>
+                          )}
                         </div>
                       </td>
                       <td className="py-2 pr-4">
@@ -331,10 +358,12 @@ export default function ProductCatalogSection() {
                         </span>
                       </td>
                       <td className="py-2 space-x-2 whitespace-nowrap">
+                        <button onClick={() => setViewingProduct(p)} className="text-xs text-gray-600 hover:underline">View</button>
                         <button onClick={() => startEdit(p)} className="text-xs text-gray-600 hover:underline">Edit</button>
                         <button onClick={() => toggleActive(p)} className="text-xs text-brand hover:underline">
                           {p.active ? 'Deactivate' : 'Reactivate'}
                         </button>
+                        <button onClick={() => deleteProduct(p)} className="text-xs text-red-600 hover:underline">Delete</button>
                       </td>
                     </>
                   )}
@@ -357,6 +386,9 @@ export default function ProductCatalogSection() {
         )}
       </div>
 
+      {viewingProduct && (
+        <ProductDetailModal product={viewingProduct} onClose={() => setViewingProduct(null)} isStaffView />
+      )}
       <ConfirmDialog {...dialogProps} />
     </div>
   )

@@ -3,6 +3,7 @@ package com.gymapp.service;
 import com.gymapp.dto.PageDtos.PageResponse;
 import com.gymapp.dto.ProductDtos.*;
 import com.gymapp.entity.Product;
+import com.gymapp.repository.ProductOrderItemRepository;
 import com.gymapp.repository.ProductRepository;
 import com.gymapp.storage.ImagePurpose;
 import com.gymapp.storage.ImageRefs;
@@ -21,10 +22,14 @@ import java.util.UUID;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductOrderItemRepository productOrderItemRepository;
     private final ImageRefs imageRefs;
 
-    public ProductService(ProductRepository productRepository, ImageRefs imageRefs) {
+    public ProductService(ProductRepository productRepository,
+                          ProductOrderItemRepository productOrderItemRepository,
+                          ImageRefs imageRefs) {
         this.productRepository = productRepository;
+        this.productOrderItemRepository = productOrderItemRepository;
         this.imageRefs = imageRefs;
     }
 
@@ -75,6 +80,28 @@ public class ProductService {
 
         product = productRepository.save(product);
         return toResponse(product);
+    }
+
+    // Owner-only (enforced at the controller). A hard delete is only safe when the product
+    // has never been part of an order - product_order_items.product_id has no cascade (see
+    // V16 migration) precisely so a delete here can never silently corrupt a past invoice.
+    // If it HAS been ordered, the Owner is pointed at deactivating instead (already-existing
+    // active=false toggle), same "can't delete, can deactivate" pattern as
+    // UserManagementService.deleteUser() for staff who've recorded payments/expenses.
+    @Transactional
+    public void delete(UUID productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+
+        if (productOrderItemRepository.existsByProductId(productId)) {
+            throw new IllegalArgumentException(
+                    "This product has order history - deleting it would break those invoices. " +
+                            "Deactivate it instead so it stops appearing in the catalog.");
+        }
+
+        List<String> imageKeys = new ArrayList<>(product.getImageKeys());
+        productRepository.delete(product);
+        imageKeys.forEach(imageRefs::deleteAfterCommit);
     }
 
     @Transactional(readOnly = true)

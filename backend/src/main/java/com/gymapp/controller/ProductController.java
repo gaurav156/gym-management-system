@@ -56,4 +56,10 @@ public class ProductController {
     public ProductResponse get(@PathVariable UUID id) {
         return productService.get(id);
     }
+
+    @DeleteMapping("/manage/{id}")
+    @PreAuthorize("hasRole('OWNER')")
+    public void delete(@PathVariable UUID id) {
+        productService.delete(id);
+    }
 }

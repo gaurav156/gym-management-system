@@ -1,12 +1,15 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { api } from '../../api/client'
 import ConfirmDialog from '../ConfirmDialog'
+import ProductDetailModal from '../ProductDetailModal'
+import ProductImage from '../ProductImage'
 import { useConfirm } from '../../hooks/useConfirm'
 import Spinner from '../Spinner'
 import { TableSkeleton } from '../Skeleton'
 import type { Product, ProductOrder, MemberSummary, PageResponse } from '../../types'
 
-const PAGE_SIZE = 10
+const ORDER_PAGE_SIZE = 10
+const PRODUCT_PAGE_SIZE = 8
 const MEMBER_SEARCH_SIZE = 20
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
 
@@ -16,13 +19,13 @@ interface Props {
   selectedBranch: string
 }
 
-// Front-desk purchase flow: pick a member, add products to a cart, optionally apply a
-// coupon, pick a payment mode, and record the sale - mirrors PaymentsTab's
-// member-search-dropdown + purchase-form pattern, extended for a multi-item cart.
 export default function StoreTab({ selectedBranch }: Props) {
   const [products, setProducts] = useState<Product[]>([])
   const [productSearch, setProductSearch] = useState('')
+  const [productPage, setProductPage] = useState(0)
+  const [productTotalPages, setProductTotalPages] = useState(1)
   const [cart, setCart] = useState<CartLine[]>([])
+  const [viewingProduct, setViewingProduct] = useState<Product | null>(null)
 
   const [members, setMembers] = useState<MemberSummary[]>([])
   const [selectedMember, setSelectedMember] = useState<MemberSummary | null>(null)
@@ -53,9 +56,14 @@ export default function StoreTab({ selectedBranch }: Props) {
 
   const { confirm, dialogProps } = useConfirm()
 
-  function loadProducts(search = productSearch) {
-    api.get<PageResponse<Product>>('/api/products', { params: { search: search || undefined, size: 50 } })
-      .then((res) => setProducts(res.data.content))
+  function loadProducts(page = 0, search = productSearch) {
+    api.get<PageResponse<Product>>('/api/products', {
+      params: { search: search || undefined, page, size: PRODUCT_PAGE_SIZE },
+    }).then((res) => {
+      setProducts(res.data.content)
+      setProductTotalPages(res.data.totalPages)
+      setProductPage(res.data.page)
+    })
   }
 
   function loadMemberOptions(search: string) {
@@ -68,7 +76,7 @@ export default function StoreTab({ selectedBranch }: Props) {
   function loadOrders(page = 0) {
     if (!selectedBranch) return
     setOrdersLoading(true)
-    api.get<PageResponse<ProductOrder>>(`/api/product-orders/branch/${selectedBranch}`, { params: { page, size: PAGE_SIZE } })
+    api.get<PageResponse<ProductOrder>>(`/api/product-orders/branch/${selectedBranch}`, { params: { page, size: ORDER_PAGE_SIZE } })
       .then((res) => {
         setOrders(res.data.content)
         setOrderTotalPages(res.data.totalPages)
@@ -77,10 +85,10 @@ export default function StoreTab({ selectedBranch }: Props) {
       }).finally(() => setOrdersLoading(false))
   }
 
-  useEffect(() => { loadProducts() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadProducts(0) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const handle = setTimeout(() => loadProducts(productSearch), 300)
+    const handle = setTimeout(() => loadProducts(0, productSearch), 300)
     return () => clearTimeout(handle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productSearch])
@@ -119,12 +127,16 @@ export default function StoreTab({ selectedBranch }: Props) {
     })
   }
 
-  function updateQuantity(productId: string, quantity: number) {
-    setCart((lines) => lines
-      .map((l) => l.product.id === productId ? { ...l, quantity: Math.max(1, Math.min(quantity, l.product.stockQuantity)) } : l)
-      .filter((l) => l.quantity > 0))
+  // Decrementing to zero removes the line instead of getting stuck at 1 - matches how a
+  // modern cart stepper behaves (the "-" button on qty 1 removes the item).
+  function decrementLine(productId: string, quantity: number) {
+    if (quantity <= 1) { removeFromCart(productId); return }
+    setCart((lines) => lines.map((l) => l.product.id === productId ? { ...l, quantity: l.quantity - 1 } : l))
   }
-
+  function incrementLine(productId: string, quantity: number, stock: number) {
+    if (quantity >= stock) return
+    setCart((lines) => lines.map((l) => l.product.id === productId ? { ...l, quantity: l.quantity + 1 } : l))
+  }
   function removeFromCart(productId: string) {
     setCart((lines) => lines.filter((l) => l.product.id !== productId))
   }
@@ -172,7 +184,7 @@ export default function StoreTab({ selectedBranch }: Props) {
       )
       setPurchaseMessage(`Recorded - invoice ${data.invoiceNumber}, total ₹${data.totalAmount}.`)
       resetCart()
-      loadProducts()
+      loadProducts(productPage)
       loadOrders(0)
     } catch (err: any) {
       setPurchaseMessage(err.response?.data?.error || 'Failed to record purchase')
@@ -203,7 +215,7 @@ export default function StoreTab({ selectedBranch }: Props) {
       })
       setCancelTarget(null)
       loadOrders(orderPage)
-      loadProducts()
+      loadProducts(productPage)
     } catch (err: any) {
       setCancelError(err.response?.data?.error || 'Failed to cancel order')
     } finally {
@@ -218,24 +230,45 @@ export default function StoreTab({ selectedBranch }: Props) {
           <h2 className="font-medium">Products</h2>
           <input placeholder="Search products..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
             className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {/* grid-cols-1 explicit - without it a plain `grid` with no column count falls back
+              to implicit auto-sizing, which let a long name/wide image stretch the row past
+              the container instead of stacking. */}
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {products.map((p) => (
-              <button key={p.id} type="button" disabled={p.outOfStock} onClick={() => addToCart(p)}
-                className="flex items-center gap-3 rounded-md border border-gray-200 p-3 text-left disabled:cursor-not-allowed disabled:opacity-50 hover:border-brand">
-                {p.imageUrls[0] && <img src={p.imageUrls[0]} alt="" className="h-12 w-12 flex-shrink-0 rounded object-cover" />}
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{p.name}</p>
-                  <p className="text-xs text-gray-500">
-                    {p.discountActive ? (
-                      <><span className="line-through">₹{p.price}</span> <span className="text-green-700">₹{p.discountPrice}</span></>
-                    ) : `₹${p.price}`}
-                  </p>
-                  <p className="text-xs text-gray-400">{p.outOfStock ? 'Out of stock' : `${p.stockQuantity} in stock`}</p>
-                </div>
-              </button>
+              <div key={p.id} className="flex min-w-0 items-center gap-3 rounded-md border border-gray-200 p-3">
+                {/* min-w-0 on every flex ancestor of the truncated name - a flex item's
+                    default min-width is `auto` (its content size), which silently defeats
+                    `truncate` and pushes the row (and the View button) wider than the card. */}
+                <button type="button" disabled={p.outOfStock} onClick={() => addToCart(p)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-not-allowed disabled:opacity-50">
+                  <ProductImage src={p.imageUrls[0]} alt={p.name} className="h-12 w-12 flex-shrink-0 rounded" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{p.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {p.discountActive ? (
+                        <><span className="line-through">₹{p.price}</span> <span className="text-green-700">₹{p.discountPrice}</span></>
+                      ) : `₹${p.price}`}
+                    </p>
+                    <p className="text-xs text-gray-400">{p.outOfStock ? 'Out of stock' : `${p.stockQuantity} in stock`}</p>
+                  </div>
+                </button>
+                <button type="button" onClick={() => setViewingProduct(p)}
+                  className="flex-shrink-0 text-xs text-gray-500 hover:underline">View</button>
+              </div>
             ))}
-            {products.length === 0 && <p className="text-sm text-gray-400">No products found.</p>}
+            {products.length === 0 && <p className="text-sm text-gray-400 sm:col-span-2">No products found.</p>}
           </div>
+          {productTotalPages > 1 && (
+            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+              <span>Page {productPage + 1} of {productTotalPages}</span>
+              <div className="space-x-2">
+                <button disabled={productPage === 0} onClick={() => loadProducts(productPage - 1)}
+                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                <button disabled={productPage + 1 >= productTotalPages} onClick={() => loadProducts(productPage + 1)}
+                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="rounded-lg border border-gray-200 p-6 lg:col-span-2">
@@ -268,15 +301,28 @@ export default function StoreTab({ selectedBranch }: Props) {
 
           <ul className="mt-4 divide-y divide-gray-100 text-sm">
             {cart.map((l) => (
-              <li key={l.product.id} className="flex items-center justify-between py-2">
-                <div className="min-w-0">
+              <li key={l.product.id} className="flex min-w-0 items-center gap-3 py-2">
+                {/* min-w-0 + flex-1 on the name block, flex-shrink-0 on the stepper - this
+                    is the "space between name and counter" fix: the name now truncates
+                    instead of squeezing the +/- controls up against it. */}
+                <div className="min-w-0 flex-1">
                   <p className="truncate">{l.product.name}</p>
                   <p className="text-xs text-gray-500">₹{l.product.effectivePrice} each</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input type="number" min={1} max={l.product.stockQuantity} value={l.quantity}
-                    onChange={(e) => updateQuantity(l.product.id, Number(e.target.value))}
-                    className="w-14 rounded-md border border-gray-300 px-2 py-1 text-xs" />
+                <div className="flex flex-shrink-0 items-center gap-2">
+                  <div className="flex items-center rounded-md border border-gray-300">
+                    <button type="button" onClick={() => decrementLine(l.product.id, l.quantity)}
+                      className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-50" aria-label="Decrease quantity">
+                      −
+                    </button>
+                    <span className="w-7 text-center text-sm tabular-nums">{l.quantity}</span>
+                    <button type="button" disabled={l.quantity >= l.product.stockQuantity}
+                      onClick={() => incrementLine(l.product.id, l.quantity, l.product.stockQuantity)}
+                      className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-30"
+                      aria-label="Increase quantity">
+                      +
+                    </button>
+                  </div>
                   <button onClick={() => removeFromCart(l.product.id)} className="text-xs text-red-600 hover:underline">Remove</button>
                 </div>
               </li>
@@ -421,6 +467,9 @@ export default function StoreTab({ selectedBranch }: Props) {
         </div>
       )}
 
+      {viewingProduct && (
+        <ProductDetailModal product={viewingProduct} onClose={() => setViewingProduct(null)} isStaffView />
+      )}
       <ConfirmDialog {...dialogProps} />
     </div>
   )
