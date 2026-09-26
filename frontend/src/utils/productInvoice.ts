@@ -3,7 +3,6 @@ import type { ProductOrderInvoice } from '../types'
 
 const GYM_NAME = import.meta.env.VITE_GYM_NAME || 'Gym Invoice'
 const GYM_LOGO_URL = import.meta.env.VITE_GYM_LOGO_URL || ''
-const DIRECTOR_NAME = (import.meta.env.VITE_DIRECTOR_NAME || '').trim()
 
 // Kept separate from utils/invoice.ts - the doc-building differs enough (item table vs.
 // one plan line) that sharing a single buildDoc would need a lot of branching.
@@ -140,6 +139,23 @@ async function buildInvoiceDoc(inv: ProductOrderInvoice): Promise<jsPDF> {
   doc.text(`Mode: ${inv.mode.replace('_', ' ')}`, col4, y, { align: 'right' })
   y += 36
 
+  if (inv.status === 'CANCELLED') {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(185, 28, 28)
+    doc.text(`CANCELLED - Refunded Rs. ${(inv.refundAmount ?? 0).toFixed(2)} via ${(inv.refundMode ?? '-').replace('_', ' ')}`, margin, y)
+    doc.setTextColor(0, 0, 0)
+    y += 16
+    if (inv.refundNote) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      const wrapped = doc.splitTextToSize(`Note: ${inv.refundNote}`, pageWidth - margin * 2)
+      doc.text(wrapped, margin, y)
+      y += 13 * wrapped.length
+    }
+    y += 10
+  }
+
   const sigX = pageWidth - margin - 120
   let signature: string | null = null
   if (inv.recordedBySignature) {
@@ -158,15 +174,6 @@ async function buildInvoiceDoc(inv: ProductOrderInvoice): Promise<jsPDF> {
   doc.setFontSize(8)
   doc.text('Authorized Signatory', sigX, y); y += 12
   if (inv.recordedByName) doc.text(inv.recordedByName, sigX, y)
-
-  if (DIRECTOR_NAME) {
-    y += 30
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
-    doc.text('Director', margin, y); y += 14
-    doc.setFont('helvetica', 'normal')
-    doc.text(DIRECTOR_NAME, margin, y)
-  }
 
   return doc
 }

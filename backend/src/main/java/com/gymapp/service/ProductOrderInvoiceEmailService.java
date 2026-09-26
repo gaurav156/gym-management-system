@@ -38,12 +38,16 @@ public class ProductOrderInvoiceEmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress);
             helper.setTo(inv.memberEmail());
-            helper.setSubject(gymName + " - Order " + inv.invoiceNumber());
+            helper.setSubject(gymName + " - " + (isCancelled(inv) ? "Order Cancelled " : "Order ") + inv.invoiceNumber());
             helper.setText(buildPlainText(inv), buildHtml(inv));
             mailSender.send(message);
         } catch (Exception e) {
             throw new RuntimeException("Failed to build/send product order invoice email", e);
         }
+    }
+
+    private boolean isCancelled(OrderInvoiceResponse inv) {
+        return "CANCELLED".equals(inv.status());
     }
 
     private String invoiceUrl(OrderInvoiceResponse inv) {
@@ -52,16 +56,27 @@ public class ProductOrderInvoiceEmailService {
 
     private String buildPlainText(OrderInvoiceResponse inv) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Hi ").append(inv.memberName()).append(",\n\n")
-                .append("Thanks for your purchase at ").append(inv.branchName()).append(".\n\n")
-                .append("Order: ").append(inv.invoiceNumber()).append("\n");
+        sb.append("Hi ").append(inv.memberName()).append(",\n\n");
+        if (isCancelled(inv)) {
+            sb.append("Your order at ").append(inv.branchName()).append(" has been cancelled and refunded.\n\n");
+        } else {
+            sb.append("Thanks for your purchase at ").append(inv.branchName()).append(".\n\n");
+        }
+        sb.append("Order: ").append(inv.invoiceNumber()).append("\n");
         for (OrderItemResponse item : inv.items()) {
             sb.append("  - ").append(item.productName()).append(" x").append(item.quantity())
                     .append(" = Rs. ").append(item.lineTotal()).append("\n");
         }
         sb.append("Total: Rs. ").append(inv.totalAmount()).append("\n")
-                .append("Mode: ").append(inv.mode().replace("_", " ")).append("\n")
-                .append("\nView or download your invoice here: ").append(invoiceUrl(inv)).append("\n");
+                .append("Mode: ").append(inv.mode().replace("_", " ")).append("\n");
+        if (isCancelled(inv)) {
+            sb.append("\nRefund: Rs. ").append(inv.refundAmount())
+                    .append(" via ").append(inv.refundMode() != null ? inv.refundMode().replace("_", " ") : "-").append("\n");
+            if (inv.refundNote() != null && !inv.refundNote().isBlank()) {
+                sb.append("Note: ").append(inv.refundNote()).append("\n");
+            }
+        }
+        sb.append("\nView or download your invoice here: ").append(invoiceUrl(inv)).append("\n");
         return sb.toString();
     }
 
@@ -70,6 +85,7 @@ public class ProductOrderInvoiceEmailService {
         String safeGymName = HtmlUtils.htmlEscape(gymName);
         String safeBranch = HtmlUtils.htmlEscape(inv.branchName());
         String url = invoiceUrl(inv);
+        boolean cancelled = isCancelled(inv);
 
         String logoHtml = (logoUrl != null && !logoUrl.isBlank())
                 ? "<img src=\"" + HtmlUtils.htmlEscape(logoUrl) + "\" alt=\"" + safeGymName + "\" "
@@ -80,6 +96,17 @@ public class ProductOrderInvoiceEmailService {
         for (OrderItemResponse item : inv.items()) {
             itemRows.append(row(HtmlUtils.htmlEscape(item.productName()) + " x" + item.quantity(), "Rs. " + item.lineTotal()));
         }
+
+        String cancelledBanner = cancelled
+                ? "<tr><td style=\"padding:0 32px;\"><div style=\"background-color:#fef2f2;border:1px solid #fecaca;"
+                +   "border-radius:8px;padding:10px 14px;margin-bottom:16px;color:#b91c1c;font-size:13px;font-weight:600;\">"
+                +   "Cancelled - refund of Rs. " + inv.refundAmount() + " recorded via "
+                +   HtmlUtils.htmlEscape(inv.refundMode() != null ? inv.refundMode().replace("_", " ") : "-") + "</div></td></tr>"
+                : "";
+
+        String introLine = cancelled
+                ? "Your order at " + safeBranch + " has been cancelled and refunded. Here's the updated summary:"
+                : "Thanks for your purchase at " + safeBranch + ". Here's your order summary:";
 
         return "<!DOCTYPE html>"
                 + "<html><body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;\">"
@@ -93,9 +120,10 @@ public class ProductOrderInvoiceEmailService {
                 + "</td></tr>"
                 + "<tr><td style=\"padding:32px;\">"
                 + "<p style=\"margin:0 0 4px;font-size:15px;color:#111827;\">Hi " + safeName + ",</p>"
-                + "<p style=\"margin:0 0 24px;font-size:15px;line-height:1.5;color:#4b5563;\">"
-                +   "Thanks for your purchase at " + safeBranch + ". Here's your order summary:"
-                + "</p>"
+                + "<p style=\"margin:0 0 16px;font-size:15px;line-height:1.5;color:#4b5563;\">" + introLine + "</p>"
+                + "</td></tr>"
+                + cancelledBanner
+                + "<tr><td style=\"padding:0 32px 32px;\">"
                 + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" "
                 +   "style=\"background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;\">"
                 + row("Order #", inv.invoiceNumber())
@@ -112,9 +140,6 @@ public class ProductOrderInvoiceEmailService {
                 + "</a>"
                 + "</td></tr>"
                 + "</table>"
-                + "<p style=\"margin:24px 0 0;font-size:13px;line-height:1.5;color:#9ca3af;\">"
-                +   "You can also view this any time from your Store tab under Your purchases."
-                + "</p>"
                 + "</td></tr>"
                 + "<tr><td style=\"padding:20px 32px;border-top:1px solid #f3f4f6;text-align:center;\">"
                 + "<p style=\"margin:0;font-size:12px;color:#9ca3af;\">This is an automated message from " + safeGymName + ". Please don't reply to this email.</p>"

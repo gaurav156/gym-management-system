@@ -177,7 +177,6 @@ public class ProductOrderService {
         User refundedBy = userRepository.findById(refundedByUserId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // Restored to the SAME branch it was taken from - never a different one.
         for (ProductOrderItem item : order.getItems()) {
             branchStockRepository.findByProductIdAndBranchId(item.getProduct().getId(), order.getBranch().getId())
                     .ifPresent(stock -> {
@@ -194,6 +193,12 @@ public class ProductOrderService {
         order.setRefundedBy(refundedBy);
 
         order = productOrderRepository.save(order);
+
+        // Same event/listener as purchase() - fires AFTER_COMMIT + @Async, so a slow/
+        // failing mail server never delays or fails the cancellation response. The
+        // listener rebuilds the invoice from the order's current (now cancelled) state.
+        eventPublisher.publishEvent(new ProductOrderRecordedEvent(order.getId()));
+
         return toResponse(order);
     }
 
@@ -247,7 +252,12 @@ public class ProductOrderService {
                 o.getCoupon() != null ? o.getCoupon().getCode() : null,
                 o.getTotalAmount(), o.getMode().name(),
                 o.getRecordedBy() != null ? o.getRecordedBy().getName() : null,
-                o.getRecordedBy() != null ? imageRefs.toUrl(o.getRecordedBy().getSignature()) : null
+                o.getRecordedBy() != null ? imageRefs.toUrl(o.getRecordedBy().getSignature()) : null,
+                o.getStatus().name(),
+                o.getCancelledAt(),
+                o.getRefundAmount(),
+                o.getRefundMode() != null ? o.getRefundMode().name() : null,
+                o.getRefundNote()
         );
     }
 

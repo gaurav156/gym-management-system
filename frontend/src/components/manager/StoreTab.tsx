@@ -118,6 +118,10 @@ export default function StoreTab({ selectedBranch }: Props) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  function cartQuantity(productId: string): number {
+    return cart.find((l) => l.product.id === productId)?.quantity ?? 0
+  }
+
   function addToCart(product: Product) {
     setCart((lines) => {
       const existing = lines.find((l) => l.product.id === product.id)
@@ -227,7 +231,7 @@ export default function StoreTab({ selectedBranch }: Props) {
 
   return (
     <div>
-      <div className="grid gap-8 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
         <div className="rounded-lg border border-gray-200 p-6 lg:col-span-3">
           <h2 className="font-medium">Products</h2>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -240,25 +244,51 @@ export default function StoreTab({ selectedBranch }: Props) {
             </select>
           </div>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {products.map((p) => (
-              <div key={p.id} className="flex min-w-0 items-center gap-3 rounded-md border border-gray-200 p-3">
-                <button type="button" disabled={!!p.outOfStock} onClick={() => addToCart(p)}
-                  className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-not-allowed disabled:opacity-50">
-                  <ProductImage src={p.imageUrls[0]} alt={p.name} className="h-12 w-12 flex-shrink-0 rounded" />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{p.name}</p>
-                    <p className="text-xs text-gray-500">
-                      {p.discountActive ? (
-                        <><span className="line-through">₹{p.price}</span> <span className="text-green-700">₹{p.discountPrice}</span></>
-                      ) : `₹${p.price}`}
-                    </p>
-                    <p className="text-xs text-gray-400">{p.outOfStock ? 'Out of stock' : `${p.stockQuantity} in stock`}</p>
+            {products.map((p) => {
+              const quantity = cartQuantity(p.id)
+              const stock = p.stockQuantity ?? 0
+              return (
+                <div key={p.id} className="flex min-w-0 flex-col gap-2 rounded-md border border-gray-200 p-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <ProductImage src={p.imageUrls[0]} alt={p.name} className="h-12 w-12 flex-shrink-0 rounded" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{p.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {p.discountActive ? (
+                          <><span className="line-through">₹{p.price}</span> <span className="text-green-700">₹{p.discountPrice}</span></>
+                        ) : `₹${p.price}`}
+                      </p>
+                      <p className="text-xs text-gray-400">{p.outOfStock ? 'Out of stock' : `${p.stockQuantity} in stock`}</p>
+                    </div>
+                    <button type="button" onClick={() => setViewingProduct(p)}
+                      className="flex-shrink-0 text-xs text-gray-500 hover:underline">View</button>
                   </div>
-                </button>
-                <button type="button" onClick={() => setViewingProduct(p)}
-                  className="flex-shrink-0 text-xs text-gray-500 hover:underline">View</button>
-              </div>
-            ))}
+
+                  {/* Visible add/quantity control on the card itself - clicking the row used
+                      to add silently, with the only feedback in the checkout panel, which is
+                      off-screen on mobile until the person scrolls. This makes the effect of
+                      the tap visible right where it happened. */}
+                  <div className="flex justify-end">
+                    {quantity === 0 ? (
+                      <button type="button" disabled={!!p.outOfStock} onClick={() => addToCart(p)}
+                        className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50">
+                        Add to cart
+                      </button>
+                    ) : (
+                      <div className="flex items-center rounded-md border border-gray-300">
+                        <button type="button" onClick={() => decrementLine(p.id, quantity)}
+                          className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-50" aria-label="Decrease quantity">−</button>
+                        <span className="w-7 text-center text-sm tabular-nums">{quantity}</span>
+                        <button type="button" disabled={quantity >= stock}
+                          onClick={() => incrementLine(p.id, quantity, stock)}
+                          className="flex h-7 w-7 items-center justify-center text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-30"
+                          aria-label="Increase quantity">+</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
             {products.length === 0 && <p className="text-sm text-gray-400 sm:col-span-2">No products found.</p>}
           </div>
           {productTotalPages > 1 && (

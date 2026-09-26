@@ -249,6 +249,11 @@ export interface ProductOrderInvoice {
   mode: string
   recordedByName: string | null
   recordedBySignature: string | null
+  status: string
+  cancelledAt: string | null
+  refundAmount: number | null
+  refundMode: string | null
+  refundNote: string | null
 }
 
 export interface Coupon {

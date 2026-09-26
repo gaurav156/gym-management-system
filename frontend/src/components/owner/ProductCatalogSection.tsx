@@ -282,10 +282,12 @@ export default function ProductCatalogSection({ branches }: Props) {
             <label className="text-xs text-gray-500">Images</label>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               {formImages.map((url, i) => (
-                <div key={url} className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded border border-gray-200 bg-gray-50">
-                  <img src={url} alt="" className="max-h-full max-w-full object-contain" />
+                <div key={url} className="relative h-16 w-16">
+                  <div className="flex h-full w-full items-center justify-center overflow-hidden rounded border border-gray-200 bg-gray-50">
+                    <img src={url} alt="" className="max-h-full max-w-full object-contain" />
+                  </div>
                   <button type="button" onClick={() => setFormImages((imgs) => imgs.filter((_, idx) => idx !== i))}
-                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white">✕</button>
+                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white shadow">✕</button>
                 </div>
               ))}
               <PhotoUploadButton onLoaded={(url) => setFormImages((imgs) => [...imgs, url])} onError={setFormError}
@@ -372,10 +374,12 @@ export default function ProductCatalogSection({ branches }: Props) {
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                           {editImages.map((url, i) => (
-                            <div key={url} className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded border border-gray-200 bg-gray-50">
-                              <img src={url} alt="" className="max-h-full max-w-full object-contain" />
+                            <div key={url} className="relative h-14 w-14">
+                              <div className="flex h-full w-full items-center justify-center overflow-hidden rounded border border-gray-200 bg-gray-50">
+                                <img src={url} alt="" className="max-h-full max-w-full object-contain" />
+                              </div>
                               <button type="button" onClick={() => setEditImages((imgs) => imgs.filter((_, idx) => idx !== i))}
-                                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white">✕</button>
+                                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white shadow">✕</button>
                             </div>
                           ))}
                           <PhotoUploadButton onLoaded={(url) => setEditImages((imgs) => [...imgs, url])} onError={setEditError}

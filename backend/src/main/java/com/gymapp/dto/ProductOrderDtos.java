@@ -81,6 +81,13 @@ public class ProductOrderDtos {
             BigDecimal totalAmount,
             String mode,
             String recordedByName,
-            String recordedBySignature
+            String recordedBySignature,
+            // Cancellation/refund - null/empty unless status is CANCELLED, so the same
+            // response shape serves a normal invoice and a post-cancellation one.
+            String status,
+            java.time.LocalDateTime cancelledAt,
+            BigDecimal refundAmount,
+            String refundMode,
+            String refundNote
     ) {}
 }

@@ -32,6 +32,12 @@ export default function ProductInvoiceViewPage() {
             <li key={it.productId} className="flex justify-between"><span>{it.productName} ×{it.quantity}</span><span>₹{it.lineTotal}</span></li>
           ))}
         </ul>
+        {invoice.status === 'CANCELLED' && (
+          <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            Cancelled - refunded ₹{invoice.refundAmount} via {invoice.refundMode?.replace('_', ' ')}
+            {invoice.refundNote && <> · {invoice.refundNote}</>}
+          </div>
+        )}
         <dl className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between"><dt className="text-gray-500">Total</dt><dd>₹{invoice.totalAmount}</dd></div>
           <div className="flex justify-between"><dt className="text-gray-500">Mode</dt><dd>{invoice.mode.replace('_', ' ')}</dd></div>
