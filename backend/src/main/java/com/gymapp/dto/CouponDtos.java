@@ -16,18 +16,24 @@ public class CouponDtos {
             String description,
             @NotNull DiscountType discountType,
             @NotNull @Positive BigDecimal discountValue,
+            // Only applied when discountType = PERCENTAGE; ignored (and should be left
+            // null) for FIXED.
+            BigDecimal maxDiscountAmount,
             LocalDateTime startsAt,
             LocalDateTime endsAt,
             boolean firstTimeBuyersOnly,
             Integer maxRedemptions
     ) {}
 
-    // All fields optional/nullable - null means "leave as is". active lets the Owner
-    // kill a coupon early without deleting its redemption history.
+    // All fields optional/nullable - null means "leave as is", EXCEPT maxDiscountAmount,
+    // which follows Product's discountPrice convention: always set from what's sent, so
+    // an explicit null is how the Owner clears a previously-configured cap.
     public record UpdateCouponRequest(
+            String code,
             String description,
             DiscountType discountType,
             BigDecimal discountValue,
+            BigDecimal maxDiscountAmount,
             LocalDateTime startsAt,
             LocalDateTime endsAt,
             Boolean active,
@@ -41,6 +47,7 @@ public class CouponDtos {
             String description,
             DiscountType discountType,
             BigDecimal discountValue,
+            BigDecimal maxDiscountAmount,
             LocalDateTime startsAt,
             LocalDateTime endsAt,
             boolean active,
@@ -59,10 +66,14 @@ public class CouponDtos {
             @NotNull UUID memberId
     ) {}
 
+    // discountAmount is now included - the front desk (and the frontend's subtotal
+    // display) can show the real amount taken off immediately, rather than recomputing
+    // percentage-vs-cap logic client-side and risking it drifting from the server's math.
     public record ValidateCouponResponse(
             boolean valid,
             String message,
             DiscountType discountType,
-            BigDecimal discountValue
+            BigDecimal discountValue,
+            BigDecimal maxDiscountAmount
     ) {}
 }

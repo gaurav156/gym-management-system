@@ -143,7 +143,17 @@ public class ProductOrderService {
 
         order = productOrderRepository.save(order);
 
-        // Fires after this transaction commits - never blocks the purchase response.
+        // invoiceSeq is insertable=false/updatable=false (DB default via nextval) - the
+        // in-memory instance from save() doesn't reflect that default without a real
+        // re-read. Without this, the very first response after a purchase renders
+        // "PORD-2026-null" instead of the actual sequence number - a later GET/list call
+        // would already show it correctly, since that's a fresh read, but the purchase
+        // response itself needs its own refetch. Mirrors why Payment.invoiceSeq is only
+        // ever formatted from rows loaded via a repository query, never the just-saved
+        // instance.
+        order = productOrderRepository.findById(order.getId())
+                .orElseThrow(() -> new IllegalStateException("Order vanished immediately after save"));
+
         eventPublisher.publishEvent(new ProductOrderRecordedEvent(order.getId()));
 
         return toResponse(order);

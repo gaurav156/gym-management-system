@@ -35,7 +35,13 @@ export default function StoreTab({ selectedBranch }: Props) {
 
   const [mode, setMode] = useState('CASH')
   const [couponCode, setCouponCode] = useState('')
-  const [couponStatus, setCouponStatus] = useState<{ valid: boolean; message: string } | null>(null)
+  const [couponStatus, setCouponStatus] = useState<{
+    valid: boolean
+    message: string
+    discountType?: 'PERCENTAGE' | 'FIXED'
+    discountValue?: number
+    maxDiscountAmount?: number | null
+  } | null>(null)
   const [checkingCoupon, setCheckingCoupon] = useState(false)
 
   const [purchaseMessage, setPurchaseMessage] = useState('')
@@ -148,14 +154,31 @@ export default function StoreTab({ selectedBranch }: Props) {
 
   const subtotal = cart.reduce((sum, l) => sum + l.product.effectivePrice * l.quantity, 0)
 
+  const couponDiscount = (() => {
+    if (!couponStatus?.valid || couponStatus.discountValue == null) return 0
+    let raw = couponStatus.discountType === 'PERCENTAGE'
+      ? (subtotal * couponStatus.discountValue) / 100
+      : couponStatus.discountValue
+    if (couponStatus.discountType === 'PERCENTAGE' && couponStatus.maxDiscountAmount != null) {
+      raw = Math.min(raw, couponStatus.maxDiscountAmount)
+    }
+    return Math.min(raw, subtotal)
+  })()
+
+  const totalAfterDiscount = subtotal - couponDiscount
+
   async function checkCoupon() {
     setCouponStatus(null)
     if (!couponCode.trim() || !selectedMember) return
     setCheckingCoupon(true)
     try {
-      const { data } = await api.post<{ valid: boolean; message: string }>('/api/coupons/validate', {
-        code: couponCode.trim(), memberId: selectedMember.id,
-      })
+      const { data } = await api.post<{
+        valid: boolean
+        message: string
+        discountType?: 'PERCENTAGE' | 'FIXED'
+        discountValue?: number
+        maxDiscountAmount?: number | null
+      }>('/api/coupons/validate', { code: couponCode.trim(), memberId: selectedMember.id })
       setCouponStatus(data)
     } catch (err: any) {
       setCouponStatus({ valid: false, message: err.response?.data?.error || 'Failed to check coupon' })
@@ -372,7 +395,19 @@ export default function StoreTab({ selectedBranch }: Props) {
                 {PAYMENT_MODES.map((m) => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
               </select>
 
-              <p className="text-right text-sm font-medium">Subtotal: ₹{subtotal.toFixed(2)}</p>
+              <div className="space-y-1 text-sm">
+                <p className="flex justify-between text-gray-600">
+                  <span>Subtotal</span><span>₹{subtotal.toFixed(2)}</span>
+                </p>
+                {couponDiscount > 0 && (
+                  <p className="flex justify-between text-green-700">
+                    <span>Discount ({couponCode.trim()})</span><span>-₹{couponDiscount.toFixed(2)}</span>
+                  </p>
+                )}
+                <p className="flex justify-between font-medium">
+                  <span>Total</span><span>₹{totalAfterDiscount.toFixed(2)}</span>
+                </p>
+              </div>
 
               <button disabled={purchasing}
                 className="flex w-full items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">

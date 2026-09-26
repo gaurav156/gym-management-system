@@ -262,6 +262,7 @@ export interface Coupon {
   description: string | null
   discountType: DiscountType
   discountValue: number
+  maxDiscountAmount: number | null
   startsAt: string | null
   endsAt: string | null
   active: boolean

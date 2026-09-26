@@ -38,6 +38,7 @@ public class CouponService {
                 .description(req.description())
                 .discountType(req.discountType())
                 .discountValue(req.discountValue())
+                .maxDiscountAmount(req.discountType() == DiscountType.PERCENTAGE ? req.maxDiscountAmount() : null)
                 .startsAt(req.startsAt())
                 .endsAt(req.endsAt())
                 .active(true)
@@ -54,9 +55,23 @@ public class CouponService {
         Coupon coupon = couponRepository.findById(couponId)
                 .orElseThrow(() -> new IllegalArgumentException("Coupon not found"));
 
+        if (req.code() != null && !req.code().isBlank()) {
+            String newCode = req.code().trim().toUpperCase();
+            if (!newCode.equals(coupon.getCode())) {
+                couponRepository.findByCode(newCode).ifPresent(existing -> {
+                    throw new IllegalArgumentException("A coupon with this code already exists");
+                });
+                coupon.setCode(newCode);
+            }
+        }
         if (req.description() != null) coupon.setDescription(req.description());
         if (req.discountType() != null) coupon.setDiscountType(req.discountType());
         if (req.discountValue() != null) coupon.setDiscountValue(req.discountValue());
+        // maxDiscountAmount always follows what's sent (including null-to-clear), same
+        // convention as Product.discountPrice - but only meaningful for PERCENTAGE, so a
+        // switch to FIXED clears it regardless of what was supplied.
+        DiscountType effectiveType = req.discountType() != null ? req.discountType() : coupon.getDiscountType();
+        coupon.setMaxDiscountAmount(effectiveType == DiscountType.PERCENTAGE ? req.maxDiscountAmount() : null);
         coupon.setStartsAt(req.startsAt());
         coupon.setEndsAt(req.endsAt());
         if (req.active() != null) coupon.setActive(req.active());
@@ -65,6 +80,23 @@ public class CouponService {
 
         coupon = couponRepository.save(coupon);
         return toResponse(coupon);
+    }
+
+    // Owner-only (enforced at the controller). A coupon that's already been redeemed
+    // stays available for historical invoices' record even after being pulled from
+    // active use - so a real delete is only offered when it's never been redeemed;
+    // otherwise the Owner is pointed at deactivating instead, same "can't delete, can
+    // deactivate" pattern used for products and staff accounts elsewhere.
+    @Transactional
+    public void delete(UUID couponId) {
+        Coupon coupon = couponRepository.findById(couponId)
+                .orElseThrow(() -> new IllegalArgumentException("Coupon not found"));
+        if (coupon.getTimesRedeemed() > 0) {
+            throw new IllegalArgumentException(
+                    "This coupon has been redeemed at least once - deleting it would break those orders' " +
+                            "discount record. Deactivate it instead so it stops being offered.");
+        }
+        couponRepository.delete(coupon);
     }
 
     @Transactional(readOnly = true)
@@ -79,13 +111,14 @@ public class CouponService {
     public ValidateCouponResponse validate(String code, UUID memberId) {
         var coupon = couponRepository.findByCode(code.trim().toUpperCase());
         if (coupon.isEmpty()) {
-            return new ValidateCouponResponse(false, "Coupon not found", null, null);
+            return new ValidateCouponResponse(false, "Coupon not found", null, null, null);
         }
         String reason = ineligibilityReason(coupon.get(), memberId);
         if (reason != null) {
-            return new ValidateCouponResponse(false, reason, null, null);
+            return new ValidateCouponResponse(false, reason, null, null, null);
         }
-        return new ValidateCouponResponse(true, "Coupon applied", coupon.get().getDiscountType(), coupon.get().getDiscountValue());
+        return new ValidateCouponResponse(true, "Coupon applied", coupon.get().getDiscountType(),
+                coupon.get().getDiscountValue(), coupon.get().getMaxDiscountAmount());
     }
 
     // Returns null when eligible, otherwise a human-readable reason - used by both
@@ -105,12 +138,15 @@ public class CouponService {
         return null;
     }
 
-    // Capped at the subtotal so a FIXED coupon (or a misconfigured >100% PERCENTAGE one)
-    // can never push the total below zero.
+    // Capped at the subtotal (never negative), and for PERCENTAGE also capped at
+    // maxDiscountAmount when one is set.
     BigDecimal computeDiscount(Coupon coupon, BigDecimal subtotal) {
         BigDecimal raw = coupon.getDiscountType() == DiscountType.PERCENTAGE
                 ? subtotal.multiply(coupon.getDiscountValue()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
                 : coupon.getDiscountValue();
+        if (coupon.getDiscountType() == DiscountType.PERCENTAGE && coupon.getMaxDiscountAmount() != null) {
+            raw = raw.min(coupon.getMaxDiscountAmount());
+        }
         return raw.min(subtotal);
     }
 
@@ -120,7 +156,7 @@ public class CouponService {
                 && (c.getEndsAt() == null || !LocalDateTime.now().isAfter(c.getEndsAt()))
                 && (c.getMaxRedemptions() == null || c.getTimesRedeemed() < c.getMaxRedemptions());
         return new CouponResponse(c.getId(), c.getCode(), c.getDescription(), c.getDiscountType(),
-                c.getDiscountValue(), c.getStartsAt(), c.getEndsAt(), c.isActive(), c.isFirstTimeBuyersOnly(),
-                c.getMaxRedemptions(), c.getTimesRedeemed(), currentlyValid);
+                c.getDiscountValue(), c.getMaxDiscountAmount(), c.getStartsAt(), c.getEndsAt(), c.isActive(),
+                c.isFirstTimeBuyersOnly(), c.getMaxRedemptions(), c.getTimesRedeemed(), currentlyValid);
     }
 }

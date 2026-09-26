@@ -66,4 +66,9 @@ public class Coupon {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
+    // Only meaningful for discountType = PERCENTAGE - caps the absolute amount taken off
+    // (e.g. "20% off, up to Rs. 500"). Null means uncapped. Ignored for FIXED coupons,
+    // where discountValue already is the fixed amount.
+    private BigDecimal maxDiscountAmount;
 }

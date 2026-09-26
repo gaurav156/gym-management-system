@@ -43,4 +43,10 @@ public class CouponController {
     public ValidateCouponResponse validate(@Valid @RequestBody ValidateCouponRequest req) {
         return couponService.validate(req.code(), req.memberId());
     }
+
+    @DeleteMapping("/manage/{id}")
+    @PreAuthorize("hasRole('OWNER')")
+    public void delete(@PathVariable UUID id) {
+        couponService.delete(id);
+    }
 }
