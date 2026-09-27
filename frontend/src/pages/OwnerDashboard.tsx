@@ -7,6 +7,7 @@ import type { Branch, Plan } from '../types'
 import ProductCatalogSection from '../components/owner/ProductCatalogSection'
 import CouponsSection from '../components/owner/CouponsSection'
 import ProductCategoriesSection from '../components/owner/ProductCategoriesSection'
+import FinanceReportSection from '../components/owner/FinanceReportSection'
 
 type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
 
@@ -183,6 +184,10 @@ export default function OwnerDashboard() {
       <Link to="/manager" className="mt-3 inline-block text-sm font-medium text-brand hover:text-brand-dark">
         Go to branch operations (check-in, plans, purchases, attendance, crowd report) →
       </Link>
+
+      <div className="mt-8">
+        <FinanceReportSection branches={branches} />
+      </div>
 
       <div className="mt-8 grid gap-8 sm:grid-cols-2">
         <div className="rounded-lg border border-gray-200 p-6">

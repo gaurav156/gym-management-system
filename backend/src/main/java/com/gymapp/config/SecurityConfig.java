@@ -87,6 +87,10 @@ public class SecurityConfig {
                 // further narrowed to Owner-only via @PreAuthorize on the controller.
                 .requestMatchers("/api/expenses/**").hasAnyRole("OWNER", "MANAGER")
 
+                // Owner-only chain-wide Income & Profit reporting - can span every branch
+                // at once, so it isn't opened up to Manager the way per-branch data is.
+                .requestMatchers("/api/finance/**").hasRole("OWNER")
+
                 // Owner-only: editing a Manager's basic info. Deletion reuses /api/owner/users/**.
                 .requestMatchers("/api/managers/**").hasRole("OWNER")
 

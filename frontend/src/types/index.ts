@@ -5,6 +5,7 @@ export type DiscountType = 'PERCENTAGE' | 'FIXED'
 export type ProductOrderStatus = 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'
 export type PaymentStatus = 'PAID' | 'PARTIAL'
 export type CouponAppliesTo = 'PRODUCT' | 'MEMBERSHIP' | 'BOTH'
+export type FinanceGranularity = 'DAILY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | 'CUSTOM'
 
 export interface AuthUser {
   token: string
@@ -325,4 +326,26 @@ export interface ProductOrder {
   refundAmount: number | null
   refundedByName: string | null
   refundNote: string | null
+}
+
+export interface FinanceReportRow {
+  label: string
+  membershipIncome: number
+  productIncome: number
+  totalIncome: number
+  totalExpense: number
+  profit: number
+}
+
+export interface FinanceReportResponse {
+  fromDate: string
+  toDate: string
+  granularity: string
+  branchName: string | null
+  totalMembershipIncome: number
+  totalProductIncome: number
+  totalIncome: number
+  totalExpense: number
+  totalProfit: number
+  breakdown: FinanceReportRow[]
 }
