@@ -79,6 +79,12 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [savingMemberBranches, setSavingMemberBranches] = useState(false)
   const [savingEdit, setSavingEdit] = useState(false)
 
+  const [payTarget, setPayTarget] = useState<MembershipAdmin | null>(null)
+  const [payAmount, setPayAmount] = useState('')
+  const [payMode, setPayMode] = useState('CASH')
+  const [payError, setPayError] = useState('')
+  const [paying, setPaying] = useState(false)
+
   const isFirstSearchRun = useRef(true)
 
   function loadMembers(page = 0, search = memberSearch, status = memberStatusFilter, sort = memberSort) {
@@ -194,6 +200,30 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     loadMemberships()
     if (detailMemberId) {
       api.get<MembershipAdmin[]>(`/api/memberships/member/${detailMemberId}`).then((res) => setDetailMembershipsFetched(res.data))
+    }
+  }
+
+  function openPayDialog(m: MembershipAdmin) {
+    setPayTarget(m); setPayAmount(String(m.balanceDue)); setPayMode('CASH'); setPayError('')
+  }
+
+  async function submitPayment() {
+    if (!payTarget || !selectedBranch) return
+    setPayError('')
+    if (!payAmount || Number.isNaN(Number(payAmount)) || Number(payAmount) <= 0) {
+      setPayError('Enter a valid amount.'); return
+    }
+    setPaying(true)
+    try {
+      await api.post(`/api/memberships/${payTarget.id}/record-payment`, {
+        amount: Number(payAmount), mode: payMode, branchId: selectedBranch,
+      })
+      setPayTarget(null)
+      refreshMembershipViews()
+    } catch (err: any) {
+      setPayError(err.response?.data?.error || 'Failed to record payment')
+    } finally {
+      setPaying(false)
     }
   }
 
@@ -679,6 +709,14 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                                 <td className="truncate py-2 pr-4">
                                   <span className={statusColorClass(effective)}>{statusLabel(effective)}</span>
                                 </td>
+                                <td className="truncate py-2 pr-4">
+                                  <span className={statusColorClass(effective)}>{statusLabel(effective)}</span>
+                                  {m.paymentStatus === 'PARTIAL' && (
+                                    <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                                      Partially paid - ₹{m.balanceDue} due{m.balanceDueDate ? ` by ${m.balanceDueDate}` : ''}
+                                    </span>
+                                  )}
+                                </td>
                                 <td className="py-2 space-x-2 whitespace-nowrap">
                                   {effective === 'ACTIVE' && (
                                     <button onClick={() => pauseMembership(m.id)} className="text-xs text-amber-600 hover:underline">
@@ -698,6 +736,11 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                                   <button onClick={() => startEdit(m)} className="text-xs text-gray-600 hover:underline">
                                     Edit dates
                                   </button>
+                                  {m.paymentStatus === 'PARTIAL' && (
+                                    <button onClick={() => openPayDialog(m)} className="text-xs text-green-700 hover:underline">
+                                      Record payment
+                                    </button>
+                                  )}
                                 </td>
                               </>
                             )}
@@ -863,6 +906,31 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
           loadMemberships()
         }}
       />
+      {payTarget && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={() => !paying && setPayTarget(null)}>
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-gray-900">Record payment</h3>
+            <p className="mt-1 text-sm text-gray-600">Balance due: ₹{payTarget.balanceDue}</p>
+            <div className="mt-3 space-y-3">
+              <input type="number" min={0} step="0.01" value={payAmount} onChange={(e) => setPayAmount(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+              <select value={payMode} onChange={(e) => setPayMode(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+                {['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER'].map((m) => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
+              </select>
+              {payError && <p className="text-sm text-red-600">{payError}</p>}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button disabled={paying} onClick={() => setPayTarget(null)}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button disabled={paying} onClick={submitPayment}
+                className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-70">
+                {paying ? 'Recording...' : 'Record payment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

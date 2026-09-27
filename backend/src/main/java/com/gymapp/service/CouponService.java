@@ -2,8 +2,10 @@ package com.gymapp.service;
 
 import com.gymapp.dto.CouponDtos.*;
 import com.gymapp.entity.Coupon;
+import com.gymapp.entity.CouponAppliesTo;
 import com.gymapp.entity.DiscountType;
 import com.gymapp.repository.CouponRepository;
+import com.gymapp.repository.MembershipRepository;
 import com.gymapp.repository.ProductOrderRepository;
 import com.gymapp.entity.ProductOrderStatus;
 import org.springframework.stereotype.Service;
@@ -20,10 +22,13 @@ public class CouponService {
 
     private final CouponRepository couponRepository;
     private final ProductOrderRepository productOrderRepository;
+    private final MembershipRepository membershipRepository;
 
-    public CouponService(CouponRepository couponRepository, ProductOrderRepository productOrderRepository) {
+    public CouponService(CouponRepository couponRepository, ProductOrderRepository productOrderRepository,
+                         MembershipRepository membershipRepository) {
         this.couponRepository = couponRepository;
         this.productOrderRepository = productOrderRepository;
+        this.membershipRepository = membershipRepository;
     }
 
     // Owner-only (enforced at the controller).
@@ -44,6 +49,7 @@ public class CouponService {
                 .active(true)
                 .firstTimeBuyersOnly(req.firstTimeBuyersOnly())
                 .maxRedemptions(req.maxRedemptions())
+                .appliesTo(req.appliesTo() != null ? req.appliesTo() : CouponAppliesTo.PRODUCT)
                 .timesRedeemed(0)
                 .build();
         coupon = couponRepository.save(coupon);
@@ -77,6 +83,7 @@ public class CouponService {
         if (req.active() != null) coupon.setActive(req.active());
         if (req.firstTimeBuyersOnly() != null) coupon.setFirstTimeBuyersOnly(req.firstTimeBuyersOnly());
         coupon.setMaxRedemptions(req.maxRedemptions());
+        if (req.appliesTo() != null) coupon.setAppliesTo(req.appliesTo());
 
         coupon = couponRepository.save(coupon);
         return toResponse(coupon);
@@ -105,15 +112,16 @@ public class CouponService {
     }
 
     // Called from the front desk before submitting a purchase, and again internally by
-    // ProductOrderService right before redeeming - the second check is what actually
-    // gates the discount; this one is just fast feedback in the UI.
+    // ProductOrderService right before redeeming.
     @Transactional(readOnly = true)
-    public ValidateCouponResponse validate(String code, UUID memberId) {
+    public ValidateCouponResponse validate(String code, UUID memberId, boolean forMembership) {
         var coupon = couponRepository.findByCode(code.trim().toUpperCase());
         if (coupon.isEmpty()) {
             return new ValidateCouponResponse(false, "Coupon not found", null, null, null);
         }
-        String reason = ineligibilityReason(coupon.get(), memberId);
+        String reason = forMembership
+                ? membershipIneligibilityReason(coupon.get(), memberId)
+                : ineligibilityReason(coupon.get(), memberId);
         if (reason != null) {
             return new ValidateCouponResponse(false, reason, null, null, null);
         }
@@ -121,19 +129,43 @@ public class CouponService {
                 coupon.get().getDiscountValue(), coupon.get().getMaxDiscountAmount());
     }
 
-    // Returns null when eligible, otherwise a human-readable reason - used by both
-    // validate() above and ProductOrderService.purchase() so the two can never disagree.
+    // Product-order eligibility - returns null when eligible, otherwise a human-readable
+    // reason. Used by both validate() and ProductOrderService.purchase().
     String ineligibilityReason(Coupon coupon, UUID memberId) {
+        if (coupon.getAppliesTo() == CouponAppliesTo.MEMBERSHIP) {
+            return "This coupon is not valid for product purchases";
+        }
+        String generic = genericIneligibilityReason(coupon);
+        if (generic != null) return generic;
+        if (coupon.isFirstTimeBuyersOnly()
+                && productOrderRepository.existsByMemberIdAndStatusNot(memberId, ProductOrderStatus.CANCELLED)) {
+            return "This coupon is only for first-time buyers";
+        }
+        return null;
+    }
+
+    // Membership-purchase counterpart - same rules, but "first-time buyer" is checked
+    // against membership history instead of product-order history, and the coupon must
+    // actually be scoped to memberships. Used by validate() and MembershipService.purchase().
+    String membershipIneligibilityReason(Coupon coupon, UUID memberId) {
+        if (coupon.getAppliesTo() == CouponAppliesTo.PRODUCT) {
+            return "This coupon is not valid for membership purchases";
+        }
+        String generic = genericIneligibilityReason(coupon);
+        if (generic != null) return generic;
+        if (coupon.isFirstTimeBuyersOnly() && membershipRepository.existsByMemberId(memberId)) {
+            return "This coupon is only for first-time buyers";
+        }
+        return null;
+    }
+
+    private String genericIneligibilityReason(Coupon coupon) {
         if (!coupon.isActive()) return "This coupon is no longer active";
         LocalDateTime now = LocalDateTime.now();
         if (coupon.getStartsAt() != null && now.isBefore(coupon.getStartsAt())) return "This coupon isn't active yet";
         if (coupon.getEndsAt() != null && now.isAfter(coupon.getEndsAt())) return "This coupon has expired";
         if (coupon.getMaxRedemptions() != null && coupon.getTimesRedeemed() >= coupon.getMaxRedemptions()) {
             return "This coupon has already been fully redeemed";
-        }
-        if (coupon.isFirstTimeBuyersOnly()
-                && productOrderRepository.existsByMemberIdAndStatusNot(memberId, ProductOrderStatus.CANCELLED)) {
-            return "This coupon is only for first-time buyers";
         }
         return null;
     }
@@ -157,6 +189,6 @@ public class CouponService {
                 && (c.getMaxRedemptions() == null || c.getTimesRedeemed() < c.getMaxRedemptions());
         return new CouponResponse(c.getId(), c.getCode(), c.getDescription(), c.getDiscountType(),
                 c.getDiscountValue(), c.getMaxDiscountAmount(), c.getStartsAt(), c.getEndsAt(), c.isActive(),
-                c.isFirstTimeBuyersOnly(), c.getMaxRedemptions(), c.getTimesRedeemed(), currentlyValid);
+                c.isFirstTimeBuyersOnly(), c.getMaxRedemptions(), c.getTimesRedeemed(), currentlyValid, c.getAppliesTo());
     }
 }

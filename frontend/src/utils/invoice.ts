@@ -169,10 +169,35 @@ async function buildInvoiceDoc(inv: InvoiceResponse): Promise<jsPDF> {
   doc.line(margin, y, pageWidth - margin, y)
   y += 24
 
+  // Discount breakdown - only shown when a coupon was actually applied at purchase.
+  // membershipTotalAmount is already post-discount, so adding the discount back gives
+  // the plan's original (pre-coupon) price.
+  if (inv.membershipDiscountAmount && inv.membershipTotalAmount != null && inv.membershipDiscountAmount > 0) {
+    const planPrice = inv.membershipTotalAmount + inv.membershipDiscountAmount
+    doc.setFontSize(10)
+    doc.text('Plan price', col3, y)
+    doc.text(`Rs. ${planPrice.toFixed(2)}`, col4, y, { align: 'right' })
+    y += 16
+    doc.setTextColor(21, 128, 61)
+    doc.text(`Discount${inv.membershipCouponCode ? ` (${inv.membershipCouponCode})` : ''}`, col3, y)
+    doc.text(`-Rs. ${inv.membershipDiscountAmount.toFixed(2)}`, col4, y, { align: 'right' })
+    doc.setTextColor(0, 0, 0)
+    y += 20
+  }
+
   doc.setFont('helvetica', 'bold')
   doc.text('Total Paid', col3, y)
   doc.text(`Rs. ${inv.amount.toFixed(2)}`, col4, y, { align: 'right' })
   y += 36
+
+  // Partial-payment balance, if any.
+  if (inv.membershipPaymentStatus === 'PARTIAL' && inv.membershipBalanceDue) {
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(180, 83, 9)
+    doc.text(`PARTIALLY PAID - Balance due: Rs. ${inv.membershipBalanceDue.toFixed(2)}`, col1, y - 20)
+    doc.setTextColor(0, 0, 0)
+    doc.setFont('helvetica', 'normal')
+  }
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(9)

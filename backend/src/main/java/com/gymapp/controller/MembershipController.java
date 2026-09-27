@@ -84,4 +84,19 @@ public class MembershipController {
     public MembershipAdminResponse edit(@PathVariable UUID id, @RequestBody EditMembershipRequest req) {
         return membershipService.edit(id, req);
     }
+
+    @PutMapping("/plans/manage/{id}")
+    @PreAuthorize("hasRole('OWNER')")
+    public PlanResponse updatePlan(@PathVariable UUID id, @RequestBody UpdatePlanRequest req) {
+        return membershipService.updatePlan(id, req);
+    }
+
+    @PostMapping("/memberships/{id}/record-payment")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public MembershipAdminResponse recordPayment(@PathVariable UUID id,
+                                                 @Valid @RequestBody RecordMembershipPaymentRequest req,
+                                                 Authentication authentication) {
+        UUID recordedBy = UUID.fromString((String) authentication.getDetails());
+        return membershipService.recordAdditionalPayment(id, req, recordedBy);
+    }
 }

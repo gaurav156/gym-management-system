@@ -112,7 +112,13 @@ public class PaymentService {
                 p.getAmount(),
                 p.getMode().name(),
                 p.getRecordedBy().getName(),
-                imageRefs.toUrl(p.getRecordedBy().getSignature())
+                imageRefs.toUrl(p.getRecordedBy().getSignature()),
+                m != null ? m.getTotalAmount() : null,
+                m != null ? m.getAmountPaid() : null,
+                m != null ? m.getTotalAmount().subtract(m.getAmountPaid()) : null,
+                m != null ? m.getPaymentStatus().name() : null,
+                m != null && m.getCoupon() != null ? m.getDiscountAmount() : null,
+                m != null && m.getCoupon() != null ? m.getCoupon().getCode() : null
         );
     }
 

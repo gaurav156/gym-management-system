@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -31,6 +32,14 @@ public class MembershipPlan {
 
     @Column(nullable = false)
     private BigDecimal price;
+
+    // Nullable - no discount configured. Only actually applied while now() falls within
+    // discountStartsAt/discountEndsAt (either bound optional - null means unbounded on
+    // that side), computed at read time in MembershipService, never stored as a flag.
+    // Mirrors Product's discount fields exactly.
+    private BigDecimal discountPrice;
+    private LocalDateTime discountStartsAt;
+    private LocalDateTime discountEndsAt;
 
     @Builder.Default
     private boolean active = true;

@@ -2,6 +2,7 @@ package com.gymapp.repository;
 
 import com.gymapp.entity.Membership;
 import com.gymapp.entity.MembershipStatus;
+import com.gymapp.entity.PaymentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -44,4 +45,12 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     @Query("SELECT MAX(m.endDate) FROM Membership m WHERE m.member.id = :memberId "
             + "AND m.status = 'ACTIVE' AND m.endDate >= :today")
     LocalDate findLatestQueuedEndDate(@Param("memberId") UUID memberId, @Param("today") LocalDate today);
+
+    // Powers MembershipDueJob - every currently-ACTIVE membership with an unpaid balance
+    // whose grace period has passed, regardless of member.
+    List<Membership> findByStatusAndPaymentStatusAndBalanceDueDateBefore(
+            MembershipStatus status, PaymentStatus paymentStatus, LocalDate cutoff);
+
+    // Used by CouponService's membership-coupon first-time-buyer check.
+    boolean existsByMemberId(UUID memberId);
 }

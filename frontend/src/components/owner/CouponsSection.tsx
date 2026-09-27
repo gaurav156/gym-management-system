@@ -15,11 +15,12 @@ interface CouponFormState {
   endsAt: string
   firstTimeBuyersOnly: boolean
   maxRedemptions: string
+  appliesTo: 'PRODUCT' | 'MEMBERSHIP' | 'BOTH'
 }
 
 const emptyForm: CouponFormState = {
   code: '', description: '', discountType: 'PERCENTAGE', discountValue: '', maxDiscountAmount: '',
-  startsAt: '', endsAt: '', firstTimeBuyersOnly: false, maxRedemptions: '',
+  startsAt: '', endsAt: '', firstTimeBuyersOnly: false, maxRedemptions: '', appliesTo: 'PRODUCT'
 }
 
 function toFormState(c: Coupon): CouponFormState {
@@ -33,6 +34,7 @@ function toFormState(c: Coupon): CouponFormState {
     endsAt: c.endsAt ? c.endsAt.slice(0, 16) : '',
     firstTimeBuyersOnly: c.firstTimeBuyersOnly,
     maxRedemptions: c.maxRedemptions != null ? String(c.maxRedemptions) : '',
+    appliesTo: c.appliesTo
   }
 }
 
@@ -82,6 +84,7 @@ export default function CouponsSection() {
         endsAt: form.endsAt || null,
         firstTimeBuyersOnly: form.firstTimeBuyersOnly,
         maxRedemptions: form.maxRedemptions ? Number(form.maxRedemptions) : null,
+        appliesTo: form.appliesTo
       })
       setForm(emptyForm)
       setCreating(false)
@@ -114,6 +117,7 @@ export default function CouponsSection() {
         endsAt: editForm.endsAt || null,
         firstTimeBuyersOnly: editForm.firstTimeBuyersOnly,
         maxRedemptions: editForm.maxRedemptions ? Number(editForm.maxRedemptions) : null,
+        appliesTo: editForm.appliesTo
       })
       setEditingId(null)
       loadCoupons()
@@ -171,6 +175,12 @@ export default function CouponsSection() {
               className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
           </div>
         )}
+        <select value={f.appliesTo} onChange={(e) => onChange({ ...f, appliesTo: e.target.value as any })}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm">
+          <option value="PRODUCT">Store products only</option>
+          <option value="MEMBERSHIP">Memberships only</option>
+          <option value="BOTH">Both</option>
+        </select>
       </>
     )
   }

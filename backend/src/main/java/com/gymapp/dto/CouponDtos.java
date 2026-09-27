@@ -1,5 +1,6 @@
 package com.gymapp.dto;
 
+import com.gymapp.entity.CouponAppliesTo;
 import com.gymapp.entity.DiscountType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -22,7 +23,10 @@ public class CouponDtos {
             LocalDateTime startsAt,
             LocalDateTime endsAt,
             boolean firstTimeBuyersOnly,
-            Integer maxRedemptions
+            Integer maxRedemptions,
+            // Null defaults to PRODUCT server-side, so existing callers that don't send
+            // this yet keep working unchanged.
+            CouponAppliesTo appliesTo
     ) {}
 
     // All fields optional/nullable - null means "leave as is", EXCEPT maxDiscountAmount,
@@ -38,7 +42,9 @@ public class CouponDtos {
             LocalDateTime endsAt,
             Boolean active,
             Boolean firstTimeBuyersOnly,
-            Integer maxRedemptions
+            Integer maxRedemptions,
+            // Null means "leave as is".
+            CouponAppliesTo appliesTo
     ) {}
 
     public record CouponResponse(
@@ -54,16 +60,18 @@ public class CouponDtos {
             boolean firstTimeBuyersOnly,
             Integer maxRedemptions,
             int timesRedeemed,
-            // Computed: active AND within the date window AND (no cap or not yet reached).
-            // Doesn't check first-time-buyer eligibility, since that's member-specific.
-            boolean currentlyValid
+            boolean currentlyValid,
+            CouponAppliesTo appliesTo
     ) {}
 
     // Front-desk "does this code work for this member" check, called before purchase so
     // a mistyped or expired code surfaces immediately rather than at order submission.
     public record ValidateCouponRequest(
             @NotBlank String code,
-            @NotNull UUID memberId
+            @NotNull UUID memberId,
+            // True when checking eligibility for a membership purchase rather than a
+            // product order. Null/false = product (backward compatible with the store).
+            Boolean forMembership
     ) {}
 
     // discountAmount is now included - the front desk (and the frontend's subtotal

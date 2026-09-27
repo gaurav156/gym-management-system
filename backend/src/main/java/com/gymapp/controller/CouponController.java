@@ -41,7 +41,7 @@ public class CouponController {
     @PostMapping("/validate")
     @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
     public ValidateCouponResponse validate(@Valid @RequestBody ValidateCouponRequest req) {
-        return couponService.validate(req.code(), req.memberId());
+        return couponService.validate(req.code(), req.memberId(), Boolean.TRUE.equals(req.forMembership()));
     }
 
     @DeleteMapping("/manage/{id}")

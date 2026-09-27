@@ -43,7 +43,19 @@ export default function InvoiceViewPage() {
               <dd>{invoice.membershipStartDate} to {invoice.membershipEndDate}</dd>
             </div>
           )}
-          <div className="flex justify-between"><dt className="text-gray-500">Amount</dt><dd>₹{invoice.amount}</dd></div>
+          {invoice.membershipDiscountAmount != null && invoice.membershipDiscountAmount > 0 && invoice.membershipTotalAmount != null && (
+            <>
+              <div className="flex justify-between"><dt className="text-gray-500">Plan price</dt><dd>₹{invoice.membershipTotalAmount + invoice.membershipDiscountAmount}</dd></div>
+              <div className="flex justify-between text-green-700">
+                <dt>Discount{invoice.membershipCouponCode ? ` (${invoice.membershipCouponCode})` : ''}</dt>
+                <dd>-₹{invoice.membershipDiscountAmount}</dd>
+              </div>
+            </>
+          )}
+          <div className="flex justify-between"><dt className="text-gray-500">Amount paid (this invoice)</dt><dd>₹{invoice.amount}</dd></div>
+          {invoice.membershipPaymentStatus === 'PARTIAL' && (
+            <div className="flex justify-between text-amber-700"><dt>Balance due</dt><dd>₹{invoice.membershipBalanceDue}</dd></div>
+          )}
           <div className="flex justify-between"><dt className="text-gray-500">Mode</dt><dd>{invoice.mode.replace('_', ' ')}</dd></div>
           <div className="flex justify-between"><dt className="text-gray-500">Date</dt><dd>{new Date(invoice.invoiceDate).toLocaleDateString()}</dd></div>
         </dl>

@@ -3,6 +3,8 @@ export type OtpChannel = 'EMAIL' | 'SMS' | 'WHATSAPP'
 export type ExpenseCategory = 'SALARY' | 'UTILITY' | 'RENT' | 'EQUIPMENT' | 'MAINTENANCE' | 'OTHER'
 export type DiscountType = 'PERCENTAGE' | 'FIXED'
 export type ProductOrderStatus = 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'
+export type PaymentStatus = 'PAID' | 'PARTIAL'
+export type CouponAppliesTo = 'PRODUCT' | 'MEMBERSHIP' | 'BOTH'
 
 export interface AuthUser {
   token: string
@@ -24,6 +26,11 @@ export interface Plan {
   name: string
   durationMonths: number
   price: number
+  discountPrice: number | null
+  discountStartsAt: string | null
+  discountEndsAt: string | null
+  effectivePrice: number
+  discountActive: boolean
 }
 
 export interface Membership {
@@ -33,6 +40,11 @@ export interface Membership {
   endDate: string
   status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'PAUSED'
   pausedAt: string | null
+  totalAmount: number
+  amountPaid: number
+  balanceDue: number
+  paymentStatus: PaymentStatus
+  balanceDueDate: string | null
 }
 
 export interface MembershipAdmin {
@@ -44,6 +56,11 @@ export interface MembershipAdmin {
   endDate: string
   status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'PAUSED'
   pausedAt: string | null
+  totalAmount: number
+  amountPaid: number
+  balanceDue: number
+  paymentStatus: PaymentStatus
+  balanceDueDate: string | null
 }
 
 export interface Payment {
@@ -76,6 +93,12 @@ export interface InvoiceResponse {
   mode: string
   recordedByName: string
   recordedBySignature: string | null
+  membershipTotalAmount: number | null
+  membershipAmountPaid: number | null
+  membershipBalanceDue: number | null
+  membershipPaymentStatus: PaymentStatus | null
+  membershipDiscountAmount: number | null
+  membershipCouponCode: string | null
 }
 
 export interface Profile {
@@ -270,6 +293,7 @@ export interface Coupon {
   maxRedemptions: number | null
   timesRedeemed: number
   currentlyValid: boolean
+  appliesTo: CouponAppliesTo
 }
 
 export interface ProductOrderItem {

@@ -130,7 +130,9 @@ async function buildInvoiceDoc(inv: ProductOrderInvoice): Promise<jsPDF> {
 
   doc.text(`Subtotal: Rs. ${inv.subtotal.toFixed(2)}`, col4, y, { align: 'right' }); y += 14
   if (inv.discountAmount > 0) {
+    doc.setTextColor(21, 128, 61)
     doc.text(`Discount${inv.couponCode ? ` (${inv.couponCode})` : ''}: -Rs. ${inv.discountAmount.toFixed(2)}`, col4, y, { align: 'right' })
+    doc.setTextColor(0, 0, 0)
     y += 14
   }
   doc.setFont('helvetica', 'bold')

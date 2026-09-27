@@ -19,9 +19,10 @@ public class PaymentDtos {
             LocalDateTime createdAt
     ) {}
 
-    // Full detail needed to render the invoice document - fetched on-demand via
-    // GET /api/payments/{id}/invoice rather than embedded in every list row, since
-    // branch/member address fields aren't needed until someone actually opens an invoice.
+    // Full detail needed to render the invoice document. The four membership* fields are
+    // null unless this payment is tied to a membership - when present, they show the
+    // membership's overall payment picture (not just this one transaction's amount),
+    // which is what lets the invoice show a running balance due for a partially-paid plan.
     public record InvoiceResponse(
             UUID paymentId,
             String invoiceNumber,
@@ -39,6 +40,15 @@ public class PaymentDtos {
             BigDecimal amount,
             String mode,
             String recordedByName,
-            String recordedBySignature
+            String recordedBySignature,
+            BigDecimal membershipTotalAmount,
+            BigDecimal membershipAmountPaid,
+            BigDecimal membershipBalanceDue,
+            String membershipPaymentStatus,
+            // Coupon discount applied at purchase, if any - membershipTotalAmount already
+            // has this subtracted, so membershipTotalAmount + membershipDiscountAmount is
+            // the plan's pre-discount price. Both null unless a coupon was actually used.
+            BigDecimal membershipDiscountAmount,
+            String membershipCouponCode
     ) {}
 }

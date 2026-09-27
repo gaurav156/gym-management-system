@@ -104,7 +104,7 @@ public class SecurityConfig {
                 // GET /mine endpoint.
                 .requestMatchers("/api/memberships/branch/**", "/api/memberships/member/**").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers("/api/memberships/*/cancel", "/api/memberships/*/pause",
-                        "/api/memberships/*/resume").hasAnyRole("OWNER", "MANAGER")
+                        "/api/memberships/*/resume", "/api/memberships/*/record-payment").hasAnyRole("OWNER", "MANAGER")
                 .requestMatchers(HttpMethod.PUT, "/api/memberships/*").hasAnyRole("OWNER", "MANAGER")
 
                 // payment history - branch/member views for staff, "my payments" for the

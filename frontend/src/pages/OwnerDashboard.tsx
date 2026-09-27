@@ -69,6 +69,7 @@ export default function OwnerDashboard() {
   const [planPrice, setPlanPrice] = useState('')
   const [planError, setPlanError] = useState('')
   const [creatingPlan, setCreatingPlan] = useState(false)
+  const [planDiscountPrice, setPlanDiscountPrice] = useState('')
 
   function loadBranches() {
     setBranchesLoading(true)
@@ -164,8 +165,9 @@ export default function OwnerDashboard() {
     try {
       await api.post('/api/plans/manage', {
         name: planName, durationMonths: planMonths, price: Number(planPrice),
+        discountPrice: planDiscountPrice ? Number(planDiscountPrice) : null,
       })
-      setPlanName(''); setPlanPrice('')
+      setPlanName(''); setPlanPrice(''); setPlanDiscountPrice('')
       loadPlans()
     } catch (err: any) {
       setPlanError(err.response?.data?.error || 'Failed to create plan')
@@ -242,6 +244,9 @@ export default function OwnerDashboard() {
             <input type="number" min={0} placeholder="Price" required value={planPrice}
               onChange={(e) => setPlanPrice(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            <input type="number" min={0} placeholder="Discount price (optional)" value={planDiscountPrice}
+              onChange={(e) => setPlanDiscountPrice(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />  
             <button disabled={creatingPlan}
               className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
               {creatingPlan && <Spinner className="h-4 w-4" />}
@@ -261,6 +266,9 @@ export default function OwnerDashboard() {
                 <li key={p.id} className="flex justify-between py-2">
                   <span>{p.name} <span className="text-xs text-gray-400">({p.durationMonths} month{p.durationMonths > 1 ? 's' : ''})</span></span>
                   <span className="text-gray-500">₹{p.price}</span>
+                  <span className="text-gray-500">
+                    {p.discountActive ? <><span className="line-through">₹{p.price}</span> ₹{p.effectivePrice}</> : `₹${p.price}`}
+                  </span>
                 </li>
               ))}
               {plans.length === 0 && <li className="py-2 text-gray-400">No plans yet - add one above.</li>}

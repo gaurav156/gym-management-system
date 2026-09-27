@@ -53,6 +53,14 @@ public class Coupon {
     @Builder.Default
     private boolean firstTimeBuyersOnly = false;
 
+    // Which purchase flow(s) this coupon is valid for - see CouponAppliesTo. Defaults to
+    // PRODUCT so every coupon created before this field existed keeps behaving exactly as
+    // it did (product-order coupons only).
+    @Enumerated(EnumType.STRING)
+    @Column(name = "applies_to", nullable = false)
+    @Builder.Default
+    private CouponAppliesTo appliesTo = CouponAppliesTo.PRODUCT;
+
     // Nullable - no cap on total redemptions.
     private Integer maxRedemptions;
 

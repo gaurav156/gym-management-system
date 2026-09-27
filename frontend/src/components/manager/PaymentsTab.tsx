@@ -30,6 +30,29 @@ export default function PaymentsTab({ selectedBranch }: Props) {
   const [purchaseStartDate, setPurchaseStartDate] = useState('')
   const [purchaseMessage, setPurchaseMessage] = useState('')
   const [purchasing, setPurchasing] = useState(false)
+  const [purchaseFullPayment, setPurchaseFullPayment] = useState(true)
+  const [purchaseAmountPaid, setPurchaseAmountPaid] = useState('')
+  const [purchaseBalanceDueDate, setPurchaseBalanceDueDate] = useState('')
+  const [purchaseCouponCode, setPurchaseCouponCode] = useState('')
+  const [purchaseCouponStatus, setPurchaseCouponStatus] = useState<{
+    valid: boolean; message: string
+    discountType?: 'PERCENTAGE' | 'FIXED'; discountValue?: number; maxDiscountAmount?: number | null
+  } | null>(null)
+  const [checkingPurchaseCoupon, setCheckingPurchaseCoupon] = useState(false)
+
+  const selectedPlan = plans.find((p) => p.id === purchasePlanId) ?? null
+  const purchasePlanPrice = selectedPlan?.effectivePrice ?? 0
+  const purchaseCouponDiscount = (() => {
+    if (!purchaseCouponStatus?.valid || purchaseCouponStatus.discountValue == null) return 0
+    let raw = purchaseCouponStatus.discountType === 'PERCENTAGE'
+      ? (purchasePlanPrice * purchaseCouponStatus.discountValue) / 100
+      : purchaseCouponStatus.discountValue
+    if (purchaseCouponStatus.discountType === 'PERCENTAGE' && purchaseCouponStatus.maxDiscountAmount != null) {
+      raw = Math.min(raw, purchaseCouponStatus.maxDiscountAmount)
+    }
+    return Math.min(raw, purchasePlanPrice)
+  })()
+  const purchaseTotalDue = purchasePlanPrice - purchaseCouponDiscount
 
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [memberDropdownOpen, setMemberDropdownOpen] = useState(false)
@@ -88,6 +111,22 @@ export default function PaymentsTab({ selectedBranch }: Props) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  async function checkPurchaseCoupon() {
+    setPurchaseCouponStatus(null)
+    if (!purchaseCouponCode.trim() || !purchaseMemberId) return
+    setCheckingPurchaseCoupon(true)
+    try {
+      const { data } = await api.post('/api/coupons/validate', {
+        code: purchaseCouponCode.trim(), memberId: purchaseMemberId, forMembership: true,
+      })
+      setPurchaseCouponStatus(data)
+    } catch (err: any) {
+      setPurchaseCouponStatus({ valid: false, message: err.response?.data?.error || 'Failed to check coupon' })
+    } finally {
+      setCheckingPurchaseCoupon(false)
+    }
+  }
+
   async function recordPurchase(e: FormEvent) {
     e.preventDefault()
     setPurchaseMessage('')
@@ -108,11 +147,16 @@ export default function PaymentsTab({ selectedBranch }: Props) {
           mode: purchaseMode,
           branchId: selectedBranch,
           startDate: purchaseStartDate || null,
+          amountPaid: purchaseFullPayment ? null : Number(purchaseAmountPaid),
+          balanceDueDate: purchaseFullPayment ? null : (purchaseBalanceDueDate || null),
+          couponCode: purchaseCouponStatus?.valid ? purchaseCouponCode.trim() : null,
         },
         { params: { memberId: purchaseMemberId } }
       )
       setPurchaseMessage(`Recorded - valid until ${data.endDate}.`)
       setPurchaseMemberId(''); setPurchasePlanId(''); setPurchaseStartDate('')
+      setPurchaseFullPayment(true); setPurchaseAmountPaid(''); setPurchaseBalanceDueDate('')
+      setPurchaseCouponCode(''); setPurchaseCouponStatus(null)
       setSelectedMember(null)
       loadPayments(0)
     } catch (err: any) {
@@ -196,8 +240,55 @@ export default function PaymentsTab({ selectedBranch }: Props) {
             <select required value={purchasePlanId} onChange={(e) => setPurchasePlanId(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
               <option value="">Select plan</option>
-              {plans.map((p) => <option key={p.id} value={p.id}>{p.name} - ₹{p.price}</option>)}
+              {plans.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} - ₹{p.effectivePrice}{p.discountActive ? ` (was ₹${p.price})` : ''}
+                </option>
+              ))}
             </select>
+            <div className="rounded-md border border-gray-200 p-2 text-sm">
+              <div className="flex gap-2">
+                <input placeholder="Coupon code" value={purchaseCouponCode}
+                  onChange={(e) => { setPurchaseCouponCode(e.target.value.toUpperCase()); setPurchaseCouponStatus(null) }}
+                  className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm uppercase" />
+                <button type="button" disabled={checkingPurchaseCoupon || !purchaseCouponCode.trim() || !purchaseMemberId}
+                  onClick={checkPurchaseCoupon}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                  {checkingPurchaseCoupon ? 'Checking...' : 'Apply'}
+                </button>
+              </div>
+              {purchaseCouponStatus && (
+                <p className={`mt-1 text-xs ${purchaseCouponStatus.valid ? 'text-green-700' : 'text-red-600'}`}>
+                  {purchaseCouponStatus.message}
+                </p>
+              )}
+              {selectedPlan && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Total due: ₹{purchaseTotalDue.toFixed(2)}
+                  {purchaseCouponDiscount > 0 && <span className="text-green-700"> (₹{purchaseCouponDiscount.toFixed(2)} off)</span>}
+                </p>
+              )}
+            </div>
+
+            <label className="flex items-center gap-1.5 text-xs text-gray-600">
+              <input type="checkbox" checked={purchaseFullPayment} onChange={(e) => setPurchaseFullPayment(e.target.checked)} />
+              Paid in full
+            </label>
+            {!purchaseFullPayment && (
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs text-gray-500">Amount paid now</label>
+                  <input type="number" min={0} step="0.01" required={!purchaseFullPayment} value={purchaseAmountPaid}
+                    onChange={(e) => setPurchaseAmountPaid(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500">Balance due by (defaults to +1 month)</label>
+                  <input type="date" value={purchaseBalanceDueDate} onChange={(e) => setPurchaseBalanceDueDate(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                </div>
+              </div>
+            )}
             <select required value={purchaseMode} onChange={(e) => setPurchaseMode(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
               {PAYMENT_MODES.map((m) => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
@@ -223,7 +314,7 @@ export default function PaymentsTab({ selectedBranch }: Props) {
             {plans.map((p) => (
               <li key={p.id} className="flex justify-between py-2">
                 <span>{p.name}</span>
-                <span className="text-gray-500">₹{p.price}</span>
+                <span className="text-gray-500">₹{p.effectivePrice}{p.discountActive ? ` (was ₹${p.price})` : ''}</span>
               </li>
             ))}
             {plans.length === 0 && <li className="py-2 text-gray-400">No plans published yet.</li>}
