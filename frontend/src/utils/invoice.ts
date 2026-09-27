@@ -179,8 +179,7 @@ async function buildInvoiceDoc(inv: InvoiceResponse): Promise<jsPDF> {
     doc.text(`Rs. ${planPrice.toFixed(2)}`, col4, y, { align: 'right' })
     y += 16
     doc.setTextColor(21, 128, 61)
-    doc.text(`Discount${inv.membershipCouponCode ? ` (${inv.membershipCouponCode})` : ''}`, col3, y)
-    doc.text(`-Rs. ${inv.membershipDiscountAmount.toFixed(2)}`, col4, y, { align: 'right' })
+    doc.text(`Discount${inv.membershipCouponCode ? ` (${inv.membershipCouponCode})` : ''}: -Rs. ${inv.membershipDiscountAmount.toFixed(2)}`, col4, y, { align: 'right' })
     doc.setTextColor(0, 0, 0)
     y += 20
   }

@@ -246,30 +246,11 @@ export default function PaymentsTab({ selectedBranch }: Props) {
                 </option>
               ))}
             </select>
-            <div className="rounded-md border border-gray-200 p-2 text-sm">
-              <div className="flex gap-2">
-                <input placeholder="Coupon code" value={purchaseCouponCode}
-                  onChange={(e) => { setPurchaseCouponCode(e.target.value.toUpperCase()); setPurchaseCouponStatus(null) }}
-                  className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm uppercase" />
-                <button type="button" disabled={checkingPurchaseCoupon || !purchaseCouponCode.trim() || !purchaseMemberId}
-                  onClick={checkPurchaseCoupon}
-                  className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
-                  {checkingPurchaseCoupon ? 'Checking...' : 'Apply'}
-                </button>
-              </div>
-              {purchaseCouponStatus && (
-                <p className={`mt-1 text-xs ${purchaseCouponStatus.valid ? 'text-green-700' : 'text-red-600'}`}>
-                  {purchaseCouponStatus.message}
-                </p>
-              )}
-              {selectedPlan && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Total due: ₹{purchaseTotalDue.toFixed(2)}
-                  {purchaseCouponDiscount > 0 && <span className="text-green-700"> (₹{purchaseCouponDiscount.toFixed(2)} off)</span>}
-                </p>
-              )}
+            <div>
+              <label className="text-xs text-gray-500">Start date (only used if member has no active plan)</label>
+              <input type="date" value={purchaseStartDate} onChange={(e) => setPurchaseStartDate(e.target.value)}
+                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
             </div>
-
             <label className="flex items-center gap-1.5 text-xs text-gray-600">
               <input type="checkbox" checked={purchaseFullPayment} onChange={(e) => setPurchaseFullPayment(e.target.checked)} />
               Paid in full
@@ -293,10 +274,28 @@ export default function PaymentsTab({ selectedBranch }: Props) {
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
               {PAYMENT_MODES.map((m) => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
             </select>
-            <div>
-              <label className="text-xs text-gray-500">Start date (only used if member has no active plan)</label>
-              <input type="date" value={purchaseStartDate} onChange={(e) => setPurchaseStartDate(e.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            <div className="rounded-md border border-gray-200 p-2 text-sm">
+              <div className="flex gap-2">
+                <input placeholder="Coupon code" value={purchaseCouponCode}
+                  onChange={(e) => { setPurchaseCouponCode(e.target.value.toUpperCase()); setPurchaseCouponStatus(null) }}
+                  className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm uppercase" />
+                <button type="button" disabled={checkingPurchaseCoupon || !purchaseCouponCode.trim() || !purchaseMemberId}
+                  onClick={checkPurchaseCoupon}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                  {checkingPurchaseCoupon ? 'Checking...' : 'Apply'}
+                </button>
+              </div>
+              {purchaseCouponStatus && (
+                <p className={`mt-1 text-xs ${purchaseCouponStatus.valid ? 'text-green-700' : 'text-red-600'}`}>
+                  {purchaseCouponStatus.message}
+                </p>
+              )}
+              {selectedPlan && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Total due: ₹{purchaseTotalDue.toFixed(2)}
+                  {purchaseCouponDiscount > 0 && <span className="text-green-700"> (₹{purchaseCouponDiscount.toFixed(2)} off)</span>}
+                </p>
+              )}
             </div>
             <button disabled={purchasing}
               className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
