@@ -359,21 +359,21 @@ export default function PaymentsTab({ selectedBranch }: Props) {
               ))}
             </tbody>
           </table>
-          {invoiceError && <p className="mt-2 text-sm text-red-600">{invoiceError}</p>}
-          {sendMessage && <p className="mt-2 text-sm text-green-700">{sendMessage}</p>}
-          {!paymentsLoading && payments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
-          {paymentTotalElements > 0 && (
-            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-              <span>Page {paymentPage + 1} of {paymentTotalPages} ({paymentTotalElements} total)</span>
-              <div className="space-x-2">
-                <button disabled={paymentPage === 0} onClick={() => loadPayments(paymentPage - 1)}
-                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                <button disabled={paymentPage + 1 >= paymentTotalPages} onClick={() => loadPayments(paymentPage + 1)}
-                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
-              </div>
-            </div>
-          )}
         </div>
+        {invoiceError && <p className="mt-2 text-sm text-red-600">{invoiceError}</p>}
+        {sendMessage && <p className="mt-2 text-sm text-green-700">{sendMessage}</p>}
+        {!paymentsLoading && payments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
+        {paymentTotalElements > 0 && (
+          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+            <span>Page {paymentPage + 1} of {paymentTotalPages} ({paymentTotalElements} total)</span>
+            <div className="space-x-2">
+              <button disabled={paymentPage === 0} onClick={() => loadPayments(paymentPage - 1)}
+                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+              <button disabled={paymentPage + 1 >= paymentTotalPages} onClick={() => loadPayments(paymentPage + 1)}
+                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

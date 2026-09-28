@@ -501,19 +501,19 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
               )}
             </tbody>
           </table>
-          {!membersLoading && members.length === 0 && <p className="py-4 text-sm text-gray-400">No members match.</p>}
-          {memberTotalElements > 0 && (
-            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-              <span>Page {memberPage + 1} of {memberTotalPages} ({memberTotalElements} total)</span>
-              <div className="space-x-2">
-                <button disabled={memberPage === 0} onClick={() => loadMembers(memberPage - 1)}
-                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                <button disabled={memberPage + 1 >= memberTotalPages} onClick={() => loadMembers(memberPage + 1)}
-                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
-              </div>
-            </div>
-          )}
         </div>
+        {!membersLoading && members.length === 0 && <p className="py-4 text-sm text-gray-400">No members match.</p>}
+        {memberTotalElements > 0 && (
+          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+            <span>Page {memberPage + 1} of {memberTotalPages} ({memberTotalElements} total)</span>
+            <div className="space-x-2">
+              <button disabled={memberPage === 0} onClick={() => loadMembers(memberPage - 1)}
+                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+              <button disabled={memberPage + 1 >= memberTotalPages} onClick={() => loadMembers(memberPage + 1)}
+                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {detailMember && (
@@ -749,54 +749,56 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                       })}
                     </tbody>
                   </table>
-                  {detailMemberships.length === 0 && <p className="py-4 text-sm text-gray-400">No memberships to show.</p>}
-                  {detailMemberships.length > 0 && (
-                    <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                      <span>Page {modalPage} of {modalTotalPages} ({detailMemberships.length} total)</span>
-                      <div className="space-x-2">
-                        <button disabled={modalPage === 1} onClick={() => setModalPage((p) => p - 1)}
-                          className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                        <button disabled={modalPage === modalTotalPages} onClick={() => setModalPage((p) => p + 1)}
-                          className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
-                      </div>
-                    </div>
-                  )}
                 </div>
+                {detailMemberships.length === 0 && <p className="py-4 text-sm text-gray-400">No memberships to show.</p>}
+                {detailMemberships.length > 0 && (
+                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                    <span>Page {modalPage} of {modalTotalPages} ({detailMemberships.length} total)</span>
+                    <div className="space-x-2">
+                      <button disabled={modalPage === 1} onClick={() => setModalPage((p) => p - 1)}
+                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                      <button disabled={modalPage === modalTotalPages} onClick={() => setModalPage((p) => p + 1)}
+                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
             {modalTab === 'PAYMENTS' && (
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 text-gray-500">
-                      <th className="pb-2 pr-4">Date</th>
-                      <th className="pb-2 pr-4">Plan</th>
-                      <th className="pb-2 pr-4">Amount</th>
-                      <th className="pb-2 pr-4">Mode</th>
-                      <th className="pb-2 pr-4">Recorded by</th>
-                      <th className="pb-2">Invoice</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {detailPayments.map((p) => (
-                      <tr key={p.id}>
-                        <td className="py-2 pr-4 text-gray-500">{new Date(p.createdAt).toLocaleString()}</td>
-                        <td className="py-2 pr-4">{p.planName ?? '—'}</td>
-                        <td className="py-2 pr-4">₹{p.amount}</td>
-                        <td className="py-2 pr-4">{p.mode}</td>
-                        <td className="py-2 pr-4">{p.recordedByName}</td>
-                        <td className="py-2 space-x-2 whitespace-nowrap">
-                          <button onClick={() => handleInvoiceAction(p.id, 'view')} className="text-xs text-brand hover:underline">View</button>
-                          <button onClick={() => handleInvoiceAction(p.id, 'print')} className="text-xs text-brand hover:underline">Print</button>
-                          <button onClick={() => handleInvoiceAction(p.id, 'download')} className="text-xs text-brand hover:underline">Download</button>
-                          <button onClick={() => handlePaymentSendAction(p.id, 'email')} className="text-xs text-brand hover:underline">Email</button>
-                          <button onClick={() => handlePaymentSendAction(p.id, 'whatsapp')} className="text-xs text-brand hover:underline">WhatsApp</button>
-                        </td>
+              <div className="mt-4">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-gray-500">
+                        <th className="pb-2 pr-4">Date</th>
+                        <th className="pb-2 pr-4">Plan</th>
+                        <th className="pb-2 pr-4">Amount</th>
+                        <th className="pb-2 pr-4">Mode</th>
+                        <th className="pb-2 pr-4">Recorded by</th>
+                        <th className="pb-2">Invoice</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {detailPayments.map((p) => (
+                        <tr key={p.id}>
+                          <td className="py-2 pr-4 text-gray-500">{new Date(p.createdAt).toLocaleString()}</td>
+                          <td className="py-2 pr-4">{p.planName ?? '—'}</td>
+                          <td className="py-2 pr-4">₹{p.amount}</td>
+                          <td className="py-2 pr-4">{p.mode}</td>
+                          <td className="py-2 pr-4">{p.recordedByName}</td>
+                          <td className="py-2 space-x-2 whitespace-nowrap">
+                            <button onClick={() => handleInvoiceAction(p.id, 'view')} className="text-xs text-brand hover:underline">View</button>
+                            <button onClick={() => handleInvoiceAction(p.id, 'print')} className="text-xs text-brand hover:underline">Print</button>
+                            <button onClick={() => handleInvoiceAction(p.id, 'download')} className="text-xs text-brand hover:underline">Download</button>
+                            <button onClick={() => handlePaymentSendAction(p.id, 'email')} className="text-xs text-brand hover:underline">Email</button>
+                            <button onClick={() => handlePaymentSendAction(p.id, 'whatsapp')} className="text-xs text-brand hover:underline">WhatsApp</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 {detailPayments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
                 {detailPaymentsTotalElements > 0 && (
                   <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
@@ -813,28 +815,30 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
             )}
 
             {modalTab === 'ATTENDANCE' && (
-              <div className="mt-4 overflow-x-auto">
-                <p className="mb-2 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 text-gray-500">
-                      <th className="pb-2 pr-4">Check-in</th>
-                      <th className="pb-2 pr-4">Check-out</th>
-                      <th className="pb-2 pr-4">Method</th>
-                      <th className="pb-2">Branch</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {detailAttendance.map((a) => (
-                      <tr key={a.id}>
-                        <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleString()}</td>
-                        <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '—'}</td>
-                        <td className="py-2 pr-4">{a.method}</td>
-                        <td className="py-2 text-gray-500">{a.branchName}</td>
+              <div className="mt-4">
+                <div className="overflow-x-auto">
+                  <p className="mb-2 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-gray-500">
+                        <th className="pb-2 pr-4">Check-in</th>
+                        <th className="pb-2 pr-4">Check-out</th>
+                        <th className="pb-2 pr-4">Method</th>
+                        <th className="pb-2">Branch</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {detailAttendance.map((a) => (
+                        <tr key={a.id}>
+                          <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleString()}</td>
+                          <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '—'}</td>
+                          <td className="py-2 pr-4">{a.method}</td>
+                          <td className="py-2 text-gray-500">{a.branchName}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 {detailAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
                 {paymentSendMessage && <p className="mt-2 text-sm text-green-700">{paymentSendMessage}</p>}
                 {detailAttendanceTotalElements > 0 && (

@@ -437,19 +437,19 @@ export default function ProductCatalogSection({ branches }: Props) {
             })}
           </tbody>
         </table>
-        {!loading && products.length === 0 && <p className="py-4 text-sm text-gray-400">No products yet - add one above.</p>}
-        {totalElements > 0 && (
-          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-            <span>Page {page + 1} of {totalPages} ({totalElements} total)</span>
-            <div className="space-x-2">
-              <button disabled={page === 0} onClick={() => loadProducts(page - 1)}
-                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-              <button disabled={page + 1 >= totalPages} onClick={() => loadProducts(page + 1)}
-                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
-            </div>
-          </div>
-        )}
       </div>
+      {!loading && products.length === 0 && <p className="py-4 text-sm text-gray-400">No products yet - add one above.</p>}
+      {totalElements > 0 && (
+        <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+          <span>Page {page + 1} of {totalPages} ({totalElements} total)</span>
+          <div className="space-x-2">
+            <button disabled={page === 0} onClick={() => loadProducts(page - 1)}
+              className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+            <button disabled={page + 1 >= totalPages} onClick={() => loadProducts(page + 1)}
+              className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+          </div>
+        </div>
+      )}
 
       {viewingProduct && (
         <ProductDetailModal product={viewingProduct} onClose={() => setViewingProduct(null)} isStaffView />

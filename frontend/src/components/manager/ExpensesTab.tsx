@@ -207,19 +207,19 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
               ))}
             </tbody>
           </table>
-          {!expensesLoading && expenses.length === 0 && <p className="py-4 text-sm text-gray-400">No expenses recorded yet.</p>}
-          {expenseTotalElements > 0 && (
-            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-              <span>Page {expensePage + 1} of {expenseTotalPages} ({expenseTotalElements} total)</span>
-              <div className="space-x-2">
-                <button disabled={expensePage === 0} onClick={() => loadExpenses(expensePage - 1)}
-                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                <button disabled={expensePage + 1 >= expenseTotalPages} onClick={() => loadExpenses(expensePage + 1)}
-                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
-              </div>
-            </div>
-          )}
         </div>
+        {!expensesLoading && expenses.length === 0 && <p className="py-4 text-sm text-gray-400">No expenses recorded yet.</p>}
+        {expenseTotalElements > 0 && (
+          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+            <span>Page {expensePage + 1} of {expenseTotalPages} ({expenseTotalElements} total)</span>
+            <div className="space-x-2">
+              <button disabled={expensePage === 0} onClick={() => loadExpenses(expensePage - 1)}
+                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+              <button disabled={expensePage + 1 >= expenseTotalPages} onClick={() => loadExpenses(expensePage + 1)}
+                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+            </div>
+          </div>
+        )}
       </div>
 
       <ConfirmDialog {...dialogProps} />

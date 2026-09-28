@@ -392,23 +392,23 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
               ))}
             </tbody>
           </table>
-          {!staffLoading && staff.length === 0 && (
-            <p className="py-4 text-sm text-gray-400">
-              {staff.length === 0 ? 'No staff assigned to this branch yet.' : 'No staff match the current filters.'}
-            </p>
-          )}
-          {staffTotalElements > 0 && (
-            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-              <span>Page {staffPage + 1} of {staffTotalPages} ({staffTotalElements} total)</span>
-              <div className="space-x-2">
-                <button disabled={staffPage === 0} onClick={() => loadStaff(staffPage - 1)}
-                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                <button disabled={staffPage + 1 >= staffTotalPages} onClick={() => loadStaff(staffPage + 1)}
-                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
-              </div>
-            </div>
-          )}
         </div>
+        {!staffLoading && staff.length === 0 && (
+          <p className="py-4 text-sm text-gray-400">
+            {staff.length === 0 ? 'No staff assigned to this branch yet.' : 'No staff match the current filters.'}
+          </p>
+        )}
+        {staffTotalElements > 0 && (
+          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+            <span>Page {staffPage + 1} of {staffTotalPages} ({staffTotalElements} total)</span>
+            <div className="space-x-2">
+              <button disabled={staffPage === 0} onClick={() => loadStaff(staffPage - 1)}
+                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+              <button disabled={staffPage + 1 >= staffTotalPages} onClick={() => loadStaff(staffPage + 1)}
+                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {detailStaff && (
@@ -626,28 +626,30 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
             )}
 
             {staffModalTab === 'ATTENDANCE' && (
-              <div className="mt-4 overflow-x-auto">
+              <div className="mt-4">
                 <p className="mb-2 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 text-gray-500">
-                      <th className="pb-2 pr-4">Check-in</th>
-                      <th className="pb-2 pr-4">Check-out</th>
-                      <th className="pb-2 pr-4">Method</th>
-                      <th className="pb-2">Branch</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {detailStaffAttendance.map((a) => (
-                      <tr key={a.id}>
-                        <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleString()}</td>
-                        <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '—'}</td>
-                        <td className="py-2 pr-4">{a.method}</td>
-                        <td className="py-2 text-gray-500">{a.branchName}</td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-gray-500">
+                        <th className="pb-2 pr-4">Check-in</th>
+                        <th className="pb-2 pr-4">Check-out</th>
+                        <th className="pb-2 pr-4">Method</th>
+                        <th className="pb-2">Branch</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {detailStaffAttendance.map((a) => (
+                        <tr key={a.id}>
+                          <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleString()}</td>
+                          <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '—'}</td>
+                          <td className="py-2 pr-4">{a.method}</td>
+                          <td className="py-2 text-gray-500">{a.branchName}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 {detailStaffAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
                 {staffModalTotalElements > 0 && (
                   <div className="mt-3 flex items-center justify-between text-xs text-gray-500">

@@ -463,19 +463,19 @@ export default function StoreTab({ selectedBranch }: Props) {
               ))}
             </tbody>
           </table>
-          {!ordersLoading && orders.length === 0 && <p className="py-4 text-sm text-gray-400">No product orders recorded yet.</p>}
-          {orderTotalElements > 0 && (
-            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-              <span>Page {orderPage + 1} of {orderTotalPages} ({orderTotalElements} total)</span>
-              <div className="space-x-2">
-                <button disabled={orderPage === 0} onClick={() => loadOrders(orderPage - 1)}
-                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                <button disabled={orderPage + 1 >= orderTotalPages} onClick={() => loadOrders(orderPage + 1)}
-                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
-              </div>
-            </div>
-          )}
         </div>
+        {!ordersLoading && orders.length === 0 && <p className="py-4 text-sm text-gray-400">No product orders recorded yet.</p>}
+        {orderTotalElements > 0 && (
+          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+            <span>Page {orderPage + 1} of {orderTotalPages} ({orderTotalElements} total)</span>
+            <div className="space-x-2">
+              <button disabled={orderPage === 0} onClick={() => loadOrders(orderPage - 1)}
+                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+              <button disabled={orderPage + 1 >= orderTotalPages} onClick={() => loadOrders(orderPage + 1)}
+                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {cancelTarget && (

@@ -239,21 +239,21 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
               ))}
             </tbody>
           </table>
-          {!todayAttendanceLoading && filteredTodayAttendance.length === 0 && (
-            <p className="py-4 text-sm text-gray-400">No check-ins yet today.</p>
-          )}
-          {!todayAttendanceLoading && filteredTodayAttendance.length > 0 && (
-            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-              <span>Page {todayAttendancePage} of {todayAttendanceTotalPages} ({filteredTodayAttendance.length} total)</span>
-              <div className="space-x-2">
-                <button disabled={todayAttendancePage === 1} onClick={() => setTodayAttendancePage((p) => p - 1)}
-                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                <button disabled={todayAttendancePage === todayAttendanceTotalPages} onClick={() => setTodayAttendancePage((p) => p + 1)}
-                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
-              </div>
-            </div>
-          )}
         </div>
+        {!todayAttendanceLoading && filteredTodayAttendance.length === 0 && (
+          <p className="py-4 text-sm text-gray-400">No check-ins yet today.</p>
+        )}
+        {!todayAttendanceLoading && filteredTodayAttendance.length > 0 && (
+          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+            <span>Page {todayAttendancePage} of {todayAttendanceTotalPages} ({filteredTodayAttendance.length} total)</span>
+            <div className="space-x-2">
+              <button disabled={todayAttendancePage === 1} onClick={() => setTodayAttendancePage((p) => p - 1)}
+                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+              <button disabled={todayAttendancePage === todayAttendanceTotalPages} onClick={() => setTodayAttendancePage((p) => p + 1)}
+                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
