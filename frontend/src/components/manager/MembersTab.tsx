@@ -10,6 +10,8 @@ import { useConfirm } from '../../hooks/useConfirm'
 import Spinner from '../Spinner'
 import RoleChangeOtpDialog, { type RoleChangeOtpTarget } from '../RoleChangeOtpDialog'
 import Avatar from '../Avatar'
+import RowActionsMenu from '../RowActionsMenu'
+import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon } from '../icons/ActionIcons'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -787,12 +789,14 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                           <td className="py-2 pr-4">₹{p.amount}</td>
                           <td className="py-2 pr-4">{p.mode}</td>
                           <td className="py-2 pr-4">{p.recordedByName}</td>
-                          <td className="py-2 space-x-2 whitespace-nowrap">
-                            <button onClick={() => handleInvoiceAction(p.id, 'view')} className="text-xs text-brand hover:underline">View</button>
-                            <button onClick={() => handleInvoiceAction(p.id, 'print')} className="text-xs text-brand hover:underline">Print</button>
-                            <button onClick={() => handleInvoiceAction(p.id, 'download')} className="text-xs text-brand hover:underline">Download</button>
-                            <button onClick={() => handlePaymentSendAction(p.id, 'email')} className="text-xs text-brand hover:underline">Email</button>
-                            <button onClick={() => handlePaymentSendAction(p.id, 'whatsapp')} className="text-xs text-brand hover:underline">WhatsApp</button>
+                          <td className="py-2">
+                            <RowActionsMenu actions={[
+                              { label: 'View', icon: <EyeIcon />, onClick: () => handleInvoiceAction(p.id, 'view') },
+                              { label: 'Print', icon: <PrinterIcon />, onClick: () => handleInvoiceAction(p.id, 'print') },
+                              { label: 'Download', icon: <DownloadIcon />, onClick: () => handleInvoiceAction(p.id, 'download') },
+                              { label: 'Send Email', icon: <MailIcon />, onClick: () => handlePaymentSendAction(p.id, 'email')},
+                              { label: 'Send WhatsApp', icon: <WhatsAppIcon />, onClick: () => handlePaymentSendAction(p.id, 'whatsapp') },
+                            ]} />
                           </td>
                         </tr>
                       ))}

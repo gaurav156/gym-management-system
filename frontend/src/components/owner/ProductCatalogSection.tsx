@@ -8,6 +8,8 @@ import ConfirmDialog from '../ConfirmDialog'
 import { useConfirm } from '../../hooks/useConfirm'
 import { TableSkeleton } from '../Skeleton'
 import type { Product, ProductCategory, Branch, PageResponse } from '../../types'
+import RowActionsMenu from '../RowActionsMenu'
+import { EyeIcon, PencilIcon, BanIcon, CheckIcon, TrashIcon } from '../icons/ActionIcons'
 
 const PAGE_SIZE = 10
 
@@ -422,14 +424,14 @@ export default function ProductCatalogSection({ branches }: Props) {
                       <td className="py-2 pr-4">
                         <span className={p.active ? 'text-green-700' : 'text-gray-400'}>{p.active ? 'Active' : 'Inactive'}</span>
                       </td>
-                      <td className="py-2 space-x-2 whitespace-nowrap">
-                        <button onClick={() => setViewingProduct(p)} className="text-xs text-gray-600 hover:underline">View</button>
-                        <button onClick={() => startEdit(p)} className="text-xs text-gray-600 hover:underline">Edit</button>
-                        <button onClick={() => toggleActive(p)} className="text-xs text-brand hover:underline">
-                          {p.active ? 'Deactivate' : 'Reactivate'}
-                        </button>
-                        <button onClick={() => deleteProduct(p)} className="text-xs text-red-600 hover:underline">Delete</button>
-                      </td>
+                      <td className="py-2">
+                      <RowActionsMenu actions={[
+                        { label: 'View', icon: <EyeIcon />, onClick: () => setViewingProduct(p) },
+                        { label: 'Edit', icon: <PencilIcon />, onClick: () => startEdit(p) },
+                        { label: p.active ? 'Deactivate' : 'Reactivate', icon: p.active ? <BanIcon /> : <CheckIcon />, onClick: () => toggleActive(p), danger: p.active },
+                        { label: 'Delete', icon: <TrashIcon />, onClick: () => deleteProduct(p), danger: true },
+                      ]} />
+                    </td>
                     </>
                   )}
                 </tr>

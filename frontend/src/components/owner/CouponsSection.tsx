@@ -4,6 +4,8 @@ import Spinner from '../Spinner'
 import ConfirmDialog from '../ConfirmDialog'
 import { useConfirm } from '../../hooks/useConfirm'
 import type { Coupon, DiscountType } from '../../types'
+import RowActionsMenu from '../RowActionsMenu'
+import { PencilIcon, BanIcon, CheckIcon, TrashIcon } from '../icons/ActionIcons'
 
 interface CouponFormState {
   code: string
@@ -330,12 +332,12 @@ export default function CouponsSection() {
                       {c.currentlyValid ? 'Valid' : c.active ? 'Not in window' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="py-2 space-x-2 whitespace-nowrap">
-                    <button onClick={() => startEdit(c)} className="text-xs text-gray-600 hover:underline">Edit</button>
-                    <button onClick={() => toggleActive(c)} className="text-xs text-brand hover:underline">
-                      {c.active ? 'Deactivate' : 'Reactivate'}
-                    </button>
-                    <button onClick={() => deleteCoupon(c)} className="text-xs text-red-600 hover:underline">Delete</button>
+                  <td className="py-2">
+                    <RowActionsMenu actions={[
+                      { label: 'Edit', icon: <PencilIcon />, onClick: () => startEdit(c) },
+                      { label: c.active ? 'Deactivate' : 'Reactivate', icon: c.active ? <BanIcon /> : <CheckIcon />, onClick: () => toggleActive(c), danger: c.active },
+                      { label: 'Delete', icon: <TrashIcon />, onClick: () => deleteCoupon(c), danger: true },
+                    ]} />
                   </td>
                 </tr>
               )

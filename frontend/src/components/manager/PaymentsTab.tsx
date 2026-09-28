@@ -4,6 +4,8 @@ import type { Plan, Payment, MemberSummary, InvoiceResponse, PageResponse } from
 import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
 import { TableSkeleton } from '../Skeleton'
 import Spinner from '../Spinner'
+import RowActionsMenu from '../RowActionsMenu'
+import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon } from '../icons/ActionIcons'
 
 const PAGE_SIZE = 10
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
@@ -348,12 +350,14 @@ export default function PaymentsTab({ selectedBranch }: Props) {
                   <td className="py-2 pr-4">₹{p.amount}</td>
                   <td className="py-2 pr-4">{p.mode}</td>
                   <td className="py-2 pr-4">{p.recordedByName}</td>
-                  <td className="py-2 space-x-2 whitespace-nowrap">
-                    <button onClick={() => handleInvoiceAction(p.id, 'view')} className="text-xs text-brand hover:underline">View</button>
-                    <button onClick={() => handleInvoiceAction(p.id, 'print')} className="text-xs text-brand hover:underline">Print</button>
-                    <button onClick={() => handleInvoiceAction(p.id, 'download')} className="text-xs text-brand hover:underline">Download</button>
-                    <button onClick={() => handleSendAction(p.id, 'email')} className="text-xs text-brand hover:underline">Email</button>
-                    <button onClick={() => handleSendAction(p.id, 'whatsapp')} className="text-xs text-brand hover:underline">WhatsApp</button>
+                  <td className="py-2">
+                    <RowActionsMenu actions={[
+                      { label: 'View', icon: <EyeIcon />, onClick: () => handleInvoiceAction(p.id, 'view') },
+                      { label: 'Print', icon: <PrinterIcon />, onClick: () => handleInvoiceAction(p.id, 'print') },
+                      { label: 'Download', icon: <DownloadIcon />, onClick: () => handleInvoiceAction(p.id, 'download') },
+                      { label: 'Send Email', icon: <MailIcon />, onClick: () => handleSendAction(p.id, 'email') },
+                      { label: 'Send WhatsApp', icon: <WhatsAppIcon />, onClick: () => handleSendAction(p.id, 'whatsapp') },
+                    ]} />
                   </td>
                 </tr>
               ))}

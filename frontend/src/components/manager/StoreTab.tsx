@@ -8,6 +8,8 @@ import { useConfirm } from '../../hooks/useConfirm'
 import Spinner from '../Spinner'
 import { TableSkeleton } from '../Skeleton'
 import type { Product, ProductOrder, ProductCategory, ProductOrderInvoice, MemberSummary, PageResponse } from '../../types'
+import RowActionsMenu from '../RowActionsMenu'
+import { EyeIcon, DownloadIcon, BanIcon } from '../icons/ActionIcons'
 
 const ORDER_PAGE_SIZE = 10
 const PRODUCT_PAGE_SIZE = 8
@@ -452,12 +454,14 @@ export default function StoreTab({ selectedBranch }: Props) {
                       {o.status === 'CANCELLED' ? `Cancelled (refunded ₹${o.refundAmount})` : o.status}
                     </span>
                   </td>
-                  <td className="py-2 space-x-2 whitespace-nowrap">
-                    <button onClick={() => handleInvoiceAction(o.id, 'view')} className="text-xs text-brand hover:underline">View</button>
-                    <button onClick={() => handleInvoiceAction(o.id, 'download')} className="text-xs text-brand hover:underline">Download</button>
-                    {o.status !== 'CANCELLED' && (
-                      <button onClick={() => openCancelDialog(o)} className="text-xs text-red-600 hover:underline">Cancel &amp; refund</button>
-                    )}
+                  <td className="py-2">
+                    <RowActionsMenu actions={[
+                      { label: 'View', icon: <EyeIcon />, onClick: () => handleInvoiceAction(o.id, 'view') },
+                      { label: 'Download', icon: <DownloadIcon />, onClick: () => handleInvoiceAction(o.id, 'download') },
+                      ...(o.status !== 'CANCELLED'
+                        ? [{ label: 'Cancel & refund', icon: <BanIcon />, onClick: () => openCancelDialog(o), danger: true }]
+                        : []),
+                    ]} />
                   </td>
                 </tr>
               ))}
