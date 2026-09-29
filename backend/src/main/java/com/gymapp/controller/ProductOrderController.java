@@ -96,4 +96,13 @@ public class ProductOrderController {
                                                             @RequestParam(defaultValue = "20") int size) {
         return productOrderService.listForMember(personId, PageRequest.of(page, size));
     }
+
+    // Stubbed until ProductOrderWhatsAppService is wired to a real provider - returns a
+    // 400 with a clear message, same pattern as the membership-payment WhatsApp stub.
+    @PostMapping("/{orderId}/send-whatsapp")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public java.util.Map<String, String> sendWhatsApp(@PathVariable UUID orderId) {
+        productOrderService.sendInvoiceWhatsApp(orderId);
+        return java.util.Map.of("message", "Invoice sent via WhatsApp.");
+    }
 }

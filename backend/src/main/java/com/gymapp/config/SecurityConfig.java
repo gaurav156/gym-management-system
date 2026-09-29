@@ -147,7 +147,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/product-orders/purchase", "/api/product-orders/*/complete",
                         "/api/product-orders/*/cancel", "/api/product-orders/branch/**",
                         "/api/product-orders/member/**",
-                        "/api/product-orders/*/send-email").hasAnyRole("OWNER", "MANAGER")
+                        "/api/product-orders/*/send-email", "/api/product-orders/*/send-whatsapp").hasAnyRole("OWNER", "MANAGER")
                 // Previously hasRole('MEMBER') only - staff now purchase products too, and the
                 // controller's mine() already checks ownership against the caller's own JWT id
                 // regardless of role, so this can safely open to anyone authenticated.

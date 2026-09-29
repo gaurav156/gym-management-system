@@ -9,7 +9,7 @@ import Spinner from '../Spinner'
 import { TableSkeleton } from '../Skeleton'
 import type { Product, ProductOrder, ProductCategory, ProductOrderInvoice, MemberSummary, StaffSummary, PageResponse } from '../../types'
 import RowActionsMenu from '../RowActionsMenu'
-import { EyeIcon, DownloadIcon, BanIcon } from '../icons/ActionIcons'
+import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, BanIcon } from '../icons/ActionIcons'
 
 const ORDER_PAGE_SIZE = 10
 const PRODUCT_PAGE_SIZE = 8
@@ -56,6 +56,7 @@ export default function StoreTab({ selectedBranch }: Props) {
   const [orderTotalPages, setOrderTotalPages] = useState(1)
   const [orderTotalElements, setOrderTotalElements] = useState(0)
   const [invoiceError, setInvoiceError] = useState('')
+  const [sendMessage, setSendMessage] = useState('')
 
   const [cancelTarget, setCancelTarget] = useState<ProductOrder | null>(null)
   const [refundAmount, setRefundAmount] = useState('')
@@ -260,6 +261,16 @@ export default function StoreTab({ selectedBranch }: Props) {
       else await downloadProductInvoice(data)
     } catch (err: any) {
       setInvoiceError(err.response?.data?.error || 'Failed to load invoice')
+    }
+  }
+
+  async function handleSendAction(orderId: string, channel: 'email' | 'whatsapp') {
+    setInvoiceError(''); setSendMessage('')
+    try {
+      const { data } = await api.post<{ message: string }>(`/api/product-orders/${orderId}/send-${channel}`)
+      setSendMessage(data.message)
+    } catch (err: any) {
+      setInvoiceError(err.response?.data?.error || `Failed to send via ${channel}`)
     }
   }
 
@@ -473,7 +484,10 @@ export default function StoreTab({ selectedBranch }: Props) {
                   <td className="py-2">
                     <RowActionsMenu actions={[
                       { label: 'View', icon: <EyeIcon />, onClick: () => handleInvoiceAction(o.id, 'view') },
+                      { label: 'Print', icon: <PrinterIcon />, onClick: () => handleInvoiceAction(o.id, 'print') },
                       { label: 'Download', icon: <DownloadIcon />, onClick: () => handleInvoiceAction(o.id, 'download') },
+                      { label: 'Send Email', icon: <MailIcon />, onClick: () => handleSendAction(o.id, 'email') },
+                      { label: 'Send WhatsApp', icon: <WhatsAppIcon />, onClick: () => handleSendAction(o.id, 'whatsapp') },
                       ...(o.status !== 'CANCELLED'
                         ? [{ label: 'Cancel & refund', icon: <BanIcon />, onClick: () => openCancelDialog(o), danger: true }]
                         : []),
@@ -483,19 +497,20 @@ export default function StoreTab({ selectedBranch }: Props) {
               ))}
             </tbody>
           </table>
-        </div>
-        {!ordersLoading && orders.length === 0 && <p className="py-4 text-sm text-gray-400">No product orders recorded yet.</p>}
-        {orderTotalElements > 0 && (
-          <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-            <span>Page {orderPage + 1} of {orderTotalPages} ({orderTotalElements} total)</span>
-            <div className="space-x-2">
-              <button disabled={orderPage === 0} onClick={() => loadOrders(orderPage - 1)}
-                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-              <button disabled={orderPage + 1 >= orderTotalPages} onClick={() => loadOrders(orderPage + 1)}
-                className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+          {!ordersLoading && orders.length === 0 && <p className="py-4 text-sm text-gray-400">No product orders recorded yet.</p>}
+          {sendMessage && <p className="mt-2 text-sm text-green-700">{sendMessage}</p>}
+          {orderTotalElements > 0 && (
+            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+              <span>Page {orderPage + 1} of {orderTotalPages} ({orderTotalElements} total)</span>
+              <div className="space-x-2">
+                <button disabled={orderPage === 0} onClick={() => loadOrders(orderPage - 1)}
+                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                <button disabled={orderPage + 1 >= orderTotalPages} onClick={() => loadOrders(orderPage + 1)}
+                  className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {cancelTarget && (

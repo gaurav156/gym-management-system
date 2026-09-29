@@ -45,6 +45,7 @@ public class ProductOrderService {
     private final ImageRefs imageRefs;
     private final ApplicationEventPublisher eventPublisher;
     private final ProductOrderInvoiceEmailService invoiceEmailService;
+    private final ProductOrderWhatsAppService invoiceWhatsAppService;
 
     public ProductOrderService(ProductOrderRepository productOrderRepository,
                                ProductRepository productRepository,
@@ -56,7 +57,8 @@ public class ProductOrderService {
                                CouponService couponService,
                                ImageRefs imageRefs,
                                ApplicationEventPublisher eventPublisher,
-                               ProductOrderInvoiceEmailService invoiceEmailService) {
+                               ProductOrderInvoiceEmailService invoiceEmailService,
+                               ProductOrderWhatsAppService invoiceWhatsAppService) {
         this.productOrderRepository = productOrderRepository;
         this.productRepository = productRepository;
         this.branchStockRepository = branchStockRepository;
@@ -68,6 +70,7 @@ public class ProductOrderService {
         this.imageRefs = imageRefs;
         this.eventPublisher = eventPublisher;
         this.invoiceEmailService = invoiceEmailService;
+        this.invoiceWhatsAppService = invoiceWhatsAppService;
     }
 
     @Transactional
@@ -289,5 +292,12 @@ public class ProductOrderService {
                 o.getRefundAmount(), o.getRefundedBy() != null ? o.getRefundedBy().getName() : null,
                 o.getRefundNote()
         );
+    }
+
+    // Manual "Send WhatsApp" trigger - throws until ProductOrderWhatsAppService is wired
+    // to a real provider, same pattern as PaymentService.sendInvoiceWhatsApp.
+    @Transactional(readOnly = true)
+    public void sendInvoiceWhatsApp(UUID orderId) {
+        invoiceWhatsAppService.sendInvoiceWhatsApp(getInvoiceInternal(orderId));
     }
 }

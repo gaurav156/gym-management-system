@@ -2,19 +2,21 @@ import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { viewProductInvoice, printProductInvoice, downloadProductInvoice } from '../utils/productInvoice'
 import RowActionsMenu from './RowActionsMenu'
-import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon } from './icons/ActionIcons'
+import Spinner from './Spinner'
+import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, BanIcon } from './icons/ActionIcons'
 import type { ProductOrder, ProductOrderInvoice, PageResponse } from '../types'
 
 const PAGE_SIZE = 5
+const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
 
 interface Props {
   personId: string
 }
 
 // Shared between MembersTab's and StaffTab's detail modals - same View/Print/Download/
-// Send-email actions PaymentsTab already offers for membership payments, now for product
-// orders too. personId works for a Member OR a staff person (Trainer/Manager/Owner) -
-// see ProductOrderController.memberHistory.
+// Send-email/Send-WhatsApp/Cancel actions PaymentsTab and StoreTab already offer.
+// personId works for a Member OR a staff person (Trainer/Manager/Owner) - see
+// ProductOrderController.memberHistory.
 export default function ProductPurchaseHistoryTab({ personId }: Props) {
   const [orders, setOrders] = useState<ProductOrder[]>([])
   const [loading, setLoading] = useState(true)
@@ -23,6 +25,13 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
   const [totalElements, setTotalElements] = useState(0)
   const [error, setError] = useState('')
   const [sendMessage, setSendMessage] = useState('')
+
+  const [cancelTarget, setCancelTarget] = useState<ProductOrder | null>(null)
+  const [refundAmount, setRefundAmount] = useState('')
+  const [refundMode, setRefundMode] = useState('CASH')
+  const [refundNote, setRefundNote] = useState('')
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState('')
 
   function load(p = 0) {
     setLoading(true)
@@ -50,13 +59,38 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
     }
   }
 
-  async function handleSendEmail(orderId: string) {
+  async function handleSendAction(orderId: string, channel: 'email' | 'whatsapp') {
     setError(''); setSendMessage('')
     try {
-      const { data } = await api.post<{ message: string }>(`/api/product-orders/${orderId}/send-email`)
+      const { data } = await api.post<{ message: string }>(`/api/product-orders/${orderId}/send-${channel}`)
       setSendMessage(data.message)
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to send email')
+      setError(err.response?.data?.error || `Failed to send via ${channel}`)
+    }
+  }
+
+  function openCancelDialog(order: ProductOrder) {
+    setCancelTarget(order); setRefundAmount(String(order.totalAmount)); setRefundMode('CASH'); setRefundNote(''); setCancelError('')
+  }
+
+  async function submitCancel() {
+    if (!cancelTarget) return
+    setCancelError('')
+    if (!refundAmount || Number.isNaN(Number(refundAmount)) || Number(refundAmount) <= 0) {
+      setCancelError('Enter a valid refund amount.')
+      return
+    }
+    setCancelling(true)
+    try {
+      await api.post(`/api/product-orders/${cancelTarget.id}/cancel`, {
+        refundAmount: Number(refundAmount), refundMode, refundNote: refundNote || null,
+      })
+      setCancelTarget(null)
+      load(page)
+    } catch (err: any) {
+      setCancelError(err.response?.data?.error || 'Failed to cancel order')
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -93,7 +127,11 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
                     { label: 'View', icon: <EyeIcon />, onClick: () => handleInvoiceAction(o.id, 'view') },
                     { label: 'Print', icon: <PrinterIcon />, onClick: () => handleInvoiceAction(o.id, 'print') },
                     { label: 'Download', icon: <DownloadIcon />, onClick: () => handleInvoiceAction(o.id, 'download') },
-                    { label: 'Send Email', icon: <MailIcon />, onClick: () => handleSendEmail(o.id) },
+                    { label: 'Send Email', icon: <MailIcon />, onClick: () => handleSendAction(o.id, 'email') },
+                    { label: 'Send WhatsApp', icon: <WhatsAppIcon />, onClick: () => handleSendAction(o.id, 'whatsapp') },
+                    ...(o.status !== 'CANCELLED'
+                      ? [{ label: 'Cancel & refund', icon: <BanIcon />, onClick: () => openCancelDialog(o), danger: true }]
+                      : []),
                   ]} />
                 </td>
               </tr>
@@ -111,6 +149,47 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
               className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
             <button disabled={page + 1 >= totalPages} onClick={() => load(page + 1)}
               className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+          </div>
+        </div>
+      )}
+
+      {cancelTarget && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !cancelling && setCancelTarget(null)}>
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-gray-900">Cancel order {cancelTarget.invoiceNumber}</h3>
+            <p className="mt-2 text-sm text-gray-600">
+              Stock will be restored for every item. Record the cash refund given.
+            </p>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="text-xs text-gray-500">Refund amount</label>
+                <input type="number" min={0} step="0.01" value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Refund mode</label>
+                <select value={refundMode} onChange={(e) => setRefundMode(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+                  {PAYMENT_MODES.map((m) => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Note (optional)</label>
+                <textarea value={refundNote} onChange={(e) => setRefundNote(e.target.value)} rows={2}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+              {cancelError && <p className="text-sm text-red-600">{cancelError}</p>}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button disabled={cancelling} onClick={() => setCancelTarget(null)}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60">Cancel</button>
+              <button disabled={cancelling} onClick={submitCancel}
+                className="flex items-center gap-2 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70">
+                {cancelling && <Spinner className="h-3.5 w-3.5" />}
+                {cancelling ? 'Working...' : 'Confirm cancel & refund'}
+              </button>
+            </div>
           </div>
         </div>
       )}
