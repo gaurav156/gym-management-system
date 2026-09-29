@@ -65,8 +65,13 @@ public class ProductOrderController {
         return productOrderService.listForMember(memberId, PageRequest.of(page, size));
     }
 
+    // Any of the four roles can call this - the service itself enforces that a non-staff
+    // caller (Member or Trainer) may only fetch their OWN invoice, so a stolen order id
+    // can't leak someone else's purchase. TRAINER was missing here after staff became
+    // buyers too - Members and Managers worked because they were explicitly listed,
+    // Trainers weren't, so their own valid JWT was rejected before getInvoice() ever ran.
     @GetMapping("/{orderId}/invoice")
-    @PreAuthorize("hasAnyRole('OWNER','MANAGER','MEMBER')")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER','MEMBER','TRAINER')")
     public com.gymapp.dto.ProductOrderDtos.OrderInvoiceResponse invoice(@PathVariable UUID orderId, Authentication authentication) {
         UUID requesterId = UUID.fromString((String) authentication.getDetails());
         boolean isStaff = authentication.getAuthorities().stream()
