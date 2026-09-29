@@ -7,7 +7,7 @@ import { viewProductInvoice, printProductInvoice, downloadProductInvoice } from 
 import { useConfirm } from '../../hooks/useConfirm'
 import Spinner from '../Spinner'
 import { TableSkeleton } from '../Skeleton'
-import type { Product, ProductOrder, ProductCategory, ProductOrderInvoice, MemberSummary, PageResponse } from '../../types'
+import type { Product, ProductOrder, ProductCategory, ProductOrderInvoice, MemberSummary, StaffSummary, PageResponse } from '../../types'
 import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, DownloadIcon, BanIcon } from '../icons/ActionIcons'
 
@@ -18,6 +18,7 @@ const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
 
 interface CartLine { product: Product; quantity: number }
 interface Props { selectedBranch: string }
+interface BuyerOption { id: string; name: string; email: string; role: string }
 
 export default function StoreTab({ selectedBranch }: Props) {
   const [products, setProducts] = useState<Product[]>([])
@@ -29,11 +30,11 @@ export default function StoreTab({ selectedBranch }: Props) {
   const [cart, setCart] = useState<CartLine[]>([])
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null)
 
-  const [members, setMembers] = useState<MemberSummary[]>([])
-  const [selectedMember, setSelectedMember] = useState<MemberSummary | null>(null)
-  const [memberSearchQuery, setMemberSearchQuery] = useState('')
-  const [memberDropdownOpen, setMemberDropdownOpen] = useState(false)
-  const memberDropdownRef = useRef<HTMLDivElement>(null)
+  const [buyers, setBuyers] = useState<BuyerOption[]>([])
+  const [selectedBuyer, setSelectedBuyer] = useState<BuyerOption | null>(null)
+  const [buyerSearchQuery, setBuyerSearchQuery] = useState('')
+  const [buyerDropdownOpen, setBuyerDropdownOpen] = useState(false)
+  const buyerDropdownRef = useRef<HTMLDivElement>(null)
 
   const [mode, setMode] = useState('CASH')
   const [couponCode, setCouponCode] = useState('')
@@ -76,11 +77,22 @@ export default function StoreTab({ selectedBranch }: Props) {
     })
   }
 
-  function loadMemberOptions(search: string) {
+  function loadBuyerOptions(search: string) {
     if (!selectedBranch) return
-    api.get<PageResponse<MemberSummary>>('/api/members', {
-      params: { branchId: selectedBranch, search: search || undefined, page: 0, size: MEMBER_SEARCH_SIZE },
-    }).then((res) => setMembers(res.data.content))
+    Promise.all([
+      api.get<PageResponse<MemberSummary>>('/api/members', {
+        params: { branchId: selectedBranch, search: search || undefined, page: 0, size: MEMBER_SEARCH_SIZE },
+      }),
+      api.get<PageResponse<StaffSummary>>('/api/staff', {
+        params: { branchId: selectedBranch, role: 'ALL', includeLeft: false, sort: 'NAME', page: 0, size: MEMBER_SEARCH_SIZE },
+      }),
+    ]).then(([membersRes, staffRes]) => {
+      const memberOptions: BuyerOption[] = membersRes.data.content.map((m) => ({ id: m.id, name: m.name, email: m.email, role: 'MEMBER' }))
+      const staffOptions: BuyerOption[] = staffRes.data.content
+        .filter((s) => search === '' || s.name.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase()))
+        .map((s) => ({ id: s.id, name: s.name, email: s.email, role: s.role }))
+      setBuyers([...memberOptions, ...staffOptions])
+    })
   }
 
   function loadOrders(page = 0) {
@@ -100,7 +112,7 @@ export default function StoreTab({ selectedBranch }: Props) {
   useEffect(() => {
     if (!selectedBranch) return
     loadProducts(0)
-    loadMemberOptions('')
+    loadBuyerOptions('')
     loadOrders(0)
   }, [selectedBranch]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -112,15 +124,15 @@ export default function StoreTab({ selectedBranch }: Props) {
   }, [productSearch, categoryFilter])
 
   useEffect(() => {
-    if (!memberDropdownOpen) return
-    const handle = setTimeout(() => loadMemberOptions(memberSearchQuery), 300)
+    if (!buyerDropdownOpen) return
+    const handle = setTimeout(() => loadBuyerOptions(buyerSearchQuery), 300)
     return () => clearTimeout(handle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [memberSearchQuery, memberDropdownOpen])
+  }, [buyerSearchQuery, buyerDropdownOpen])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (memberDropdownRef.current && !memberDropdownRef.current.contains(e.target as Node)) setMemberDropdownOpen(false)
+      if (buyerDropdownRef.current && !buyerDropdownRef.current.contains(e.target as Node)) setBuyerDropdownOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -171,16 +183,13 @@ export default function StoreTab({ selectedBranch }: Props) {
 
   async function checkCoupon() {
     setCouponStatus(null)
-    if (!couponCode.trim() || !selectedMember) return
+    if (!couponCode.trim() || !selectedBuyer) return
     setCheckingCoupon(true)
     try {
       const { data } = await api.post<{
-        valid: boolean
-        message: string
-        discountType?: 'PERCENTAGE' | 'FIXED'
-        discountValue?: number
-        maxDiscountAmount?: number | null
-      }>('/api/coupons/validate', { code: couponCode.trim(), memberId: selectedMember.id })
+        valid: boolean; message: string
+        discountType?: 'PERCENTAGE' | 'FIXED'; discountValue?: number; maxDiscountAmount?: number | null
+      }>('/api/coupons/validate', { code: couponCode.trim(), memberId: selectedBuyer.id })
       setCouponStatus(data)
     } catch (err: any) {
       setCouponStatus({ valid: false, message: err.response?.data?.error || 'Failed to check coupon' })
@@ -190,13 +199,13 @@ export default function StoreTab({ selectedBranch }: Props) {
   }
 
   function resetCart() {
-    setCart([]); setSelectedMember(null); setCouponCode(''); setCouponStatus(null); setMode('CASH')
+    setCart([]); setSelectedBuyer(null); setCouponCode(''); setCouponStatus(null); setMode('CASH')
   }
 
   async function recordPurchase(e: FormEvent) {
     e.preventDefault()
     setPurchaseMessage('')
-    if (!selectedMember) { setPurchaseMessage('Select a member.'); return }
+    if (!selectedBuyer) { setPurchaseMessage('Select who this purchase is for.'); return }
     if (cart.length === 0) { setPurchaseMessage('Add at least one product to the cart.'); return }
     if (!selectedBranch) { setPurchaseMessage('No branch selected.'); return }
 
@@ -206,7 +215,7 @@ export default function StoreTab({ selectedBranch }: Props) {
         '/api/product-orders/purchase',
         { branchId: selectedBranch, mode, couponCode: couponStatus?.valid ? couponCode.trim() : null,
           items: cart.map((l) => ({ productId: l.product.id, quantity: l.quantity })) },
-        { params: { memberId: selectedMember.id } }
+        { params: { memberId: selectedBuyer.id } }
       )
       setPurchaseMessage(`Recorded - invoice ${data.invoiceNumber}, total ₹${data.totalAmount}.`)
       resetCart()
@@ -331,26 +340,33 @@ export default function StoreTab({ selectedBranch }: Props) {
 
         <div className="rounded-lg border border-gray-200 p-6 lg:col-span-2">
           <h2 className="font-medium">Cart &amp; checkout</h2>
-          <div className="relative mt-3" ref={memberDropdownRef}>
+          <div className="relative mt-3" ref={buyerDropdownRef}>
             <input
-              type="text" required={!selectedMember}
+              type="text" required={!selectedBuyer}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Search member by name or email..."
-              value={memberDropdownOpen ? memberSearchQuery : selectedMember?.name ?? ''}
-              onFocus={() => { setMemberDropdownOpen(true); setMemberSearchQuery(''); loadMemberOptions('') }}
-              onChange={(e) => setMemberSearchQuery(e.target.value)}
+              placeholder="Search member or staff by name or email..."
+              value={buyerDropdownOpen ? buyerSearchQuery : selectedBuyer?.name ?? ''}
+              onFocus={() => { setBuyerDropdownOpen(true); setBuyerSearchQuery(''); loadBuyerOptions('') }}
+              onChange={(e) => setBuyerSearchQuery(e.target.value)}
             />
-            {memberDropdownOpen && (
+            {buyerDropdownOpen && (
               <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-gray-300 bg-white shadow-lg">
-                {members.map((m) => (
-                  <button key={m.id} type="button"
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${m.id === selectedMember?.id ? 'bg-blue-100 font-medium' : ''}`}
-                    onClick={() => { setSelectedMember(m); setMemberDropdownOpen(false); setMemberSearchQuery(''); setCouponStatus(null) }}>
-                    <div>{m.name}</div>
-                    <div className="text-xs text-gray-500">{m.email}</div>
+                {buyers.map((b) => (
+                  <button key={b.id} type="button"
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${b.id === selectedBuyer?.id ? 'bg-blue-100 font-medium' : ''}`}
+                    onClick={() => { setSelectedBuyer(b); setBuyerDropdownOpen(false); setBuyerSearchQuery(''); setCouponStatus(null) }}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate">{b.name}</div>
+                        <div className="truncate text-xs text-gray-500">{b.email}</div>
+                      </div>
+                      {b.role !== 'MEMBER' && (
+                        <span className="flex-shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500">{b.role}</span>
+                      )}
+                    </div>
                   </button>
                 ))}
-                {members.length === 0 && <div className="px-3 py-2 text-sm text-gray-500">No members found</div>}
+                {buyers.length === 0 && <div className="px-3 py-2 text-sm text-gray-500">No matches found</div>}
               </div>
             )}
           </div>
@@ -385,7 +401,7 @@ export default function StoreTab({ selectedBranch }: Props) {
                 <input placeholder="Coupon code" value={couponCode}
                   onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponStatus(null) }}
                   className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm uppercase" />
-                <button type="button" disabled={checkingCoupon || !couponCode.trim() || !selectedMember} onClick={checkCoupon}
+                <button type="button" disabled={checkingCoupon || !couponCode.trim() || !selectedBuyer} onClick={checkCoupon}
                   className="rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
                   {checkingCoupon ? 'Checking...' : 'Apply'}
                 </button>

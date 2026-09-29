@@ -80,4 +80,15 @@ public class ProductOrderController {
         productOrderService.sendInvoiceEmail(orderId);
         return java.util.Map.of("message", "Invoice emailed.");
     }
+
+    // Staff-facing: view a specific person's (member OR staff) product purchase history -
+    // mirrors PaymentController.memberHistory. personId is deliberately not restricted to
+    // MEMBER role, since staff can now purchase products for themselves too.
+    @GetMapping("/member/{personId}")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public PageResponse<ProductOrderResponse> memberHistory(@PathVariable UUID personId,
+                                                            @RequestParam(defaultValue = "0") int page,
+                                                            @RequestParam(defaultValue = "20") int size) {
+        return productOrderService.listForMember(personId, PageRequest.of(page, size));
+    }
 }

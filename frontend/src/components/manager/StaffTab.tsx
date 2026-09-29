@@ -8,6 +8,7 @@ import { TableSkeleton } from '../Skeleton'
 import { useConfirm } from '../../hooks/useConfirm'
 import RoleChangeOtpDialog, { type RoleChangeOtpTarget } from '../RoleChangeOtpDialog'
 import Avatar from '../Avatar'
+import ProductPurchaseHistoryTab from '../ProductPurchaseHistoryTab'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -46,7 +47,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const [staffSort, setStaffSort] = useState<'NAME' | 'ROLE'>('NAME')
 
   const [detailStaffId, setDetailStaffId] = useState<string | null>(null)
-  const [staffModalTab, setStaffModalTab] = useState<'INFO' | 'ATTENDANCE' | 'BRANCHES'>('INFO')
+  const [staffModalTab, setStaffModalTab] = useState<'INFO' | 'ATTENDANCE' | 'BRANCHES' | 'STORE'>('INFO')
   const [staffModalMessage, setStaffModalMessage] = useState('')
 
   const [editingStaffInfo, setEditingStaffInfo] = useState(false)
@@ -414,7 +415,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       {detailStaff && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onClick={() => setDetailStaffId(null)}>
-          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6"
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 lg:max-w-4xl"
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
@@ -434,12 +435,12 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
 
             <div className="mt-4 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
               <div className="flex min-w-max gap-1">
-                {(['INFO', 'ATTENDANCE', 'BRANCHES'] as const).map((tab) => (
+                {(['INFO', 'ATTENDANCE', 'BRANCHES', 'STORE'] as const).map((tab) => (
                   <button key={tab} onClick={() => setStaffModalTab(tab)}
                     className={`-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm ${
                       staffModalTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
                     }`}>
-                    {tab === 'INFO' ? 'Info' : tab === 'ATTENDANCE' ? 'Attendance' : 'Branches'}
+                    {tab === 'INFO' ? 'Info' : tab === 'ATTENDANCE' ? 'Attendance' : tab === 'BRANCHES' ? 'Branches' : 'Product purchases'}
                   </button>
                 ))}
               </div>
@@ -706,6 +707,10 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                   </>
                 )}
               </div>
+            )}
+
+            {staffModalTab === 'STORE' && detailStaff && (
+              <ProductPurchaseHistoryTab personId={detailStaff.id} />
             )}
           </div>
         </div>

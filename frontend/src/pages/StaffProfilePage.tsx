@@ -7,10 +7,11 @@ import ChangePasswordSection from '../components/ChangePasswordSection'
 import Spinner from '../components/Spinner'
 import type { Profile, AttendanceLogEntry, PageResponse } from '../types'
 import Avatar from '../components/Avatar'
+import MemberStoreTab from '../components/member/MemberStoreTab'
 
 const PAGE_SIZE = 5
 
-type Tab = 'PROFILE' | 'ATTENDANCE'
+type Tab = 'PROFILE' | 'ATTENDANCE' | 'STORE'
 
 export default function StaffProfilePage() {
     const user = useAuthStore((s) => s.user)
@@ -103,10 +104,11 @@ export default function StaffProfilePage() {
     const TABS: { key: Tab; label: string }[] = [
         { key: 'PROFILE', label: 'Profile' },
         { key: 'ATTENDANCE', label: 'Attendance' },
+        { key: 'STORE', label: 'Store' },
     ]
 
     return (
-        <div className="mx-auto max-w-md px-4 py-10">
+        <div className={`mx-auto px-4 py-10 ${activeTab === 'STORE' ? 'max-w-3xl' : 'max-w-md'}`}>
             <h1 className="text-2xl font-semibold">Your profile</h1>
 
             <div className="mt-6 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
@@ -247,6 +249,12 @@ export default function StaffProfilePage() {
                             </div>
                         )}
                     </div>
+                </div>
+            )}
+
+            {activeTab === 'STORE' && user && (
+                <div className="mt-6">
+                    <MemberStoreTab memberId={user.userId} />
                 </div>
             )}
         </div>

@@ -146,8 +146,12 @@ public class SecurityConfig {
                 // order's invoice, which a blanket OWNER/MANAGER matcher here would otherwise block.
                 .requestMatchers("/api/product-orders/purchase", "/api/product-orders/*/complete",
                         "/api/product-orders/*/cancel", "/api/product-orders/branch/**",
+                        "/api/product-orders/member/**",
                         "/api/product-orders/*/send-email").hasAnyRole("OWNER", "MANAGER")
-                .requestMatchers("/api/product-orders/mine").hasRole("MEMBER")
+                // Previously hasRole('MEMBER') only - staff now purchase products too, and the
+                // controller's mine() already checks ownership against the caller's own JWT id
+                // regardless of role, so this can safely open to anyone authenticated.
+                .requestMatchers("/api/product-orders/mine").authenticated()
 
                 .anyRequest().authenticated()
             )

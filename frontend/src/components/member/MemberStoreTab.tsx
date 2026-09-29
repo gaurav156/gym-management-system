@@ -4,12 +4,15 @@ import ProductDetailModal from '../ProductDetailModal'
 import ProductImage from '../ProductImage'
 import { viewProductInvoice, printProductInvoice, downloadProductInvoice } from '../../utils/productInvoice'
 import type { Product, ProductOrder, ProductCategory, Branch, ProductOrderInvoice, PageResponse } from '../../types'
+import { useAuthStore } from '../../store/authStore'
 
 const PRODUCT_PAGE_SIZE = 9
 const SHOW_ALL_SIZE = 500
 const ORDER_PAGE_SIZE = 5
 
 export default function MemberStoreTab({ memberId }: { memberId: string }) {
+  const user = useAuthStore((s) => s.user)
+  
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranch, setSelectedBranch] = useState('')
 
@@ -34,7 +37,15 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
   const [invoiceError, setInvoiceError] = useState('')
 
   useEffect(() => {
-    api.get<Branch[]>('/api/branches/mine', { params: { userId: memberId } }).then((res) => {
+    // Owner has implicit access to every branch (no branch_assignments row of their
+    // own - see BranchService) - /api/branches/mine would return [] for them, which is
+    // why the Owner's Store tab was stuck on the loading skeleton forever. Same
+    // role-aware fetch ManagerDashboard already uses.
+    const request = user?.role === 'OWNER'
+      ? api.get<Branch[]>('/api/branches')
+      : api.get<Branch[]>('/api/branches/mine', { params: { userId: memberId } })
+
+    request.then((res) => {
       setBranches(res.data)
       if (res.data.length > 0) setSelectedBranch(res.data[0].id)
     })
@@ -152,12 +163,13 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
                   {stockNote && <p className={`mt-1 text-xs ${p.outOfStock ? 'text-red-600' : 'text-amber-600'}`}>{stockNote}</p>}
                   <div className="mt-3 flex gap-2">
                     <button onClick={() => setViewingProduct(p)}
-                      className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                      className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
                       View details
                     </button>
-                    <button disabled={!!p.outOfStock}
+                    <button
+                      disabled={!!p.outOfStock}
                       onClick={() => setCartMessage('Online checkout is coming soon - for now, purchase this at the front desk of any branch.')}
-                      className="flex-1 rounded-md bg-brand px-2 py-1.5 text-xs font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50">
+                      className="min-w-0 flex-1 rounded-md bg-brand px-2 py-1.5 text-xs font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50">
                       Add to cart
                     </button>
                   </div>

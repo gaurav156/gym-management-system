@@ -12,6 +12,7 @@ import RoleChangeOtpDialog, { type RoleChangeOtpTarget } from '../RoleChangeOtpD
 import Avatar from '../Avatar'
 import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon } from '../icons/ActionIcons'
+import ProductPurchaseHistoryTab from '../ProductPurchaseHistoryTab'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -36,7 +37,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [memberPage, setMemberPage] = useState(0) // 0-indexed
 
   const [detailMemberId, setDetailMemberId] = useState<string | null>(null)
-  const [modalTab, setModalTab] = useState<'INFO' | 'MEMBERSHIPS' | 'PAYMENTS' | 'ATTENDANCE' | 'BRANCHES'>('INFO')
+  const [modalTab, setModalTab] = useState<'INFO' | 'MEMBERSHIPS' | 'PAYMENTS' | 'STORE' | 'ATTENDANCE' | 'BRANCHES'>('INFO')
   const [modalShowExpired, setModalShowExpired] = useState(false)
   const [modalPage, setModalPage] = useState(1)
   const [memberModalMessage, setMemberModalMessage] = useState('')
@@ -521,7 +522,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       {detailMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onClick={() => { setDetailMemberId(null); cancelEdit() }}>
-          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6"
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 lg:max-w-4xl"
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
@@ -537,12 +538,13 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
 
             <div className="mt-4 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
               <div className="flex min-w-max gap-1">
-                {(['INFO', 'MEMBERSHIPS', 'PAYMENTS', 'ATTENDANCE', 'BRANCHES'] as const).map((tab) => (
+                {(['INFO', 'MEMBERSHIPS', 'PAYMENTS', 'STORE', 'ATTENDANCE', 'BRANCHES'] as const).map((tab) => (
                   <button key={tab} onClick={() => setModalTab(tab)}
                     className={`-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm ${
                       modalTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
                     }`}>
-                    {tab === 'INFO' ? 'Info' : tab === 'MEMBERSHIPS' ? 'Membership plans' : tab === 'PAYMENTS' ? 'Payment history' : tab === 'ATTENDANCE' ? 'Attendance' : 'Branches'}
+                    {tab === 'INFO' ? 'Info' : tab === 'MEMBERSHIPS' ? 'Membership plans' : tab === 'PAYMENTS' ? 'Payment history'
+                      : tab === 'STORE' ? 'Product purchases' : tab === 'ATTENDANCE' ? 'Attendance' : 'Branches'}
                   </button>
                 ))}
               </div>
@@ -816,6 +818,10 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                   </div>
                 )}
               </div>
+            )}
+
+            {modalTab === 'STORE' && detailMember && (
+              <ProductPurchaseHistoryTab personId={detailMember.id} />
             )}
 
             {modalTab === 'ATTENDANCE' && (
