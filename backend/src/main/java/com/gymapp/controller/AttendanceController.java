@@ -5,10 +5,12 @@ import com.gymapp.dto.PageDtos.PageResponse;
 import com.gymapp.service.AttendanceService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,8 +32,20 @@ public class AttendanceController {
     }
 
     @GetMapping("/summary/{branchId}")
-    public List<HourlyCount> hourlySummary(@PathVariable UUID branchId) {
-        return attendanceService.hourlySummary(branchId);
+    public List<HourlyCount> hourlySummary(@PathVariable UUID branchId,
+                                           @RequestParam(required = false)
+                                           @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                           Authentication authentication) {
+        // Members/Trainers may only see today's crowd. Deliberately an
+        // IllegalArgumentException (400), not a 403 - api/client.ts treats any 403 as
+        // "access changed" and logs the user out.
+        boolean isPastDate = date != null && !date.equals(LocalDate.now());
+        if (isPastDate) {
+            boolean isStaff = authentication.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_OWNER") || a.getAuthority().equals("ROLE_MANAGER"));
+            if (!isStaff) throw new IllegalArgumentException("Only staff can view crowd data for past dates");
+        }
+        return attendanceService.hourlySummary(branchId, date);
     }
 
     // Self-service: a Member or Trainer viewing their own attendance log. Identity comes
@@ -53,8 +67,10 @@ public class AttendanceController {
 
     @GetMapping("/today/{branchId}")
     @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
-    public List<TodayAttendanceEntry> today(@PathVariable UUID branchId) {
-        return attendanceService.todayAttendance(branchId);
+    public List<TodayAttendanceEntry> today(@PathVariable UUID branchId,
+                                            @RequestParam(required = false)
+                                            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return attendanceService.attendanceForDate(branchId, date);
     }
 
     @GetMapping("/last-checkin/{branchId}")

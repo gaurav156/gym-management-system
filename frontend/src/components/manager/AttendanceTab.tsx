@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
+import { localDateISO, formatDateLabel } from '../../utils/date'
 import { api } from '../../api/client'
 import QrScanner from '../QrScanner'
 import HourlyCrowdChart from '../HourlyCrowdChart'
@@ -34,27 +35,57 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
   const [resultMessage, setResultMessage] = useState('')
   const [cameraError, setCameraError] = useState('')
 
+  const [selectedDate, setSelectedDate] = useState(() => localDateISO())
+  const isToday = selectedDate === localDateISO()
+
+  const summaryTicket = useRef(0)
+  const attendanceTicket = useRef(0)
+
+  function renderDatePicker() {
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          type="date"
+          value={selectedDate}
+          max={localDateISO()}
+          onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+          className="rounded-md border border-gray-300 px-2 py-1 text-xs"
+        />
+        {!isToday && (
+          <button type="button" onClick={() => setSelectedDate(localDateISO())}
+            className="text-xs text-brand hover:underline">Today</button>
+        )}
+      </div>
+    )
+  }
+
   function loadSummary() {
     if (!selectedBranch) return
-    api.get<HourlyCount[]>(`/api/attendance/summary/${selectedBranch}`).then((res) => setSummary(res.data))
+    const ticket = ++summaryTicket.current
+    api.get<HourlyCount[]>(`/api/attendance/summary/${selectedBranch}`, {
+      params: { date: isToday ? undefined : selectedDate },
+    }).then((res) => { if (ticket === summaryTicket.current) setSummary(res.data) })
   }
 
   function loadTodayAttendance() {
     if (!selectedBranch) return
+    const ticket = ++attendanceTicket.current
     setTodayAttendanceLoading(true)
-    api.get<TodayAttendanceEntry[]>(`/api/attendance/today/${selectedBranch}`)
-      .then((res) => setTodayAttendance(res.data))
-      .finally(() => setTodayAttendanceLoading(false))
+    api.get<TodayAttendanceEntry[]>(`/api/attendance/today/${selectedBranch}`, {
+      params: { date: isToday ? undefined : selectedDate },
+    })
+      .then((res) => { if (ticket === attendanceTicket.current) setTodayAttendance(res.data) })
+      .finally(() => { if (ticket === attendanceTicket.current) setTodayAttendanceLoading(false) })
   }
 
   useEffect(() => {
     loadSummary()
     loadTodayAttendance()
-  }, [selectedBranch])
+  }, [selectedBranch, selectedDate])
 
   useEffect(() => {
     setTodayAttendancePage(1)
-  }, [attendanceTab, selectedBranch])
+  }, [attendanceTab, selectedBranch, selectedDate])
 
   // Leaving the branch, or switching away from the QR tab, should always release the
   // camera and clear any stale result rather than leaving it running against a branch
@@ -195,15 +226,21 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
         </div>
 
         <div className="rounded-lg border border-gray-200 p-6">
-          <h2 className="font-medium">Today's crowd by hour</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-medium">{isToday ? "Today's crowd by hour" : `Crowd by hour · ${formatDateLabel(selectedDate)}`}</h2>
+            {renderDatePicker()}
+          </div>
           <div className="mt-4">
-            <HourlyCrowdChart data={summary} />
+            <HourlyCrowdChart key={selectedDate} data={summary} date={selectedDate} />
           </div>
         </div>
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">Today's attendance</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-medium">{isToday ? "Today's attendance" : `Attendance · ${formatDateLabel(selectedDate)}`}</h2>
+          {renderDatePicker()}
+        </div>
         <div className="mt-3 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
           <div className="flex min-w-max gap-1">
             {(['MEMBERS', 'STAFF'] as const).map((tab) => (
@@ -241,7 +278,9 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
           </table>
         </div>
         {!todayAttendanceLoading && filteredTodayAttendance.length === 0 && (
-          <p className="py-4 text-sm text-gray-400">No check-ins yet today.</p>
+          <p className="py-4 text-sm text-gray-400">
+            {isToday ? 'No check-ins yet today.' : 'No check-ins on this date.'}
+          </p>
         )}
         {!todayAttendanceLoading && filteredTodayAttendance.length > 0 && (
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">

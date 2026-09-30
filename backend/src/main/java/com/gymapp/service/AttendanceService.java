@@ -195,9 +195,9 @@ public class AttendanceService {
     // writes a real checkOutTime. Always returns all 24 hours (zero-filled) so the
     // frontend never has to guess which hours are missing.
     @Transactional(readOnly = true)
-    public List<HourlyCount> hourlySummary(UUID branchId) {
-        LocalDate today = LocalDate.now();
-        LocalDateTime startOfDay = today.atStartOfDay();
+    public List<HourlyCount> hourlySummary(UUID branchId, LocalDate date) {
+        LocalDate day = resolveDate(date);
+        LocalDateTime startOfDay = day.atStartOfDay();
         LocalDateTime endOfDay = startOfDay.plusDays(1);
         LocalDateTime now = LocalDateTime.now();
 
@@ -246,11 +246,10 @@ public class AttendanceService {
                         a.getMethod().name(), a.getBranch().getName())));
     }
 
-    // Today's check-ins at a branch, members and trainers together - the frontend splits
-    // this into two tabs by the role field rather than needing two separate calls.
+    // Check-ins at a branch on the given day (null = today), members and staff together.
     @Transactional(readOnly = true)
-    public List<TodayAttendanceEntry> todayAttendance(UUID branchId) {
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+    public List<TodayAttendanceEntry> attendanceForDate(UUID branchId, LocalDate date) {
+        LocalDateTime startOfDay = resolveDate(date).atStartOfDay();
         LocalDateTime endOfDay = startOfDay.plusDays(1);
 
         return attendanceRepository
@@ -268,5 +267,13 @@ public class AttendanceService {
         return attendanceRepository.findLastCheckInPerMember(branchId).stream()
                 .map(row -> new LastCheckinEntry((UUID) row[0], (LocalDateTime) row[1]))
                 .toList();
+    }
+
+    // Null = today. Future dates are rejected.
+    private LocalDate resolveDate(LocalDate date) {
+        LocalDate today = LocalDate.now();
+        if (date == null) return today;
+        if (date.isAfter(today)) throw new IllegalArgumentException("Date cannot be in the future");
+        return date;
     }
 }

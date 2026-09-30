@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import type { HourlyCount } from '../types'
+import { localDateISO } from '../utils/date'
 
 interface Props {
   data: HourlyCount[]
+  date?: string // yyyy-MM-dd; omitted = today
 }
 
 function formatHour(hour: number): string {
@@ -16,23 +18,34 @@ function formatHour(hour: number): string {
 // exact count. Occupancy (not raw check-in counts) comes from the backend, which
 // counts a member as present in every hour their visit spans, not just the hour they
 // scanned in during.
-export default function HourlyCrowdChart({ data }: Props) {
-  const currentHour = new Date().getHours()
+export default function HourlyCrowdChart({ data, date }: Props) {
+  const isToday = !date || date === localDateISO()
+  // -1 = no "current hour" highlight when looking at a past day
+  const currentHour = isToday ? new Date().getHours() : -1
   const [focusedHour, setFocusedHour] = useState<number | null>(null)
 
   const byHour = new Map(data.map((d) => [d.hour, d.count]))
   const hours = Array.from({ length: 24 }, (_, h) => ({ hour: h, count: byHour.get(h) ?? 0 }))
   const maxCount = Math.max(1, ...hours.map((h) => h.count))
+  const peakHour = hours.reduce((best, h) => (h.count > best.count ? h : best), hours[0]).hour
 
-  const activeHour = focusedHour ?? currentHour
+  // Today: default to the current hour. Past day: default to the busiest hour.
+  const activeHour = focusedHour ?? (isToday ? currentHour : peakHour)
   const activeCount = hours.find((h) => h.hour === activeHour)?.count ?? 0
+
+  const hasVisits = maxCount > 0 && hours.some((h) => h.count > 0)
+
+  let label: string
+  if (focusedHour !== null) label = formatHour(activeHour)
+  else if (isToday) label = 'Right now'
+  else label = hasVisits ? `Peak hour · ${formatHour(activeHour)}` : formatHour(activeHour)
 
   return (
     <div>
       <p className="text-xs text-gray-500">
-        {focusedHour === null ? 'Right now' : formatHour(activeHour)} ·{' '}
+        {label} ·{' '}
         <span className="font-medium text-gray-700">
-          {activeCount === 0 ? 'Not busy' : `${activeCount} member${activeCount === 1 ? '' : 's'} present`}
+          {activeCount === 0 ? (isToday || hasVisits ? 'Not busy' : 'No visits') : `${activeCount} member${activeCount === 1 ? '' : 's'} present`}
         </span>
       </p>
 
