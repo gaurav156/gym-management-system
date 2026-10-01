@@ -1,5 +1,7 @@
 package com.gymapp.storage;
 
+import com.gymapp.repository.ExpenseRepository;
+import com.gymapp.repository.ProductRepository;
 import com.gymapp.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,20 +17,25 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-// Removes stored images that no user row references any more - most commonly an image that
-// was uploaded in an edit form which was then abandoned without saving. ImageRefs already
-// deletes the OLD image when a save replaces it; this is the backstop for everything else
-// (abandoned forms, failed deletes, rolled-back transactions).
+// Removes stored images that nothing references any more - most commonly a file uploaded in an
+// edit form which was then abandoned without saving. ImageRefs already deletes the OLD image
+// when a save replaces it; this is the backstop for everything else (abandoned forms, failed
+// deletes, rolled-back transactions).
 //
-// Safety rails, because a bug here deletes user data:
+// EVERY place a stored key can live must be loaded into `referenced` below, one per
+// ImagePurpose: PHOTO + SIGNATURE + ID_PROOF (users), BILL (expenses), PRODUCT (product_images).
+// A purpose that's listed but not referenced here gets its files deleted after
+// min-age-hours. When you add a new ImagePurpose, add its references here too.
+//
+// Safety rails, because a bug here deletes data:
 //  - only objects older than min-age-hours are touched, so an upload whose form is still open
 //    (or was saved moments ago) is never at risk;
-//  - only our own prefixes (avatars/, signatures/) are listed, never the whole bucket;
+//  - only our own prefixes are listed, never the whole bucket;
 //  - if more than max-delete objects look orphaned the run aborts and logs an error - that
 //    pattern means "wrong database" or "empty database", not genuinely abandoned uploads;
 //  - dry-run logs what would be deleted without deleting anything.
 // NEVER point two environments' databases at the same bucket while this job is enabled: each
-// would treat the other's images as orphans.
+// would treat the other's files as orphans.
 @Component
 @ConditionalOnProperty(name = "app.storage.cleanup.enabled", havingValue = "true", matchIfMissing = true)
 public class OrphanImageCleanupJob {
@@ -37,6 +44,8 @@ public class OrphanImageCleanupJob {
 
     private final StorageService storage;
     private final UserRepository userRepository;
+    private final ExpenseRepository expenseRepository;
+    private final ProductRepository productRepository;
 
     @Value("${app.storage.cleanup.min-age-hours:24}")
     private long minAgeHours;
@@ -47,9 +56,14 @@ public class OrphanImageCleanupJob {
     @Value("${app.storage.cleanup.dry-run:false}")
     private boolean dryRun;
 
-    public OrphanImageCleanupJob(StorageService storage, UserRepository userRepository) {
+    public OrphanImageCleanupJob(StorageService storage,
+                                 UserRepository userRepository,
+                                 ExpenseRepository expenseRepository,
+                                 ProductRepository productRepository) {
         this.storage = storage;
         this.userRepository = userRepository;
+        this.expenseRepository = expenseRepository;
+        this.productRepository = productRepository;
     }
 
     @Scheduled(cron = "${app.storage.cleanup.cron:0 30 3 * * *}")
@@ -58,6 +72,9 @@ public class OrphanImageCleanupJob {
         // age cutoff, so it can't be selected below.
         Set<String> referenced = new HashSet<>(userRepository.findAllPhotoKeys());
         referenced.addAll(userRepository.findAllSignatureKeys());
+        referenced.addAll(userRepository.findAllIdProofKeys());
+        referenced.addAll(expenseRepository.findAllBillKeys());
+        referenced.addAll(productRepository.findAllImageKeys());
 
         Instant cutoff = Instant.now().minus(minAgeHours, ChronoUnit.HOURS);
         List<String> orphans = new ArrayList<>();

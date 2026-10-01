@@ -1,5 +1,6 @@
 package com.gymapp.dto;
 
+import com.gymapp.entity.Gender;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -20,17 +21,28 @@ public class ProfileDtos {
             String signature,
             String role,
             LocalDate enrollmentDate,
-            LocalDate joiningDate
+            LocalDate joiningDate,
+            Gender gender,
+            LocalDate dateOfBirth,
+            boolean idProofUploaded,
+            // True once a Member/Trainer/Manager has used their one self-edit - the UI
+            // disables the details fields. Always false for the Owner.
+            boolean detailsLocked
     ) {}
 
     // Deliberately does not include email, password, or any of the staff-controlled dates -
     // this is a self-service profile edit, not an account-recovery or HR flow.
+    // idProof is the key returned by POST /api/files/images?purpose=ID_PROOF. Null = leave
+    // as is. Gender/dateOfBirth null = leave as is.
     public record UpdateProfileRequest(
             String name,
             String phone,
             String address,
             String photo,
-            String signature
+            String signature,
+            Gender gender,
+            LocalDate dateOfBirth,
+            String idProof
     ) {}
 
     // Now requires proving both the current password AND a freshly emailed OTP - see

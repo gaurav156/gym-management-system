@@ -25,7 +25,7 @@ public class ImageUploadService {
     // Returns the object KEY (callers convert to a URL via ImageRefs).
     public String upload(MultipartFile file, ImagePurpose purpose) throws IOException {
         if (file == null || file.isEmpty()) throw new IllegalArgumentException("No file provided");
-        long max = purpose == ImagePurpose.BILL ? MAX_BILL_BYTES : MAX_IMAGE_BYTES;
+        long max = allowsPdf(purpose) ? MAX_BILL_BYTES : MAX_IMAGE_BYTES;
         if (file.getSize() > max) {
             throw new IllegalArgumentException("File is too large - please use one under "
                     + (max / (1024 * 1024)) + "MB.");
@@ -58,12 +58,16 @@ public class ImageUploadService {
         }
         // PDF only accepted for bills - a profile photo/signature masquerading as a PDF
         // would break every <img> that renders that stored key elsewhere in the app.
-        if (purpose == ImagePurpose.BILL && d.length > 4
+        if (allowsPdf(purpose) && d.length > 4
                 && d[0] == '%' && d[1] == 'P' && d[2] == 'D' && d[3] == 'F') {
             return new Sniffed("pdf", "application/pdf");
         }
-        throw new IllegalArgumentException(purpose == ImagePurpose.BILL
+        throw new IllegalArgumentException(allowsPdf(purpose)
                 ? "Unsupported file - please use a JPG, PNG, WebP or PDF file."
                 : "Unsupported image - please use a JPG, PNG or WebP file.");
+    }
+
+    private boolean allowsPdf(ImagePurpose purpose) {
+        return purpose == ImagePurpose.BILL || purpose == ImagePurpose.ID_PROOF;
     }
 }

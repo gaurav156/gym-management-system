@@ -16,7 +16,9 @@ services:
       - ./frontend/.cert/cert.pem:/certs/public.crt:ro
       - ./frontend/.cert/key.pem:/certs/private.key:ro
 
-  # Creates the bucket and makes objects publicly readable, then exits.
+  # Creates the buckets, then exits:
+  #  - gym-media          public-read: avatars, signatures, products, bills
+  #  - gym-media-private  NO anonymous access: ID proofs, served only through the backend API
   minio-init:
     image: quay.io/minio/mc:latest
     depends_on: [minio]
@@ -32,7 +34,9 @@ services:
       until mc --insecure alias set local https://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}; do sleep 1; done;
       mc --insecure mb --ignore-existing local/gym-media &&
       mc --insecure anonymous set download local/gym-media &&
-      echo 'gym-media ready';
+      mc --insecure mb --ignore-existing local/gym-media-private &&
+      mc --insecure anonymous set none local/gym-media-private &&
+      echo 'gym-media + gym-media-private ready';
       exit 0;"
 
 volumes:

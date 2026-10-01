@@ -44,6 +44,7 @@ public class StaffDirectoryService {
 
     private StaffSummary toSummary(User u) {
         return new StaffSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(), imageRefs.toUrl(u.getPhoto()),
-                u.getCheckinPin(), u.getRole().name(), u.getJoiningDate(), u.getLeftDate());
+                u.getCheckinPin(), u.getRole().name(), u.getJoiningDate(), u.getLeftDate(),
+                u.getGender(), u.getDateOfBirth(), u.getIdProofKey() != null);
     }
 }

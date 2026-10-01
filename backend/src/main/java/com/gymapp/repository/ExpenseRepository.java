@@ -30,4 +30,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
                                        @Param("from") java.time.LocalDate from,
                                        @Param("to") java.time.LocalDate to,
                                        @Param("branchId") UUID branchId);
+
+    // Used by OrphanImageCleanupJob - bill uploads must count as "referenced".
+    @Query("SELECT e.billKey FROM Expense e WHERE e.billKey IS NOT NULL")
+    List<String> findAllBillKeys();
 }

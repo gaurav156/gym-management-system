@@ -2,7 +2,7 @@ import { ChangeEvent, FormEvent, useEffect, useState, useRef } from 'react'
 import { api } from '../../api/client'
 import { getEffectiveStatus, statusColorClass, statusLabel, type EffectiveStatus } from '../../utils/membership'
 import PhotoUploadButton from '../PhotoUploadButton'
-import type { Branch, MembershipAdmin, Payment, AttendanceLogEntry, MemberSummary, InvoiceResponse, AuthUser, RoleHistoryEntry, PageResponse } from '../../types'
+import type { Branch, MembershipAdmin, Payment, AttendanceLogEntry, MemberSummary, InvoiceResponse, AuthUser, RoleHistoryEntry, PageResponse, Gender } from '../../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
 import ConfirmDialog from '../ConfirmDialog'
 import { TableSkeleton } from '../Skeleton'
@@ -13,6 +13,9 @@ import Avatar from '../Avatar'
 import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon } from '../icons/ActionIcons'
 import ProductPurchaseHistoryTab from '../ProductPurchaseHistoryTab'
+import PersonalDetailsFields from '../PersonalDetailsFields'
+import IdProofField from '../IdProofField'
+import { genderLabel, formatDobWithAge } from '../../utils/person'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -57,6 +60,9 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [memberEditPhone, setMemberEditPhone] = useState('')
   const [memberEditAddress, setMemberEditAddress] = useState('')
   const [memberEditPhoto, setMemberEditPhoto] = useState<string | null>(null)
+  const [memberEditGender, setMemberEditGender] = useState<Gender | ''>('')
+  const [memberEditDob, setMemberEditDob] = useState('')
+  const [memberEditIdProof, setMemberEditIdProof] = useState<string | null>(null)
 
   const [detailMemberBranches, setDetailMemberBranches] = useState<Branch[]>([])
   const [editingMemberBranches, setEditingMemberBranches] = useState(false)
@@ -322,6 +328,9 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     setMemberEditPhone(m.phone ?? '')
     setMemberEditAddress(m.address ?? '')
     setMemberEditPhoto(m.photo)
+    setMemberEditGender(m.gender ?? '')
+    setMemberEditDob(m.dateOfBirth ?? '')
+    setMemberEditIdProof(null)
     setMemberModalMessage('')
   }
 
@@ -330,6 +339,9 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     try {
       await api.put(`/api/members/${memberId}`, {
         name: memberEditName, phone: memberEditPhone, address: memberEditAddress, photo: memberEditPhoto ?? '',
+        gender: memberEditGender || undefined,
+        dateOfBirth: memberEditDob || undefined,
+        idProof: memberEditIdProof ?? undefined,
       })
       setEditingMemberInfo(false)
       loadMembers(memberPage, memberSearch, memberStatusFilter, memberSort)
@@ -581,9 +593,13 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                       <textarea value={memberEditAddress} onChange={(e) => setMemberEditAddress(e.target.value)} rows={2}
                         className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
                     </div>
+                    <PersonalDetailsFields compact gender={memberEditGender} dateOfBirth={memberEditDob}
+                      onGenderChange={setMemberEditGender} onDateOfBirthChange={setMemberEditDob} />
+                    <IdProofField compact personId={detailMember.id} uploaded={detailMember.idProofUploaded}
+                      pendingKey={memberEditIdProof} canChange onUploaded={setMemberEditIdProof} onError={setMemberModalMessage} />
                     <div className="space-x-2">
                       <button onClick={() => saveMemberInfo(detailMember.id)} disabled={savingMemberInfo}
-                        className="flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
+                        className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
                         {savingMemberInfo && <Spinner className="h-3 w-3" />}
                         {savingMemberInfo ? 'Saving...' : 'Save'}
                       </button>
@@ -597,6 +613,10 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                     <p><span className="text-gray-500">Email:</span> {detailMember.email}</p>
                     <p><span className="text-gray-500">Phone:</span> {detailMember.phone ?? '—'}</p>
                     <p><span className="text-gray-500">Address:</span> {detailMember.address ?? '—'}</p>
+                    <p><span className="text-gray-500">Gender:</span> {genderLabel(detailMember.gender)}</p>
+                    <p><span className="text-gray-500">Date of birth:</span> {formatDobWithAge(detailMember.dateOfBirth)}</p>
+                    <IdProofField compact personId={detailMember.id} uploaded={detailMember.idProofUploaded}
+                      pendingKey={null} canChange={false} onUploaded={() => {}} onError={setMemberModalMessage} />
                     <p><span className="text-gray-500">Check-in PIN:</span> {detailMember.checkinPin ?? '—'}</p>
                     <p><span className="text-gray-500">Enrollment date:</span> {detailMember.enrollmentDate ?? 'Not enrolled yet'}</p>
                     <p><span className="text-gray-500">Last visit:</span> {

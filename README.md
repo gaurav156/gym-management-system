@@ -220,30 +220,36 @@ A few rules of thumb:
 
 ## 6. Image storage (profile photos & signatures)
 
-Images are stored in an **S3-compatible object store**, not in Postgres. The database holds
+Files are stored in an **S3-compatible object store**, not in Postgres. The database holds
 only an object *key* (e.g. `avatars/3f2c….jpg`); the API turns it into a URL using
 `STORAGE_PUBLIC_BASE_URL`. Because no URL is ever stored, changing provider or domain needs
 **no database migration**.
+
+There are **two buckets**: a public-read one for avatars, signatures, product images and
+expense bills, and a **private** one for ID proofs (identity documents). ID proofs are never
+given a URL - they are only readable through the authenticated `GET /api/id-proofs/{userId}`
+endpoint (see [§6.9](#69-id-proofs-private-bucket)).
 
 The same code talks to MinIO, Cloudflare R2, AWS S3, Supabase Storage and Backblaze B2 - only
 environment variables differ.
 
 ### 6.1 Environment variables (backend)
 
-| Variable                                                 | Meaning                                                                                                                                                   |
-|----------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `STORAGE_PROVIDER`                                       | `s3` (default). Other values need a new `StorageService` implementation ([§6.5 Adding a non-S3 provider](#65-adding-a-non-s3-provider-eg-cloudinary-gcs)) |
-| `STORAGE_S3_ENDPOINT`                                    | S3 API endpoint the **backend** talks to. Blank for real AWS S3                                                                                           |
-| `STORAGE_S3_REGION`                                      | Region (`auto` for R2)                                                                                                                                    |
-| `STORAGE_S3_BUCKET`                                      | Bucket name                                                                                                                                               |
-| `STORAGE_S3_ACCESS_KEY` / `STORAGE_S3_SECRET_KEY`        | Credentials with read/write on the bucket                                                                                                                 |
-| `STORAGE_S3_PATH_STYLE`                                  | `true` for MinIO/Supabase, `false` for AWS S3/R2                                                                                                          |
-| `STORAGE_PUBLIC_BASE_URL`                                | Base URL **browsers** use to load images. Absolute URL, or `/media` in local dev                                                                          |
-| `STORAGE_MIGRATE_LEGACY`                                 | `true` for one startup to convert old base64 photos, then back to `false`                                                                                 |
-| `STORAGE_CLEANUP_ENABLED`                                | `true` (default). Daily job deleting stored images no user references                                                                                     |
-| `STORAGE_CLEANUP_CRON` / `STORAGE_CLEANUP_MIN_AGE_HOURS` | Schedule (default 3:30 AM) / minimum object age before it's eligible (default 24)                                                                         |
-| `STORAGE_CLEANUP_MAX_DELETE`                             | Safety brake: abort if more than this many orphans are found (default 200)                                                                                |
-| `STORAGE_CLEANUP_DRY_RUN`                                | `true` = log only, delete nothing                                                                                                                         |
+| Variable                                                 | Meaning                                                                                                                                                                           |
+|----------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `STORAGE_PROVIDER`                                       | `s3` (default). Other values need a new `StorageService` implementation ([§6.5 Adding a non-S3 provider](#65-adding-a-non-s3-provider-eg-cloudinary-gcs))                         |
+| `STORAGE_S3_ENDPOINT`                                    | S3 API endpoint the **backend** talks to. Blank for real AWS S3                                                                                                                   |
+| `STORAGE_S3_REGION`                                      | Region (`auto` for R2)                                                                                                                                                            |
+| `STORAGE_S3_BUCKET`                                      | Bucket name                                                                                                                                                                       |
+| `STORAGE_S3_PRIVATE_BUCKET`                              | **Private** bucket for ID proofs (no public read). Same endpoint and credentials as above, so the key needs read/write on both buckets. Blank = shares the main bucket (dev only) |
+| `STORAGE_S3_ACCESS_KEY` / `STORAGE_S3_SECRET_KEY`        | Credentials with read/write on the bucket                                                                                                                                         |
+| `STORAGE_S3_PATH_STYLE`                                  | `true` for MinIO/Supabase, `false` for AWS S3/R2                                                                                                                                  |
+| `STORAGE_PUBLIC_BASE_URL`                                | Base URL **browsers** use to load images. Absolute URL, or `/media` in local dev                                                                                                  |
+| `STORAGE_MIGRATE_LEGACY`                                 | `true` for one startup to convert old base64 photos, then back to `false`                                                                                                         |
+| `STORAGE_CLEANUP_ENABLED`                                | `true` (default). Daily job deleting stored files nothing references                                                                                                              |
+| `STORAGE_CLEANUP_CRON` / `STORAGE_CLEANUP_MIN_AGE_HOURS` | Schedule (default 3:30 AM) / minimum object age before it's eligible (default 24)                                                                                                 |
+| `STORAGE_CLEANUP_MAX_DELETE`                             | Safety brake: abort if more than this many orphans are found (default 200)                                                                                                        |
+| `STORAGE_CLEANUP_DRY_RUN`                                | `true` = log only, delete nothing                                                                                                                                                 |
 
 The endpoint (backend → storage) and the public base URL (browser → storage) are deliberately
 separate settings - they are usually different addresses.
@@ -254,7 +260,7 @@ MinIO's Docker Hub images were removed and its community edition is archived, so
 `quay.io/minio/*` images (already set in `docker-compose.yml`). Dev use only - never expose it.
 
 ```bash
-docker compose up -d          # starts MinIO, creates the public bucket `gym-media`
+docker compose up -d          # starts MinIO, creates `gym-media` (public) and `gym-media-private`
 ```
 
 Console: http://localhost:9001 (`minioadmin` / `minioadmin`). Backend variables:
@@ -263,11 +269,15 @@ Console: http://localhost:9001 (`minioadmin` / `minioadmin`). Backend variables:
 export STORAGE_S3_ENDPOINT=http://localhost:9000
 export STORAGE_S3_REGION=us-east-1
 export STORAGE_S3_BUCKET=gym-media
+export STORAGE_S3_PRIVATE_BUCKET=gym-media-private
 export STORAGE_S3_ACCESS_KEY=minioadmin
 export STORAGE_S3_SECRET_KEY=minioadmin
 export STORAGE_S3_PATH_STYLE=true
 export STORAGE_PUBLIC_BASE_URL=/media
 ```
+> Upgrading an existing MinIO volume: run `docker compose up -d` again - `minio-init` only
+> adds the missing private bucket. Don't skip `STORAGE_S3_PRIVATE_BUCKET`, otherwise ID proofs
+> end up in the public bucket.
 
 `vite.config.ts` proxies `/media/*` to MinIO, so images load over the same HTTPS origin as
 the app - no mixed-content errors on your phone ([§4](#4-https-for-local-mobile-testing-mkcert)) and no extra certificates. Because the
@@ -287,9 +297,10 @@ Do not replace the whole truststore via `-Djavax.net.ssl.trustStore`, that break
 
 ### 6.3 Production providers
 
-The bucket must allow **public read** (objects have unguessable UUID names) and, because the
-invoice PDF fetches the signature image from the browser, a **CORS rule allowing `GET`** from
-your frontend origin(s).
+The **main bucket** must allow **public read** (objects have unguessable UUID names) and,
+because the invoice PDF fetches the signature image from the browser, a **CORS rule allowing
+`GET`** from your frontend origin(s). The **private bucket** must have **no public access and
+no CORS rule** - only the backend reads it.
 
 **Cloudflare R2** (recommended: generous free tier, no egress fees; may ask for a card)
 1. R2 → *Create bucket*.
@@ -306,11 +317,14 @@ your frontend origin(s).
      "MaxAgeSeconds": 3600
    }]
 ```
-5. Set on the backend host (e.g. Render):
+5. Create a second bucket (e.g. `gym-media-private`) and leave it without a custom domain or `r2.dev` access. 
+   Edit the API token so it has Object Read & Write on both buckets.
+6. Set on the backend host (e.g. Render):
 ```
    STORAGE_S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
    STORAGE_S3_REGION=auto
    STORAGE_S3_BUCKET=<bucket>
+   STORAGE_S3_PRIVATE_BUCKET=<private-bucket>
    STORAGE_S3_ACCESS_KEY=<key>
    STORAGE_S3_SECRET_KEY=<secret>
    STORAGE_S3_PATH_STYLE=false
@@ -320,23 +334,26 @@ your frontend origin(s).
 **Supabase Storage** (1 GB free): Storage → create a **public** bucket → *S3 Connection* →
 enable it and create S3 access keys. Use the endpoint and region shown there, `PATH_STYLE=true`,
 and `STORAGE_PUBLIC_BASE_URL=https://<project-ref>.supabase.co/storage/v1/object/public/<bucket>`.
+Also create a second bucket and keep it private (not public). The same S3 access keys work for both.
 
 **AWS S3**: create a bucket, turn off "Block public access" for it, add a bucket policy
 allowing `s3:GetObject` on `arn:aws:s3:::<bucket>/*` to `*`, add a CORS rule, and create an IAM
 user limited to that bucket. Leave `STORAGE_S3_ENDPOINT` blank, set the bucket's region,
 `PATH_STYLE=false`, and `STORAGE_PUBLIC_BASE_URL` to the bucket URL (or a CloudFront domain).
+Create a second bucket with Block all public access on, no bucket policy and no CORS; grant the IAM user access to both.
 
 ### 6.4 Switching provider later (checklist)
 
 Existing objects are addressed by key, so switching means copying the objects and changing env
 vars. Nothing in the database changes.
 
-1. **Create** the new bucket (public read + CORS, see [§6.3](#63-production-providers)) and credentials.
-2. **Copy** existing objects with the same keys, e.g. with [rclone](https://rclone.org):
+1. **Create** the new buckets - the public main bucket (public read + CORS, see [§6.3](#63-production-providers)) and the **private** bucket - plus credentials with access to both.
+2. **Copy** existing objects with the same keys, once per bucket, e.g. with [rclone](https://rclone.org):
 ```bash
    # ~/.config/rclone/rclone.conf defines two remotes, `old` and `new` (type = s3, with
    # provider/endpoint/keys for each)
    rclone sync old:gym-media new:gym-media --progress
+   rclone sync old:gym-media-private new:gym-media-private --progress
 ```
 3. **Deploy** the new `STORAGE_*` variables and restart the backend.
 4. **Verify**: open a profile with a photo, upload a new one, then view an invoice PDF that has
@@ -372,17 +389,44 @@ displaying in the meantime.
 | Images blocked on phone                                   | `http://` image on an `https://` page - use the Vite `/media` proxy or HTTPS                                                  |
 | Invoice PDF has no signature                              | Bucket CORS doesn't allow `GET` from the frontend origin                                                                      |
 | `403 SignatureDoesNotMatch` / `InvalidArgument` on upload | Wrong `PATH_STYLE`, region, or credentials for this provider                                                                  |
+| ID proof upload works but "View" fails with 400/500       | `STORAGE_S3_PRIVATE_BUCKET` names a bucket that doesn't exist, or the access key lacks read on it                             |
+| Startup warning "STORAGE_S3_PRIVATE_BUCKET is not set"    | ID proofs share the main bucket - set a private bucket, or make sure `id-proofs/` isn't public there                          |
 
 ### 6.8 Orphaned image cleanup
 
-An image is uploaded the moment it's picked, before the form is saved, so abandoning the form
+A file is uploaded the moment it's picked, before the form is saved, so abandoning the form
 leaves an unreferenced object in the bucket. `OrphanImageCleanupJob` deletes these daily: it
-compares the objects under `avatars/` and `signatures/` with `users.photo`/`users.signature`
-and removes unreferenced ones older than `STORAGE_CLEANUP_MIN_AGE_HOURS`.
+compares the objects under `avatars/`, `signatures/`, `id-proofs/`, `bills/` and `products/`
+with what the database references (`users.photo`/`signature`/`id_proof_key`,
+`expenses.bill_key`, `product_images.image_key`) and removes unreferenced ones older than
+`STORAGE_CLEANUP_MIN_AGE_HOURS`.
+
+**When you add a new `ImagePurpose`, also add its references to the job** - otherwise its
+files are treated as orphans and deleted after the age threshold.
 
 - Run it with `STORAGE_CLEANUP_DRY_RUN=true` once in a new environment and check the log first.
 - **Never share one bucket between two environments' databases** (e.g. dev DB + prod bucket) -
   each would treat the other's images as orphans. Use one bucket per environment.
-- The bucket credentials need list permission (`s3:ListBucket` on AWS).
+- The bucket credentials need list permission (`s3:ListBucket` on AWS) on both buckets.
 - A form left open longer than the age threshold and saved afterwards would reference a
   deleted image - keep the threshold well above how long an edit dialog stays open.
+
+### 6.9 ID proofs (private bucket)
+
+ID proofs (image or PDF, up to 5MB) are identity documents, so they are handled differently
+from every other upload:
+
+- They are stored in the **private bucket** (`STORAGE_S3_PRIVATE_BUCKET`) under `id-proofs/`.
+- The upload returns the object **key**, not a URL, and no API response ever contains a link
+  to them. The profile responses only carry an `idProofUploaded` flag.
+- They are read through `GET /api/id-proofs/{userId}`, which allows the person themself, the
+  Owner (anyone), and a Manager (Members and Trainers only). The file is sent with
+  `Cache-Control: private, no-store`.
+- A person can submit their own ID proof once; after that only the Owner or a Manager can
+  replace it (a Manager's proof: Owner only).
+- Deleting an account deletes its ID proof.
+
+**Production checklist:** the private bucket exists, has no public access / custom domain /
+CORS rule, and the backend's key has read/write on it. If `STORAGE_S3_PRIVATE_BUCKET` is
+blank the backend logs a warning at startup and keeps ID proofs in the main bucket, which is
+only acceptable if `id-proofs/` is not publicly readable there.

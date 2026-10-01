@@ -1,5 +1,6 @@
 package com.gymapp.dto;
 
+import com.gymapp.entity.Gender;
 import com.gymapp.entity.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -7,6 +8,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -36,7 +38,9 @@ public class AuthDtos {
             @NotBlank @Size(min = 6) String password,
             @NotNull UUID branchId,
             @NotBlank String otp,
-            String captchaToken
+            String captchaToken,
+            Gender gender,
+            LocalDate dateOfBirth
     ) {}
 
     // Same optional-captchaToken pattern as RegisterMemberRequest. rememberMe is
@@ -67,7 +71,9 @@ public class AuthDtos {
             String phone,
             @NotBlank @Size(min = 6) String password,
             @NotNull Role role,
-            @NotEmpty List<UUID> branchIds
+            @NotEmpty List<UUID> branchIds,
+            Gender gender,
+            LocalDate dateOfBirth
     ) {}
 
     // No JWT here (the old create-manager/create-trainer responses handed the Owner a live

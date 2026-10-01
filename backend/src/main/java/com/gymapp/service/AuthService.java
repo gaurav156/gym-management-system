@@ -39,6 +39,7 @@ public class AuthService {
     private final RegistrationOtpRepository registrationOtpRepository;
     private final OtpDeliveryRouter otpDeliveryRouter;
     private final ApplicationEventPublisher eventPublisher;
+    private final ProfileDetailsUpdater profileDetailsUpdater;
 
     @Value("${app.otp.expiry-minutes}")
     private int expiryMinutes;
@@ -59,7 +60,8 @@ public class AuthService {
                        JwtUtil jwtUtil,
                        RegistrationOtpRepository registrationOtpRepository,
                        OtpDeliveryRouter otpDeliveryRouter,
-                       ApplicationEventPublisher eventPublisher) {
+                       ApplicationEventPublisher eventPublisher,
+                       ProfileDetailsUpdater profileDetailsUpdater) {
         this.userRepository = userRepository;
         this.branchRepository = branchRepository;
         this.branchAssignmentRepository = branchAssignmentRepository;
@@ -68,6 +70,7 @@ public class AuthService {
         this.registrationOtpRepository = registrationOtpRepository;
         this.otpDeliveryRouter = otpDeliveryRouter;
         this.eventPublisher = eventPublisher;
+        this.profileDetailsUpdater = profileDetailsUpdater;
     }
 
     // Step 1 of self-registration. Unlike PasswordResetService's request-otp (which
@@ -114,6 +117,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse registerMember(RegisterMemberRequest req) {
+        if (req.dateOfBirth() != null) profileDetailsUpdater.validateDateOfBirth(req.dateOfBirth());
         String email = req.email().trim().toLowerCase();
 
         if (userRepository.existsByEmail(email)) {
@@ -149,6 +153,8 @@ public class AuthService {
                 .checkinPin(generatePin())
                 .qrToken(UUID.randomUUID().toString())
                 .active(true)
+                .gender(req.gender())
+                .dateOfBirth(req.dateOfBirth())
                 .build();
         member = userRepository.save(member);
 
@@ -171,6 +177,8 @@ public class AuthService {
     // their enrollmentDate on first purchase instead.
     @Transactional
     public CreateAccountResponse createAccount(CreateAccountRequest req) {
+        if (req.dateOfBirth() != null) profileDetailsUpdater.validateDateOfBirth(req.dateOfBirth());
+
         if (req.role() == Role.OWNER) {
             throw new IllegalArgumentException(
                     "Owner accounts can't be created directly - create the account first, then promote it to Owner (requires email verification).");
@@ -191,6 +199,8 @@ public class AuthService {
                 .qrToken(UUID.randomUUID().toString())
                 .joiningDate(req.role() == Role.MEMBER ? null : LocalDate.now())
                 .active(true)
+                .gender(req.gender())
+                .dateOfBirth(req.dateOfBirth())
                 .build();
         user = userRepository.save(user);
         assignToBranches(user, branches);

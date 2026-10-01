@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import PhotoUploadButton from '../PhotoUploadButton'
 import Spinner from '../Spinner'
-import type { Branch, StaffSummary, AttendanceLogEntry, AuthUser, RoleHistoryEntry, PageResponse } from '../../types'
+import type { Branch, StaffSummary, AttendanceLogEntry, AuthUser, RoleHistoryEntry, PageResponse, Gender } from '../../types'
 import ConfirmDialog from '../ConfirmDialog'
 import { TableSkeleton } from '../Skeleton'
 import { useConfirm } from '../../hooks/useConfirm'
 import RoleChangeOtpDialog, { type RoleChangeOtpTarget } from '../RoleChangeOtpDialog'
 import Avatar from '../Avatar'
 import ProductPurchaseHistoryTab from '../ProductPurchaseHistoryTab'
+import PersonalDetailsFields from '../PersonalDetailsFields'
+import IdProofField from '../IdProofField'
+import { genderLabel, formatDobWithAge } from '../../utils/person'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -55,6 +58,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const [staffEditPhone, setStaffEditPhone] = useState('')
   const [staffEditAddress, setStaffEditAddress] = useState('')
   const [staffEditPhoto, setStaffEditPhoto] = useState<string | null>(null)
+  const [staffEditGender, setStaffEditGender] = useState<Gender | ''>('')
+  const [staffEditDob, setStaffEditDob] = useState('')
+  const [staffEditIdProof, setStaffEditIdProof] = useState<string | null>(null)
 
   // Joining/left dates now apply to Manager as well as Trainer - both are "staff" in the
   // sense that they can leave and come back, unlike Owner.
@@ -160,6 +166,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     setStaffEditPhone(s.phone ?? '')
     setStaffEditAddress(s.address ?? '')
     setStaffEditPhoto(s.photo)
+    setStaffEditGender(s.gender ?? '')
+    setStaffEditDob(s.dateOfBirth ?? '')
+    setStaffEditIdProof(null)
     setStaffModalMessage('')
   }
 
@@ -171,6 +180,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     try {
       await api.put(endpoint, {
         name: staffEditName, phone: staffEditPhone, address: staffEditAddress, photo: staffEditPhoto ?? '',
+        gender: staffEditGender || undefined, dateOfBirth: staffEditDob || undefined, idProof: staffEditIdProof ?? undefined
       })
       setEditingStaffInfo(false)
       loadStaff(staffPage)
@@ -307,6 +317,8 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   // Edit-info is available for Trainer (Owner or Manager) and Manager (Owner only).
   const canEditInfo = detailStaff && detailStaff.role !== 'OWNER' &&
     (detailStaff.role === 'TRAINER' || user?.role === 'OWNER')
+
+  const canViewIdProof = user?.role === 'OWNER' || detailStaff?.role === 'TRAINER'
 
   // Dates editor now covers both staff roles that can actually leave/rejoin.
   const canEditDates = detailStaff && user?.role === 'OWNER' &&
@@ -477,6 +489,12 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                       <textarea value={staffEditAddress} onChange={(e) => setStaffEditAddress(e.target.value)} rows={2}
                         className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
                     </div>
+                    <PersonalDetailsFields compact gender={staffEditGender} dateOfBirth={staffEditDob}
+                      onGenderChange={setStaffEditGender} onDateOfBirthChange={setStaffEditDob} />
+                    {canViewIdProof && (  
+                      <IdProofField compact personId={detailStaff.id} uploaded={detailStaff.idProofUploaded}
+                        pendingKey={staffEditIdProof} canChange onUploaded={setStaffEditIdProof} onError={setStaffModalMessage} />
+                    )}
                     <div className="space-x-2">
                       <button onClick={() => saveStaffInfo(detailStaff)} disabled={savingStaffInfo}
                         className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
@@ -494,6 +512,12 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                     <p><span className="text-gray-500">Email:</span> {detailStaff.email}</p>
                     <p><span className="text-gray-500">Phone:</span> {detailStaff.phone ?? '—'}</p>
                     <p><span className="text-gray-500">Address:</span> {detailStaff.address ?? '—'}</p>
+                    <p><span className="text-gray-500">Gender:</span> {genderLabel(detailStaff.gender)}</p>
+                    <p><span className="text-gray-500">Date of birth:</span> {formatDobWithAge(detailStaff.dateOfBirth)}</p>
+                    {canViewIdProof && (
+                      <IdProofField compact personId={detailStaff.id} uploaded={detailStaff.idProofUploaded}
+                        pendingKey={null} canChange={false} onUploaded={() => {}} onError={setStaffModalMessage} />
+                    )}
                     <p><span className="text-gray-500">Check-in PIN:</span> {detailStaff.checkinPin ?? '—'}</p>
                     <p><span className="text-gray-500">Last visit:</span> {
                       lastCheckins[detailStaff.id] ? new Date(lastCheckins[detailStaff.id]).toLocaleString() : 'Never'

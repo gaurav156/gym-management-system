@@ -1,7 +1,7 @@
 import { ChangeEvent } from 'react'
 import { api } from '../api/client'
 
-export type ImagePurpose = 'PHOTO' | 'SIGNATURE' | 'BILL' | 'PRODUCT'
+export type ImagePurpose = 'PHOTO' | 'SIGNATURE' | 'BILL' | 'PRODUCT' | 'ID_PROOF'
 
 // Raw picked file limit - it gets downscaled before upload, so this can be generous
 // (phone cameras easily produce 5-8MB originals). The server enforces 2MB on what arrives.
@@ -12,7 +12,8 @@ const TARGETS: Record<ImagePurpose, { maxDim: number; type: 'image/jpeg' | 'imag
   PHOTO: { maxDim: 640, type: 'image/jpeg' },
   SIGNATURE: { maxDim: 600, type: 'image/png' },
   BILL: { maxDim: 0, type: 'image/jpeg' },
-  PRODUCT: { maxDim: 640, type: 'image/jpeg' }
+  PRODUCT: { maxDim: 640, type: 'image/jpeg' },
+  ID_PROOF: { maxDim: 0, type: 'image/jpeg' },
 }
 
 async function downscale(file: File, purpose: ImagePurpose): Promise<Blob> {
@@ -39,9 +40,9 @@ async function downscale(file: File, purpose: ImagePurpose): Promise<Blob> {
 
 // Uploads to the backend and resolves to the public URL to store in form state.
 export async function uploadImage(file: File, purpose: ImagePurpose = 'PHOTO'): Promise<string> {
-  const blob = purpose === 'BILL' ? file : await downscale(file, purpose)
+  const blob = (purpose === 'BILL' || purpose === 'ID_PROOF') ? file : await downscale(file, purpose)
   const form = new FormData()
-  const filename = purpose === 'PHOTO' ? 'photo.jpg' : purpose === 'SIGNATURE' ? 'signature.png' : (file.name || 'bill')
+  const filename = purpose === 'PHOTO' ? 'photo.jpg' : purpose === 'SIGNATURE' ? 'signature.png' : (file.name || 'upload')
   form.append('file', blob, filename)
   const { data } = await api.post<{ url: string }>('/api/files/images', form, { params: { purpose } })
   return data.url

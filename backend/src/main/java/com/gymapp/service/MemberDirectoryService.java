@@ -22,10 +22,12 @@ public class MemberDirectoryService {
 
     private final UserRepository userRepository;
     private final ImageRefs imageRefs;
+    private final ProfileDetailsUpdater profileDetailsUpdater;
 
-    public MemberDirectoryService(UserRepository userRepository, ImageRefs imageRefs) {
+    public MemberDirectoryService(UserRepository userRepository, ImageRefs imageRefs, ProfileDetailsUpdater profileDetailsUpdater) {
         this.userRepository = userRepository;
         this.imageRefs = imageRefs;
+        this.profileDetailsUpdater = profileDetailsUpdater;
     }
 
     @Transactional(readOnly = true)
@@ -54,10 +56,8 @@ public class MemberDirectoryService {
             throw new IllegalArgumentException("This account is not a member");
         }
 
-        if (req.name() != null && !req.name().isBlank()) u.setName(req.name());
-        if (req.phone() != null) u.setPhone(req.phone());
-        if (req.address() != null) u.setAddress(req.address().isBlank() ? null : req.address());
-        u.setPhoto(imageRefs.resolveForSave(u.getPhoto(), req.photo(), ImagePurpose.PHOTO));
+        profileDetailsUpdater.applyDetails(u, req);
+        profileDetailsUpdater.applyIdProof(u, req, false);
 
         u = userRepository.save(u);
         return toSummary(u);
@@ -65,6 +65,7 @@ public class MemberDirectoryService {
 
     private MemberSummary toSummary(User u) {
         return new MemberSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), imageRefs.toUrl(u.getPhoto()),
-                u.getAddress(), u.getCheckinPin(), u.getEnrollmentDate());
+                u.getAddress(), u.getCheckinPin(), u.getEnrollmentDate(),
+                u.getGender(), u.getDateOfBirth(), u.getIdProofKey() != null);
     }
 }

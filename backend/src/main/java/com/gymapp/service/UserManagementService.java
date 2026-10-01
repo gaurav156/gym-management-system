@@ -77,8 +77,10 @@ public class UserManagementService {
 
         String photo = user.getPhoto();
         String signature = user.getSignature();
+        String idProof = user.getIdProofKey();
         userRepository.delete(user);
         imageRefs.deleteAfterCommit(photo);
         imageRefs.deleteAfterCommit(signature);
+        imageRefs.deleteAfterCommit(idProof);
     }
 }

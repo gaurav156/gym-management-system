@@ -36,6 +36,8 @@ public class FileController {
             if (!isStaff) throw new IllegalArgumentException("Only an Owner or Manager can upload this file");
         }
         String key = imageUploadService.upload(file, purpose);
-        return new UploadResponse(imageRefs.toUrl(key));
+        // ID proofs are never given a public URL - the key goes back to the client, which
+        // hands it to the profile save; viewing happens via /api/id-proofs/{userId}.
+        return new UploadResponse(purpose == ImagePurpose.ID_PROOF ? key : imageRefs.toUrl(key));
     }
 }

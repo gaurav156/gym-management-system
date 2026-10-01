@@ -4,7 +4,8 @@ import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import Spinner from '../components/Spinner'
 import Turnstile from '../components/Turnstile'
-import type { AuthUser, Branch } from '../types'
+import PersonalDetailsFields from '../components/PersonalDetailsFields'
+import type { AuthUser, Branch, Gender } from '../types'
 
 const RESEND_COOLDOWN_SECONDS = 60
 
@@ -16,6 +17,8 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [branchId, setBranchId] = useState('')
   const [otp, setOtp] = useState('')
+  const [gender, setGender] = useState<Gender | ''>('')
+  const [dob, setDob] = useState('')
 
   const [step, setStep] = useState<'FORM' | 'OTP'>('FORM')
   const [error, setError] = useState('')
@@ -106,6 +109,8 @@ export default function RegisterPage() {
     try {
       const { data } = await api.post<AuthUser>('/api/auth/register', {
         name, email, phone, password, branchId, otp,
+        gender: gender || undefined,
+        dateOfBirth: dob || undefined,
         captchaToken: captchaRequired ? captchaToken : undefined,
       })
       setUser(data)
@@ -138,6 +143,8 @@ export default function RegisterPage() {
             <input value={phone} onChange={(e) => setPhone(e.target.value)}
               className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none" />
           </div>
+          <PersonalDetailsFields gender={gender} dateOfBirth={dob}
+            onGenderChange={setGender} onDateOfBirthChange={setDob} />
           <div>
             <label className="block text-sm font-medium text-gray-700">Password</label>
             <input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)}

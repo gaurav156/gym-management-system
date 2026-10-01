@@ -1,5 +1,7 @@
 package com.gymapp.dto;
 
+import com.gymapp.entity.Gender;
+
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -15,7 +17,10 @@ public class TrainerDtos {
             String photo,
             String checkinPin,
             LocalDate joiningDate,
-            LocalDate leftDate
+            LocalDate leftDate,
+            Gender gender,
+            LocalDate dateOfBirth,
+            boolean idProofUploaded
     ) {}
 
     // Owner-only correction tool - joiningDate is otherwise set automatically at account

@@ -120,4 +120,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Query("SELECT u.signature FROM User u WHERE u.signature IS NOT NULL AND u.signature NOT LIKE 'data:%'")
     List<String> findAllSignatureKeys();
+
+    // Used by OrphanImageCleanupJob - ID proofs must count as "referenced" or they'd be deleted.
+    @Query("SELECT u.idProofKey FROM User u WHERE u.idProofKey IS NOT NULL")
+    List<String> findAllIdProofKeys();
 }

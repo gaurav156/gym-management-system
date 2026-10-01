@@ -5,7 +5,11 @@ import { useAuthStore } from '../store/authStore'
 import PhotoUploadButton from '../components/PhotoUploadButton'
 import ChangePasswordSection from '../components/ChangePasswordSection'
 import Spinner from '../components/Spinner'
-import type { Profile, AttendanceLogEntry, PageResponse } from '../types'
+import PersonalDetailsFields from '../components/PersonalDetailsFields'
+import IdProofField from '../components/IdProofField'
+import ConfirmDialog from '../components/ConfirmDialog'
+import { useConfirm } from '../hooks/useConfirm'
+import type { Gender, Profile, AttendanceLogEntry, PageResponse } from '../types'
 import Avatar from '../components/Avatar'
 import MemberStoreTab from '../components/member/MemberStoreTab'
 
@@ -24,6 +28,10 @@ export default function StaffProfilePage() {
     const [address, setAddress] = useState('')
     const [photo, setPhoto] = useState<string | null>(null)
     const [signature, setSignature] = useState<string | null>(null)
+    const [gender, setGender] = useState<Gender | ''>('')
+    const [dob, setDob] = useState('')
+    const [idProofPending, setIdProofPending] = useState<string | null>(null)
+    const { confirm, dialogProps } = useConfirm()
     const [message, setMessage] = useState('')
     const [error, setError] = useState('')
     const [saving, setSaving] = useState(false)
@@ -43,6 +51,9 @@ export default function StaffProfilePage() {
             setAddress(res.data.address ?? '')
             setPhoto(res.data.photo)
             setSignature(res.data.signature)
+            setGender(res.data.gender ?? '')
+            setDob(res.data.dateOfBirth ?? '')
+            setIdProofPending(null)
         }).finally(() => setProfileLoading(false))
     }
 
@@ -69,18 +80,46 @@ export default function StaffProfilePage() {
         }
     }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    async function handleSubmit(e: FormEvent) {
-        e.preventDefault()
+    function detailsChanged(): boolean {
+        if (!profile) return false
+        const n = (s: string | null | undefined) => (s ?? '').trim()
+        return n(name) !== n(profile.name) || n(phone) !== n(profile.phone) || n(address) !== n(profile.address)
+            || (photo ?? '') !== (profile.photo ?? '') || gender !== (profile.gender ?? '') || dob !== (profile.dateOfBirth ?? '')
+    }
+
+    async function save() {
         setMessage(''); setError('')
         setSaving(true)
         try {
-            const { data } = await api.put<Profile>('/api/profile/me', { name, phone, address, photo: photo ?? '', signature: signature ?? '' })
+            const { data } = await api.put<Profile>('/api/profile/me', {
+                name, phone, address, photo: photo ?? '', signature: signature ?? '',
+                gender: gender || undefined, dateOfBirth: dob || undefined, idProof: idProofPending ?? undefined,
+            })
             setProfile(data)
+            setGender(data.gender ?? '')
+            setDob(data.dateOfBirth ?? '')
+            setIdProofPending(null)
             setMessage('Profile updated.')
         } catch (err: any) {
             setError(err.response?.data?.error || 'Failed to update profile')
         } finally {
             setSaving(false)
+        }
+    }
+
+    function handleSubmit(e: FormEvent) {
+        e.preventDefault()
+        if (saving) return
+        // Only a Manager is limited to one edit (the Owner is exempt) - warn before it's used up.
+        if (profile?.role === 'MANAGER' && !profile.detailsLocked && detailsChanged()) {
+            confirm({
+                title: 'Save your details?',
+                message: 'You can update your details only once. After this, only the Owner can change them. Make sure everything is correct.',
+                confirmLabel: 'Save',
+                onConfirm: save,
+            })
+        } else {
+            save()
         }
     }
 
@@ -100,6 +139,8 @@ export default function StaffProfilePage() {
             </div>
         )
     }
+
+    const locked = profile.detailsLocked
 
     const TABS: { key: Tab; label: string }[] = [
         { key: 'PROFILE', label: 'Profile' },
@@ -127,20 +168,22 @@ export default function StaffProfilePage() {
             {activeTab === 'PROFILE' && (
                 <div className="mt-6">
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="flex flex-col items-center gap-3">
-                            <Avatar src={photo} name={profile.name} className="h-24 w-24" textClassName="text-2xl" />
-                            <PhotoUploadButton onLoaded={setPhoto} onError={setError} label="Upload photo" />
-                            {photo && (
-                                <button type="button" onClick={() => setPhoto(null)} className="text-xs text-red-600 hover:underline">
-                                    Remove photo
-                                </button>
-                            )}
-                        </div>
+                        {locked && (
+                            <div className="flex flex-col items-center gap-3">
+                                <Avatar src={photo} name={profile.name} className="h-24 w-24" textClassName="text-2xl" />
+                                <PhotoUploadButton onLoaded={setPhoto} onError={setError} label="Upload photo" />
+                                {photo && (
+                                    <button type="button" onClick={() => setPhoto(null)} className="text-xs text-red-600 hover:underline">
+                                        Remove photo
+                                    </button>
+                                )}
+                            </div>
+                        )}
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Full name</label>
-                            <input required value={name} onChange={(e) => setName(e.target.value)}
-                                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none" />
+                            <input required disabled={locked} value={name} onChange={(e) => setName(e.target.value)}
+                                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none disabled:bg-gray-50" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Email</label>
@@ -149,14 +192,23 @@ export default function StaffProfilePage() {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Phone</label>
-                            <input value={phone} onChange={(e) => setPhone(e.target.value)}
-                                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none" />
+                            <input disabled={locked} value={phone} onChange={(e) => setPhone(e.target.value)}
+                                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none disabled:bg-gray-50" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Address</label>
-                            <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2}
-                                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none" />
+                            <textarea disabled={locked} value={address} onChange={(e) => setAddress(e.target.value)} rows={2}
+                                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none disabled:bg-gray-50" />
                         </div>
+
+                        <PersonalDetailsFields gender={gender} dateOfBirth={dob} disabled={locked}
+                            onGenderChange={setGender} onDateOfBirthChange={setDob} />
+                        <IdProofField personId={profile.id} uploaded={profile.idProofUploaded} pendingKey={idProofPending}
+                            canChange={profile.role === 'OWNER' || !profile.idProofUploaded}
+                            onUploaded={setIdProofPending} onError={setError} />
+                        {locked && (
+                            <p className="text-xs text-gray-500">You've already used your one-time update - ask the Owner to change your details. Your signature can still be changed.</p>
+                        )}
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Signature</label>
@@ -189,6 +241,7 @@ export default function StaffProfilePage() {
                     </form>
 
                     <ChangePasswordSection />
+                    <ConfirmDialog {...dialogProps} />
                 </div>
             )}
 

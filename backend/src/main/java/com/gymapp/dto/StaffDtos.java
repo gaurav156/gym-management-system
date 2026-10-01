@@ -1,5 +1,7 @@
 package com.gymapp.dto;
 
+import com.gymapp.entity.Gender;
+
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -19,6 +21,9 @@ public class StaffDtos {
             String checkinPin,
             String role,
             LocalDate joiningDate,
-            LocalDate leftDate
+            LocalDate leftDate,
+            Gender gender,
+            LocalDate dateOfBirth,
+            boolean idProofUploaded
     ) {}
 }

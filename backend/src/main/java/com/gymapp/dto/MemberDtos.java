@@ -1,5 +1,7 @@
 package com.gymapp.dto;
 
+import com.gymapp.entity.Gender;
+
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -16,6 +18,9 @@ public class MemberDtos {
             String photo,
             String address,
             String checkinPin,
-            LocalDate enrollmentDate
+            LocalDate enrollmentDate,
+            Gender gender,
+            LocalDate dateOfBirth,
+            boolean idProofUploaded
     ) {}
 }

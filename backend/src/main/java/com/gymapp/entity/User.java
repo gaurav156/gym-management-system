@@ -66,6 +66,23 @@ public class User {
 
     private String address;
 
+    @Enumerated(EnumType.STRING)
+    private Gender gender;
+
+    private LocalDate dateOfBirth;
+
+    // Object key under id-proofs/ - never exposed as a public URL; viewed only through
+    // GET /api/id-proofs/{userId} (see IdProofService).
+    @Column(name = "id_proof_key", columnDefinition = "TEXT")
+    private String idProofKey;
+
+    // True once the person has used their one self-service details edit (Member/Trainer/
+    // Manager). The Owner is never limited by this. Staff editing on someone's behalf
+    // never sets it.
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean selfEditUsed = false;
+
     // Members only - set automatically on their first membership purchase
     // (MembershipService.purchase()), never editable directly. Null until then.
     private LocalDate enrollmentDate;

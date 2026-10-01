@@ -22,10 +22,12 @@ public class ManagerDirectoryService {
 
     private final UserRepository userRepository;
     private final ImageRefs imageRefs;
+    private final ProfileDetailsUpdater profileDetailsUpdater;
 
-    public ManagerDirectoryService(UserRepository userRepository, ImageRefs imageRefs) {
+    public ManagerDirectoryService(UserRepository userRepository, ImageRefs imageRefs, ProfileDetailsUpdater profileDetailsUpdater) {
         this.userRepository = userRepository;
         this.imageRefs = imageRefs;
+        this.profileDetailsUpdater = profileDetailsUpdater;
     }
 
     // Reuses TrainerSummary's shape (name/email/phone/address/photo/checkinPin +
@@ -39,10 +41,8 @@ public class ManagerDirectoryService {
             throw new IllegalArgumentException("This account is not a manager");
         }
 
-        if (req.name() != null && !req.name().isBlank()) manager.setName(req.name());
-        if (req.phone() != null) manager.setPhone(req.phone());
-        if (req.address() != null) manager.setAddress(req.address().isBlank() ? null : req.address());
-        manager.setPhoto(imageRefs.resolveForSave(manager.getPhoto(), req.photo(), ImagePurpose.PHOTO));
+        profileDetailsUpdater.applyDetails(manager, req);
+        profileDetailsUpdater.applyIdProof(manager, req, false);
 
         manager = userRepository.save(manager);
         return toSummary(manager);
@@ -50,7 +50,8 @@ public class ManagerDirectoryService {
 
     private TrainerSummary toSummary(User u) {
         return new TrainerSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(), imageRefs.toUrl(u.getPhoto()),
-                u.getCheckinPin(), u.getJoiningDate(), u.getLeftDate());
+                u.getCheckinPin(), u.getJoiningDate(), u.getLeftDate(),
+                u.getGender(), u.getDateOfBirth(), u.getIdProofKey() != null);
     }
 
     // Owner-only, mirrors TrainerDirectoryService.updateDates() - lets the Owner correct

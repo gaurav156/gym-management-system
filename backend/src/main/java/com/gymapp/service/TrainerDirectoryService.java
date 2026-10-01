@@ -22,13 +22,16 @@ public class TrainerDirectoryService {
     private final BranchAssignmentRepository branchAssignmentRepository;
     private final UserRepository userRepository;
     private final ImageRefs imageRefs;
+    private final ProfileDetailsUpdater profileDetailsUpdater;
 
     public TrainerDirectoryService(BranchAssignmentRepository branchAssignmentRepository,
                                    UserRepository userRepository,
-                                   ImageRefs imageRefs) {
+                                   ImageRefs imageRefs,
+                                   ProfileDetailsUpdater profileDetailsUpdater) {
         this.branchAssignmentRepository = branchAssignmentRepository;
         this.userRepository = userRepository;
         this.imageRefs = imageRefs;
+        this.profileDetailsUpdater = profileDetailsUpdater;
     }
 
     @Transactional(readOnly = true)
@@ -67,10 +70,8 @@ public class TrainerDirectoryService {
             throw new IllegalArgumentException("This account is not a trainer");
         }
 
-        if (req.name() != null && !req.name().isBlank()) trainer.setName(req.name());
-        if (req.phone() != null) trainer.setPhone(req.phone());
-        if (req.address() != null) trainer.setAddress(req.address().isBlank() ? null : req.address());
-        trainer.setPhoto(imageRefs.resolveForSave(trainer.getPhoto(), req.photo(), ImagePurpose.PHOTO));
+        profileDetailsUpdater.applyDetails(trainer, req);
+        profileDetailsUpdater.applyIdProof(trainer, req, false);
 
         trainer = userRepository.save(trainer);
         return toSummary(trainer);
@@ -78,6 +79,7 @@ public class TrainerDirectoryService {
 
     private TrainerSummary toSummary(User u) {
         return new TrainerSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(), imageRefs.toUrl(u.getPhoto()),
-                u.getCheckinPin(), u.getJoiningDate(), u.getLeftDate());
+                u.getCheckinPin(), u.getJoiningDate(), u.getLeftDate(),
+                u.getGender(), u.getDateOfBirth(), u.getIdProofKey() != null);
     }
 }

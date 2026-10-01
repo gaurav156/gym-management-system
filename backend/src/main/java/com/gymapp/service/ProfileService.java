@@ -35,6 +35,7 @@ public class ProfileService {
     private final ChangePasswordOtpRepository changePasswordOtpRepository;
     private final OtpDeliveryRouter otpDeliveryRouter;
     private final ImageRefs imageRefs;
+    private final ProfileDetailsUpdater profileDetailsUpdater;
 
     @Value("${app.otp.expiry-minutes}")
     private int expiryMinutes;
@@ -43,12 +44,14 @@ public class ProfileService {
                           PasswordEncoder passwordEncoder,
                           ChangePasswordOtpRepository changePasswordOtpRepository,
                           OtpDeliveryRouter otpDeliveryRouter,
-                          ImageRefs imageRefs) {
+                          ImageRefs imageRefs,
+                          ProfileDetailsUpdater profileDetailsUpdater) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.changePasswordOtpRepository = changePasswordOtpRepository;
         this.otpDeliveryRouter = otpDeliveryRouter;
         this.imageRefs = imageRefs;
+        this.profileDetailsUpdater = profileDetailsUpdater;
     }
 
     public ProfileResponse getProfile(UUID userId) {
@@ -61,13 +64,24 @@ public class ProfileService {
     public ProfileResponse updateProfile(UUID userId, UpdateProfileRequest req) {
         User u = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        boolean isOwner = u.getRole() == Role.OWNER;
 
-        if (req.name() != null && !req.name().isBlank()) u.setName(req.name());
-        if (req.phone() != null) u.setPhone(req.phone());
-        if (req.address() != null) u.setAddress(req.address().isBlank() ? null : req.address());
-        u.setPhoto(imageRefs.resolveForSave(u.getPhoto(), req.photo(), ImagePurpose.PHOTO));
+        // Applied first, checked after: if the lock rejects it, the exception rolls the whole
+        // transaction back, so none of the changes (or scheduled image deletes) take effect.
+        boolean changed = profileDetailsUpdater.applyDetails(u, req);
+        if (changed && !isOwner) {
+            if (u.isSelfEditUsed()) {
+                throw new IllegalArgumentException(u.getRole() == Role.MANAGER
+                        ? "Your details have already been updated once - please ask the Owner to change them"
+                        : "Your details have already been updated once - please ask the Owner or a Manager to change them");
+            }
+            u.setSelfEditUsed(true);
+        }
 
-        if (u.getRole() == Role.OWNER || u.getRole() == Role.MANAGER) {
+        profileDetailsUpdater.applyIdProof(u, req, !isOwner);
+
+        // Signature isn't a personal detail - it stays editable and never uses up the one edit.
+        if (isOwner || u.getRole() == Role.MANAGER) {
             u.setSignature(imageRefs.resolveForSave(u.getSignature(), req.signature(), ImagePurpose.SIGNATURE));
         }
 
@@ -164,6 +178,9 @@ public class ProfileService {
 
     private ProfileResponse toResponse(User u) {
         return new ProfileResponse(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(),
-                imageRefs.toUrl(u.getPhoto()), imageRefs.toUrl(u.getSignature()), u.getRole().name(), u.getEnrollmentDate(), u.getJoiningDate());
+                imageRefs.toUrl(u.getPhoto()), imageRefs.toUrl(u.getSignature()), u.getRole().name(),
+                u.getEnrollmentDate(), u.getJoiningDate(),
+                u.getGender(), u.getDateOfBirth(), u.getIdProofKey() != null,
+                u.getRole() != Role.OWNER && u.isSelfEditUsed());
     }
 }

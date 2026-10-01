@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import Spinner from '../components/Spinner'
 import { CardSkeleton } from '../components/Skeleton'
-import type { Branch, Plan } from '../types'
+import PersonalDetailsFields from '../components/PersonalDetailsFields'
+import type { Branch, Gender, Plan } from '../types'
 import ProductCatalogSection from '../components/owner/ProductCatalogSection'
 import CouponsSection from '../components/owner/CouponsSection'
 import ProductCategoriesSection from '../components/owner/ProductCategoriesSection'
@@ -58,6 +59,8 @@ export default function OwnerDashboard() {
   const [accountName, setAccountName] = useState('')
   const [accountEmail, setAccountEmail] = useState('')
   const [accountPhone, setAccountPhone] = useState('')
+  const [accountGender, setAccountGender] = useState<Gender | ''>('')
+  const [accountDob, setAccountDob] = useState('')
   const [accountPassword, setAccountPassword] = useState('')
   const [accountBranchIds, setAccountBranchIds] = useState<string[]>([])
   const [accountMessage, setAccountMessage] = useState('')
@@ -135,12 +138,14 @@ export default function OwnerDashboard() {
         name: accountName,
         email: accountEmail,
         phone: accountPhone || null,
+        gender: accountGender || undefined,
+        dateOfBirth: accountDob || undefined,
         password: accountPassword,
         branchIds: accountBranchIds,
       })
       const label = ACCOUNT_ROLES.find((r) => r.value === accountRole)?.label ?? accountRole
       setAccountMessage(`${label} account created for ${accountName} - check-in PIN ${data.checkinPin}`)
-      setAccountName(''); setAccountEmail(''); setAccountPhone(''); setAccountPassword(''); setAccountBranchIds([])
+      setAccountName(''); setAccountEmail(''); setAccountPhone(''); setAccountGender(''); setAccountDob(''); setAccountPassword(''); setAccountBranchIds([])
     } catch (err: any) {
       setAccountMessage(err.response?.data?.error || 'Failed to create account')
     } finally {
@@ -224,6 +229,8 @@ export default function OwnerDashboard() {
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
             <input placeholder="Phone (optional)" value={accountPhone} onChange={(e) => setAccountPhone(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            <PersonalDetailsFields compact gender={accountGender} dateOfBirth={accountDob}
+              onGenderChange={setAccountGender} onDateOfBirthChange={setAccountDob} />
             <input placeholder="Temporary password" type="password" required minLength={6} value={accountPassword}
               onChange={(e) => setAccountPassword(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />

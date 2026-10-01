@@ -6,6 +6,7 @@ export type ProductOrderStatus = 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'
 export type PaymentStatus = 'PAID' | 'PARTIAL'
 export type CouponAppliesTo = 'PRODUCT' | 'MEMBERSHIP' | 'BOTH'
 export type FinanceGranularity = 'DAILY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | 'CUSTOM'
+export type Gender = 'MALE' | 'FEMALE' | 'OTHER'
 
 export interface AuthUser {
   token: string
@@ -113,6 +114,10 @@ export interface Profile {
   role: Role
   enrollmentDate: string | null
   joiningDate: string | null
+  gender: Gender | null
+  dateOfBirth: string | null
+  idProofUploaded: boolean
+  detailsLocked: boolean
 }
 
 export interface TrainerSummary {
@@ -125,6 +130,9 @@ export interface TrainerSummary {
   checkinPin: string | null
   joiningDate: string | null
   leftDate: string | null
+  gender: Gender | null
+  dateOfBirth: string | null
+  idProofUploaded: boolean
 }
 
 export interface AttendanceLogEntry {
@@ -165,6 +173,9 @@ export interface MemberSummary {
   address: string | null
   checkinPin: string | null
   enrollmentDate: string | null
+  gender: Gender | null
+  dateOfBirth: string | null
+  idProofUploaded: boolean
 }
 
 export interface HourlyCount {
@@ -183,6 +194,9 @@ export interface StaffSummary {
   role: Role
   joiningDate: string | null
   leftDate: string | null
+  gender: Gender | null
+  dateOfBirth: string | null
+  idProofUploaded: boolean
 }
 
 export interface RoleHistoryEntry {

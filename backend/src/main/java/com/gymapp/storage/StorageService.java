@@ -22,4 +22,9 @@ public interface StorageService {
 
     // Every object whose key starts with prefix (all pages) - used by the orphan cleanup job.
     List<StoredObject> list(String prefix);
+
+    record StoredFile(byte[] data, String contentType) {}
+
+    // Reads an object's bytes - used to serve private files (ID proofs) through the API.
+    StoredFile get(String key);
 }
