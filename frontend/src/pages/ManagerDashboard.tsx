@@ -31,7 +31,7 @@ export default function ManagerDashboard() {
     request
       .then((res) => {
         setBranches(res.data)
-        if (res.data.length > 0) setSelectedBranch(res.data[0].id)
+        if (res.data.length > 0) setSelectedBranch((res.data.find((b) => b.active) ?? res.data[0]).id)
       })
       .catch((err) => {
         setBranchLoadError(err.response?.data?.error || 'Failed to load branches - check the backend logs.')
@@ -80,7 +80,7 @@ export default function ManagerDashboard() {
       {branches.length > 1 && (
         <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}
           className="mt-4 rounded-md border border-gray-300 px-3 py-2 text-sm">
-          {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          {branches.map((b) => <option key={b.id} value={b.id}>{b.name}{b.active ? '' : ' (inactive)'}</option>)}
         </select>
       )}
 

@@ -33,6 +33,9 @@ public class Branch {
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
+    @Builder.Default
+    private boolean active = true;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

@@ -108,6 +108,8 @@ public class MembershipService {
         Branch branch = branchRepository.findById(req.branchId())
                 .orElseThrow(() -> new IllegalArgumentException("Branch not found"));
 
+        if (!branch.isActive()) throw new IllegalArgumentException(branch.getName() + " is inactive");
+
         LocalDate today = LocalDate.now();
         LocalDate latestQueuedEnd = membershipRepository.findLatestQueuedEndDate(memberId, today);
 

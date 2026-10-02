@@ -9,6 +9,8 @@ import ProductCatalogSection from '../components/owner/ProductCatalogSection'
 import CouponsSection from '../components/owner/CouponsSection'
 import ProductCategoriesSection from '../components/owner/ProductCategoriesSection'
 import FinanceReportSection from '../components/owner/FinanceReportSection'
+import ConfirmDialog from '../components/ConfirmDialog'
+import { useConfirm } from '../hooks/useConfirm'
 
 type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
 
@@ -74,6 +76,47 @@ export default function OwnerDashboard() {
   const [planError, setPlanError] = useState('')
   const [creatingPlan, setCreatingPlan] = useState(false)
   const [planDiscountPrice, setPlanDiscountPrice] = useState('')
+
+  const { confirm, dialogProps } = useConfirm()
+  const activeBranches = branches.filter((b) => b.active)
+
+  function toggleBranchActive(b: Branch) {
+    setBranchEditMessage('')
+    confirm({
+      title: b.active ? 'Deactivate branch' : 'Reactivate branch',
+      message: b.active
+        ? `Deactivate "${b.name}"? It disappears from the public site and from Managers, and no new purchases, check-ins or sign-ups are accepted there. Existing history is kept.`
+        : `Reactivate "${b.name}"? It becomes available again everywhere.`,
+      confirmLabel: b.active ? 'Deactivate' : 'Reactivate',
+      danger: b.active,
+      onConfirm: async () => {
+        try {
+          await api.post(`/api/branches/${b.id}/${b.active ? 'deactivate' : 'reactivate'}`)
+          loadBranches()
+        } catch (err: any) {
+          setBranchEditMessage(err.response?.data?.error || 'Failed to update branch')
+        }
+      },
+    })
+  }
+
+  function deleteBranch(b: Branch) {
+    setBranchEditMessage('')
+    confirm({
+      title: 'Delete branch',
+      message: `Permanently delete "${b.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/api/branches/${b.id}`)
+          loadBranches()
+        } catch (err: any) {
+          setBranchEditMessage(err.response?.data?.error || 'Failed to delete branch')
+        }
+      },
+    })
+  }
 
   function loadBranches() {
     setBranchesLoading(true)
@@ -234,7 +277,7 @@ export default function OwnerDashboard() {
             <input placeholder="Temporary password" type="password" required minLength={6} value={accountPassword}
               onChange={(e) => setAccountPassword(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <BranchCheckboxes branches={branches} selected={accountBranchIds} onChange={setAccountBranchIds} />
+            <BranchCheckboxes branches={activeBranches} selected={accountBranchIds} onChange={setAccountBranchIds} />
             <button disabled={creatingAccount}
               className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
               {creatingAccount && <Spinner className="h-4 w-4" />}
@@ -323,15 +366,28 @@ export default function OwnerDashboard() {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p>{b.name}</p>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className={b.active ? '' : 'text-gray-400'}>
+                      {b.name}
+                      {!b.active && <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">Inactive</span>}
+                    </p>
                     <p className="text-xs text-gray-500">{b.address}</p>
                     <p className="text-xs text-gray-400">{b.phone || 'No phone on file'}</p>
+                    {b.deletable === false && (
+                      <p className="text-[10px] text-gray-400">Has recorded activity - can be deactivated but not deleted.</p>
+                    )}
                   </div>
-                  <button onClick={() => startEditBranch(b)} className="text-xs text-gray-600 hover:underline">
-                    Edit
-                  </button>
+                  <div className="flex flex-shrink-0 items-center gap-3 text-xs">
+                    <button onClick={() => startEditBranch(b)} className="text-gray-600 hover:underline">Edit</button>
+                    <button onClick={() => toggleBranchActive(b)}
+                      className={b.active ? 'text-amber-600 hover:underline' : 'text-green-700 hover:underline'}>
+                      {b.active ? 'Deactivate' : 'Reactivate'}
+                    </button>
+                    {b.deletable && (
+                      <button onClick={() => deleteBranch(b)} className="text-red-600 hover:underline">Delete</button>
+                    )}
+                  </div>
                 </div>
               )}
             </li>
@@ -341,7 +397,7 @@ export default function OwnerDashboard() {
         )}
       </div>
       <div className="mt-8">
-        <ProductCatalogSection branches={branches} />
+        <ProductCatalogSection branches={activeBranches} />
       </div>
       <div className="mt-8">
         <ProductCategoriesSection />
@@ -349,6 +405,7 @@ export default function OwnerDashboard() {
       <div className="mt-8">
         <CouponsSection />
       </div>
+      <ConfirmDialog {...dialogProps} />
     </div>
   )
 }

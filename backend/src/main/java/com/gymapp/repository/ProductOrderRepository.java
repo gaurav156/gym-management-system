@@ -36,4 +36,6 @@ public interface ProductOrderRepository extends JpaRepository<ProductOrder, UUID
                                             @Param("from") java.time.LocalDateTime from,
                                             @Param("to") java.time.LocalDateTime to,
                                             @Param("branchId") UUID branchId);
+
+    boolean existsByBranchId(UUID branchId);
 }

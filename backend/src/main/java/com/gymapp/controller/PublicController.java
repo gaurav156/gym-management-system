@@ -20,6 +20,6 @@ public class PublicController {
 
     @GetMapping("/branches")
     public List<BranchResponse> listBranches() {
-        return branchService.listAll();
+        return branchService.listActive();
     }
 }

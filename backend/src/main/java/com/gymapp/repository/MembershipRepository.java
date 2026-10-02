@@ -53,4 +53,6 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
 
     // Used by CouponService's membership-coupon first-time-buyer check.
     boolean existsByMemberId(UUID memberId);
+
+    boolean existsByBranchId(UUID branchId);
 }

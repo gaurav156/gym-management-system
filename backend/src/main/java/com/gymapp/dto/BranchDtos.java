@@ -15,11 +15,15 @@ public class BranchDtos {
             String phone
     ) {}
 
+    // deletable is only computed for the Owner's list (null elsewhere) so the UI can show
+    // "Delete" vs "deactivate only" without a failed request first.
     public record BranchResponse(
             UUID id,
             String name,
             String address,
-            String phone
+            String phone,
+            boolean active,
+            Boolean deletable
     ) {}
 
     // Owner-only: edits an existing branch's details. All fields optional/nullable so a

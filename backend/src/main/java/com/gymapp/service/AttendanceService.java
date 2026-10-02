@@ -99,6 +99,8 @@ public class AttendanceService {
         Branch branch = branchRepository.findById(req.branchId())
                 .orElseThrow(() -> new IllegalArgumentException("Branch not found"));
 
+        if (!branch.isActive()) throw new IllegalArgumentException(branch.getName() + " is inactive");
+
         // The Owner has implicit access to every branch (no branch_assignments row of
         // their own - see BranchService) so they're exempt from this check. Everyone
         // else - Manager, Trainer, Member - must actually be assigned to the branch

@@ -58,6 +58,9 @@ public class ExpenseService {
                 .orElseThrow(() -> new IllegalArgumentException("Recording user not found"));
         Branch branch = branchRepository.findById(req.branchId())
                 .orElseThrow(() -> new IllegalArgumentException("Branch not found"));
+
+        if (!branch.isActive()) throw new IllegalArgumentException(branch.getName() + " is inactive");
+
         assertBranchAccess(recordedBy, branch.getId());
 
         String billKey = (req.billUrl() == null || req.billUrl().isBlank())

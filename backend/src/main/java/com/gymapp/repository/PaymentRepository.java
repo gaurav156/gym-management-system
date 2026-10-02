@@ -30,4 +30,6 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
                                                @Param("from") java.time.LocalDateTime from,
                                                @Param("to") java.time.LocalDateTime to,
                                                @Param("branchId") UUID branchId);
+
+    boolean existsByBranchId(UUID branchId);
 }

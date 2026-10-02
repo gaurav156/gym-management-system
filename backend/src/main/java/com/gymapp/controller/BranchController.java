@@ -4,6 +4,7 @@ import com.gymapp.dto.BranchDtos.*;
 import com.gymapp.entity.Role;
 import com.gymapp.service.BranchService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,6 +31,25 @@ public class BranchController {
     @PreAuthorize("hasRole('OWNER')")
     public BranchResponse update(@PathVariable UUID branchId, @Valid @RequestBody UpdateBranchRequest req) {
         return branchService.update(branchId, req);
+    }
+
+    @PostMapping("/{branchId}/deactivate")
+    @PreAuthorize("hasRole('OWNER')")
+    public BranchResponse deactivate(@PathVariable UUID branchId) {
+        return branchService.setActive(branchId, false);
+    }
+
+    @PostMapping("/{branchId}/reactivate")
+    @PreAuthorize("hasRole('OWNER')")
+    public BranchResponse reactivate(@PathVariable UUID branchId) {
+        return branchService.setActive(branchId, true);
+    }
+
+    @DeleteMapping("/{branchId}")
+    @PreAuthorize("hasRole('OWNER')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable UUID branchId) {
+        branchService.delete(branchId);
     }
 
     // Owner sees every branch; a manager should call /mine instead

@@ -79,6 +79,9 @@ public class ProductOrderService {
                 .orElseThrow(() -> new IllegalArgumentException("Member not found"));
         Branch branch = branchRepository.findById(req.branchId())
                 .orElseThrow(() -> new IllegalArgumentException("Branch not found"));
+
+        if (!branch.isActive()) throw new IllegalArgumentException(branch.getName() + " is inactive");
+
         User recordedBy = userRepository.findById(recordedByUserId)
                 .orElseThrow(() -> new IllegalArgumentException("Recording user not found"));
 

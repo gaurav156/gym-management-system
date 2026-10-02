@@ -35,4 +35,6 @@ public interface AttendanceRepository extends JpaRepository<Attendance, UUID> {
     // in" forever.
     @Query("SELECT a FROM Attendance a WHERE a.checkOutTime IS NULL AND a.checkInTime <= :cutoff")
     List<Attendance> findOpenRecordsCheckedInBefore(@Param("cutoff") LocalDateTime cutoff);
+
+    boolean existsByBranchId(UUID branchId);
 }

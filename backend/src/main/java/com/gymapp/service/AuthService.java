@@ -126,6 +126,8 @@ public class AuthService {
         Branch branch = branchRepository.findById(req.branchId())
                 .orElseThrow(() -> new IllegalArgumentException("Branch not found"));
 
+        if (!branch.isActive()) throw new IllegalArgumentException(branch.getName() + " is inactive");
+
         RegistrationOtp record = registrationOtpRepository
                 .findFirstByEmailAndConsumedAtIsNullOrderByCreatedAtDesc(email)
                 .orElseThrow(() -> new IllegalArgumentException("Please request a verification code for this email first"));
@@ -218,6 +220,11 @@ public class AuthService {
         if (branches.size() != branchIds.size()) {
             throw new IllegalArgumentException("One or more branches not found");
         }
+
+        branches.forEach(branch -> {
+            if (!branch.isActive()) throw new IllegalArgumentException(branch.getName() + " is inactive");
+        });
+
         return branches;
     }
 

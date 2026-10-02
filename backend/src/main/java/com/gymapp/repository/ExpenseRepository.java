@@ -34,4 +34,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
     // Used by OrphanImageCleanupJob - bill uploads must count as "referenced".
     @Query("SELECT e.billKey FROM Expense e WHERE e.billKey IS NOT NULL")
     List<String> findAllBillKeys();
+
+    boolean existsByBranchId(UUID branchId);
 }
