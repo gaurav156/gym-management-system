@@ -34,8 +34,6 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
   const [plainBody, setPlainBody] = useState('')
 
   const [bannerUrl, setBannerUrl] = useState<string | null>(null)
-  const [ctaLabel, setCtaLabel] = useState('')
-  const [ctaUrl, setCtaUrl] = useState('')
   const [accent, setAccent] = useState('#e11d48')
   const [attachments, setAttachments] = useState<BroadcastAttachmentInput[]>([])
 
@@ -65,8 +63,6 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
       subject: isEmail ? subject.trim() : null,
       body: body.trim(),
       bannerUrl: effectiveFormat === 'DESIGNER' ? bannerUrl : null,
-      ctaLabel: effectiveFormat === 'DESIGNER' ? ctaLabel.trim() || null : null,
-      ctaUrl: effectiveFormat === 'DESIGNER' ? ctaUrl.trim() || null : null,
       accentColor: effectiveFormat === 'DESIGNER' ? accent : null,
       attachments: isEmail ? attachments : [],
     }
@@ -158,7 +154,7 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
         try {
           await api.post('/api/owner/broadcasts', payload)
           setSubject(''); setDesignerBody(''); setHtmlBody(''); setPlainBody('')
-          setBannerUrl(null); setCtaLabel(''); setCtaUrl(''); setAttachments([])
+          setBannerUrl(null); setAttachments([])
           setMessage('Broadcast queued - delivery is in progress, see the history below.')
           onSent()
         } catch (err: any) {
@@ -260,7 +256,7 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
       {effectiveFormat === 'DESIGNER' && (
         <div className="space-y-3">
           <div>
-            <label className="block text-xs text-gray-500">Banner image (optional, shown at the top)</label>
+            <label className="block text-xs text-gray-500">Banner image (optional, shown full-width at the top)</label>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               {bannerUrl && <img src={bannerUrl} alt="" className="h-14 rounded border border-gray-200 object-cover" />}
               <PhotoUploadButton purpose="BROADCAST_IMAGE" size="sm" label={bannerUrl ? 'Replace banner' : 'Upload banner'}
@@ -269,23 +265,19 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
             </div>
           </div>
 
-          <DescriptionEditor value={designerBody} onChange={setDesignerBody} rows={8} />
+          <DescriptionEditor value={designerBody} onChange={setDesignerBody} rows={10}
+            showPreview={false} enableButtons enableImages accent={accent} onError={setError} />
           <p className="text-[11px] text-gray-400">
-            Use the toolbar for bold, headings, lists and links. Type <code>{'{{name}}'}</code> to insert each person's name.
+            Put the cursor on a line (or select several) and click the align buttons to left / centre / right it - this works
+            for text, headings, images and buttons. Type <code>{'{{name}}'}</code> to insert each person's name.
             A greeting ("Hi Name,") is added automatically.
           </p>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <input placeholder="Button label (optional)" maxLength={60} value={ctaLabel} onChange={(e) => setCtaLabel(e.target.value)}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <input placeholder="Button link https://..." maxLength={500} value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm sm:col-span-1" />
-            <label className="flex items-center gap-2 text-xs text-gray-500">
-              Accent colour
-              <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)}
-                className="h-9 w-12 cursor-pointer rounded border border-gray-300 bg-white p-0.5" />
-            </label>
-          </div>
+          <label className="flex items-center gap-2 text-xs text-gray-500">
+            Link colour &amp; default button colour
+            <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)}
+              className="h-9 w-12 cursor-pointer rounded border border-gray-300 bg-white p-0.5" />
+          </label>
         </div>
       )}
 

@@ -2,6 +2,12 @@ import { Fragment, ReactNode } from 'react'
 
 const INLINE_PATTERN = /(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|\[[^\]]+\]\([^)]+\))/g
 
+const ALIGN_OPEN = /^:::(left|center|right|justify)$/
+// Full literal class names (not built dynamically) so Tailwind keeps them.
+const ALIGN_CLASS: Record<string, string> = {
+  left: 'text-left', center: 'text-center', right: 'text-right', justify: 'text-justify',
+}
+
 function isSafeUrl(url: string): boolean {
   return /^https?:\/\//i.test(url.trim())
 }
@@ -34,27 +40,23 @@ const ORDERED_PATTERN = /^(\d+)\.\s+(.*)$/
 //   # Text / ## Text     -> heading / subheading
 //   - Text               -> bullet list item
 //   12. Text             -> numbered list item - the number is shown AS TYPED, never
-//                           auto-renumbered by the browser (an <ol> would restart at 1
-//                           every time a blank line split it into a new list, which is
-//                           what made "2." silently look like another "1.").
+//                           auto-renumbered by the browser
 //   ---                  -> horizontal rule (must be the only thing on the line)
 //   \tText                -> indented paragraph
-//   :::justify ... :::   -> justified paragraph block
+//   :::left|center|right|justify ... :::
+//                        -> alignment block; everything inside (headings, lists, text) is aligned
 //
-// Rewritten to avoid a mutable `T | null` local captured across a forEach closure - that
-// pattern is what produced the "Property 'x' does not exist on type 'never'" TS errors:
-// TS's control-flow narrowing doesn't reliably track a nullable variable's type across
-// closure-boundary reassignment, and it collapsed to `never` at the use sites. Every
-// accumulator below is a plain array that's never null; a boolean flag tracks whether
-// we're inside a :::justify block instead of a nullable buffer.
+// Every accumulator below is a plain array/string/boolean that's never null - a nullable local
+// captured across a forEach closure collapses to `never` in TS's control-flow analysis.
 export function renderRichText(text: string): ReactNode {
   const lines = text.split('\n')
   const blocks: ReactNode[] = []
 
   let bulletBuffer: string[] = []
   let orderedBuffer: OrderedItem[] = []
-  let justifyBuffer: string[] = []
-  let inJustify = false
+  let alignBuffer: string[] = []
+  let alignKind = 'left'
+  let inAlign = false
 
   function flushBullets(key: string) {
     if (bulletBuffer.length === 0) return
@@ -81,31 +83,33 @@ export function renderRichText(text: string): ReactNode {
     orderedBuffer = []
   }
 
-  function flushJustify(key: string) {
-    if (justifyBuffer.length === 0) return
+  function flushAlign(key: string) {
+    if (alignBuffer.length === 0) return
     blocks.push(
-      <div key={key} className="text-justify">
-        {justifyBuffer.map((l, idx) => <p key={idx}>{renderInline(l, `${key}-${idx}`)}</p>)}
+      <div key={key} className={ALIGN_CLASS[alignKind] ?? ''}>
+        {renderRichText(alignBuffer.join('\n'))}
       </div>
     )
-    justifyBuffer = []
+    alignBuffer = []
   }
 
   lines.forEach((line, i) => {
     const trimmed = line.trim()
 
-    if (inJustify) {
+    if (inAlign) {
       if (trimmed === ':::') {
-        flushJustify(`just-${i}`)
-        inJustify = false
+        flushAlign(`align-${i}`)
+        inAlign = false
       } else {
-        justifyBuffer.push(line)
+        alignBuffer.push(line)
       }
       return
     }
-    if (trimmed === ':::justify') {
+    const alignMatch = ALIGN_OPEN.exec(trimmed)
+    if (alignMatch) {
       flushBullets(`b-${i}`); flushOrdered(`o-${i}`)
-      inJustify = true
+      alignKind = alignMatch[1]
+      inAlign = true
       return
     }
 
@@ -148,7 +152,7 @@ export function renderRichText(text: string): ReactNode {
 
   flushBullets('bullets-end')
   flushOrdered('ordered-end')
-  flushJustify('justify-end')
+  if (inAlign) flushAlign('align-end')
 
   return <div className="space-y-1">{blocks}</div>
 }

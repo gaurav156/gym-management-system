@@ -161,7 +161,10 @@ public class BroadcastService {
         Set<String> assetKeys = new LinkedHashSet<>();
         if (bannerKey != null) assetKeys.add(bannerKey);
         attachments.forEach(a -> assetKeys.add(a.getAssetKey()));
-        if (req.format() == BroadcastFormat.HTML) assetKeys.addAll(renderer.extractInlineImageKeys(body));
+
+        if (req.format() == BroadcastFormat.HTML || req.format() == BroadcastFormat.DESIGNER) {
+            assetKeys.addAll(renderer.extractInlineImageKeys(body));
+        }
 
         boolean hasCta = designer && !isBlank(req.ctaLabel()) && !isBlank(req.ctaUrl());
 
