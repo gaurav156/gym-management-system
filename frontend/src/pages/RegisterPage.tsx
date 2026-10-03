@@ -35,6 +35,8 @@ export default function RegisterPage() {
   const navigate = useNavigate()
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  const [marketing, setMarketing] = useState(true)
+
   useEffect(() => {
     api.get<Branch[]>('/api/public/branches').then((res) => setBranches(res.data)).catch(() => {})
   }, [])
@@ -111,6 +113,7 @@ export default function RegisterPage() {
         name, email, phone, password, branchId, otp,
         gender: gender || undefined,
         dateOfBirth: dob || undefined,
+        marketingConsent: marketing,
         captchaToken: captchaRequired ? captchaToken : undefined,
       })
       setUser(data)
@@ -158,6 +161,11 @@ export default function RegisterPage() {
               {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </div>
+
+          <label className="flex items-start gap-2 text-sm text-gray-600">
+            <input type="checkbox" className="mt-0.5" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} />
+            <span>Send me offers, promotions and updates (optional). You can unsubscribe any time.</span>
+          </label>
 
           {captchaRequired && (
             <Turnstile key={captchaKey} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />

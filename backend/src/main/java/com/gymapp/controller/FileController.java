@@ -30,10 +30,10 @@ public class FileController {
     public UploadResponse uploadImage(@RequestParam("file") MultipartFile file,
                                       @RequestParam(defaultValue = "PHOTO") ImagePurpose purpose,
                                       Authentication authentication) throws IOException {
-        if (purpose == ImagePurpose.SIGNATURE || purpose == ImagePurpose.BILL) {
-            boolean isStaff = authentication.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_OWNER") || a.getAuthority().equals("ROLE_MANAGER"));
-            if (!isStaff) throw new IllegalArgumentException("Only an Owner or Manager can upload this file");
+        if (purpose == ImagePurpose.BROADCAST_IMAGE || purpose == ImagePurpose.BROADCAST_ATTACHMENT) {
+            boolean isOwner = authentication.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_OWNER"));
+            if (!isOwner) throw new IllegalArgumentException("Only the Owner can upload broadcast files");
         }
         String key = imageUploadService.upload(file, purpose);
         // ID proofs are never given a public URL - the key goes back to the client, which

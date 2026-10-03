@@ -40,7 +40,8 @@ public class AuthDtos {
             @NotBlank String otp,
             String captchaToken,
             Gender gender,
-            LocalDate dateOfBirth
+            LocalDate dateOfBirth,
+            Boolean marketingConsent
     ) {}
 
     // Same optional-captchaToken pattern as RegisterMemberRequest. rememberMe is

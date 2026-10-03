@@ -13,7 +13,7 @@ function UploadIcon() {
 }
 
 interface Props {
-  onLoaded: (url: string) => void
+  onLoaded: (url: string, filename: string) => void
   onError: (msg: string) => void
   label?: string
   size?: 'sm' | 'md'

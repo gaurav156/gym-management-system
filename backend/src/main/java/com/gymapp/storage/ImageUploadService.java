@@ -68,6 +68,7 @@ public class ImageUploadService {
     }
 
     private boolean allowsPdf(ImagePurpose purpose) {
-        return purpose == ImagePurpose.BILL || purpose == ImagePurpose.ID_PROOF;
+        return purpose == ImagePurpose.BILL || purpose == ImagePurpose.ID_PROOF
+                || purpose == ImagePurpose.BROADCAST_ATTACHMENT;
     }
 }

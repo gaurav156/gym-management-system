@@ -9,6 +9,7 @@ import Spinner from '../components/Spinner'
 import Avatar from '../components/Avatar'
 import { useConfirm } from '../hooks/useConfirm'
 import type { Gender, Profile } from '../types'
+import MarketingPreferenceSection from '../components/MarketingPreferenceSection'
 
 const norm = (s: string | null | undefined) => (s ?? '').trim()
 
@@ -166,6 +167,7 @@ export default function ProfilePage() {
         )}
       </form>
 
+      <MarketingPreferenceSection initial={profile.marketingConsent} />
       <ChangePasswordSection />
       <ConfirmDialog {...dialogProps} />
     </div>

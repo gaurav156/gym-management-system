@@ -7,6 +7,13 @@ export type PaymentStatus = 'PAID' | 'PARTIAL'
 export type CouponAppliesTo = 'PRODUCT' | 'MEMBERSHIP' | 'BOTH'
 export type FinanceGranularity = 'DAILY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | 'CUSTOM'
 export type Gender = 'MALE' | 'FEMALE' | 'OTHER'
+export type BroadcastChannel = 'EMAIL' | 'SMS' | 'WHATSAPP'
+export type BroadcastAudience =
+  | 'ALL_USERS' | 'ALL_MEMBERS' | 'ACTIVE_MEMBERS' | 'INACTIVE_MEMBERS'
+  | 'ALL_STAFF' | 'ALL_TRAINERS' | 'ALL_MANAGERS' | 'ALL_OWNERS'
+export type BroadcastStatus = 'SENDING' | 'COMPLETED' | 'FAILED'
+export type BroadcastType = 'ANNOUNCEMENT' | 'PROMOTIONAL'
+export type BroadcastFormat = 'PLAIN' | 'DESIGNER' | 'HTML'
 
 export interface AuthUser {
   token: string
@@ -120,6 +127,7 @@ export interface Profile {
   dateOfBirth: string | null
   idProofUploaded: boolean
   detailsLocked: boolean
+  marketingConsent: boolean
 }
 
 export interface TrainerSummary {
@@ -365,3 +373,45 @@ export interface FinanceReportResponse {
   totalProfit: number
   breakdown: FinanceReportRow[]
 }
+
+export interface ChannelAvailability {
+  channel: BroadcastChannel
+  available: boolean
+}
+
+export interface BroadcastPreview {
+  eligibleRecipients: number
+  missingContact: number
+  optedOut: number
+}
+
+export interface Broadcast {
+  id: string
+  channel: BroadcastChannel
+  audience: BroadcastAudience
+  subject: string | null
+  body: string
+  status: BroadcastStatus
+  totalRecipients: number
+  sentCount: number
+  failedCount: number
+  skippedCount: number
+  createdByName: string
+  createdAt: string
+  completedAt: string | null
+  type: BroadcastType
+  format: BroadcastFormat
+  optedOutCount: number
+  attachmentNames: string[]
+}
+
+export interface BroadcastRecipient {
+  id: string
+  recipientName: string
+  destination: string
+  status: 'PENDING' | 'SENT' | 'FAILED'
+  errorMessage: string | null
+  sentAt: string | null
+}
+
+export interface BroadcastAttachmentInput { url: string; filename: string }

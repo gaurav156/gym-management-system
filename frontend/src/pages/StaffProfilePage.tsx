@@ -12,6 +12,7 @@ import { useConfirm } from '../hooks/useConfirm'
 import type { Gender, Profile, AttendanceLogEntry, PageResponse } from '../types'
 import Avatar from '../components/Avatar'
 import MemberStoreTab from '../components/member/MemberStoreTab'
+import MarketingPreferenceSection from '../components/MarketingPreferenceSection'
 
 const PAGE_SIZE = 5
 
@@ -240,6 +241,7 @@ export default function StaffProfilePage() {
                         </button>
                     </form>
 
+                    <MarketingPreferenceSection initial={profile.marketingConsent} />
                     <ChangePasswordSection />
                     <ConfirmDialog {...dialogProps} />
                 </div>

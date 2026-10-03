@@ -1,6 +1,8 @@
 package com.gymapp.controller;
 
+import com.gymapp.dto.MarketingDtos.*;
 import com.gymapp.dto.ProfileDtos.*;
+import com.gymapp.service.MarketingConsentService;
 import com.gymapp.service.ProfileService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
@@ -15,9 +17,11 @@ import java.util.UUID;
 public class ProfileController {
 
     private final ProfileService profileService;
+    private final MarketingConsentService marketingConsentService;
 
-    public ProfileController(ProfileService profileService) {
+    public ProfileController(ProfileService profileService, MarketingConsentService marketingConsentService) {
         this.profileService = profileService;
+        this.marketingConsentService = marketingConsentService;
     }
 
     @GetMapping("/me")
@@ -43,5 +47,13 @@ public class ProfileController {
 
     private UUID callerId(Authentication authentication) {
         return UUID.fromString((String) authentication.getDetails());
+    }
+
+    // Kept separate from PUT /me on purpose: toggling marketing must never use up the one-time
+    // details edit, and can be changed any number of times.
+    @PutMapping("/me/marketing-consent")
+    public MarketingPreferenceResponse updateMarketingConsent(@Valid @RequestBody UpdateMarketingConsentRequest req,
+                                                              Authentication authentication) {
+        return marketingConsentService.setConsent(callerId(authentication), req.consent());
     }
 }

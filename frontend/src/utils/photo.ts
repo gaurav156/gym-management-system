@@ -1,7 +1,7 @@
 import { ChangeEvent } from 'react'
 import { api } from '../api/client'
 
-export type ImagePurpose = 'PHOTO' | 'SIGNATURE' | 'BILL' | 'PRODUCT' | 'ID_PROOF'
+export type ImagePurpose = 'PHOTO' | 'SIGNATURE' | 'BILL' | 'PRODUCT' | 'ID_PROOF' | 'BROADCAST_IMAGE' | 'BROADCAST_ATTACHMENT'
 
 // Raw picked file limit - it gets downscaled before upload, so this can be generous
 // (phone cameras easily produce 5-8MB originals). The server enforces 2MB on what arrives.
@@ -14,6 +14,8 @@ const TARGETS: Record<ImagePurpose, { maxDim: number; type: 'image/jpeg' | 'imag
   BILL: { maxDim: 0, type: 'image/jpeg' },
   PRODUCT: { maxDim: 640, type: 'image/jpeg' },
   ID_PROOF: { maxDim: 0, type: 'image/jpeg' },
+  BROADCAST_IMAGE: { maxDim: 1200, type: 'image/jpeg' },
+  BROADCAST_ATTACHMENT: { maxDim: 0, type: 'image/jpeg' },
 }
 
 async function downscale(file: File, purpose: ImagePurpose): Promise<Blob> {
@@ -40,7 +42,7 @@ async function downscale(file: File, purpose: ImagePurpose): Promise<Blob> {
 
 // Uploads to the backend and resolves to the public URL to store in form state.
 export async function uploadImage(file: File, purpose: ImagePurpose = 'PHOTO'): Promise<string> {
-  const blob = (purpose === 'BILL' || purpose === 'ID_PROOF') ? file : await downscale(file, purpose)
+  const blob = (purpose === 'BILL' || purpose === 'ID_PROOF' || purpose === 'BROADCAST_ATTACHMENT') ? file : await downscale(file, purpose)
   const form = new FormData()
   const filename = purpose === 'PHOTO' ? 'photo.jpg' : purpose === 'SIGNATURE' ? 'signature.png' : (file.name || 'upload')
   form.append('file', blob, filename)
@@ -52,7 +54,7 @@ export async function uploadImage(file: File, purpose: ImagePurpose = 'PHOTO'): 
 // operating in, rather than this shared helper guessing or reaching into unrelated state.
 export async function handleEditPhotoChange(
   e: ChangeEvent<HTMLInputElement>,
-  onLoaded: (url: string) => void,
+  onLoaded: (url: string, filename: string) => void,
   onError: (msg: string) => void,
   purpose: ImagePurpose = 'PHOTO'
 ) {
@@ -64,7 +66,7 @@ export async function handleEditPhotoChange(
     return
   }
   try {
-    onLoaded(await uploadImage(file, purpose))
+    onLoaded(await uploadImage(file, purpose), file.name)
   } catch (err: any) {
     onError(err.response?.data?.error || 'Failed to upload image')
   }

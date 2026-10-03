@@ -11,7 +11,12 @@ public enum ImagePurpose {
     ID_PROOF("id-proofs/"),
     // Product catalog images - unlike PHOTO/SIGNATURE a product can have several, held as
     // an ordered list on the entity (see Product.imageKeys) rather than a single field.
-    PRODUCT("products/");
+    PRODUCT("products/"),
+    // Owner-only broadcast files. Images are public (emails load them by URL); attachments live in
+    // the same public bucket under unguessable names. Both are protected from the orphan job via
+    // broadcast_assets - see OrphanImageCleanupJob.
+    BROADCAST_IMAGE("broadcast-images/"),
+    BROADCAST_ATTACHMENT("broadcast-attachments/");
 
     private final String prefix;
 

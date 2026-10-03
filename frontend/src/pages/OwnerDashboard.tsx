@@ -11,6 +11,7 @@ import ProductCategoriesSection from '../components/owner/ProductCategoriesSecti
 import FinanceReportSection from '../components/owner/FinanceReportSection'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useConfirm } from '../hooks/useConfirm'
+import BroadcastsSection from '../components/owner/BroadcastsSection'
 
 type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
 
@@ -404,6 +405,9 @@ export default function OwnerDashboard() {
       </div>
       <div className="mt-8">
         <CouponsSection />
+      </div>
+      <div className="mt-8">
+        <BroadcastsSection />
       </div>
       <ConfirmDialog {...dialogProps} />
     </div>

@@ -99,6 +99,15 @@ public class User {
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
+    // Promotional-message consent. ANNOUNCEMENT broadcasts ignore it; PROMOTIONAL ones only go to
+    // people with this true. Set at registration (checkbox, off by default), changed from the
+    // Profile page or via the unsubscribe link in any promotional email.
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean marketingConsent = false;
+
+    private LocalDateTime marketingConsentUpdatedAt;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

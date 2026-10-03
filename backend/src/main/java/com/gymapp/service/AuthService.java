@@ -157,6 +157,8 @@ public class AuthService {
                 .active(true)
                 .gender(req.gender())
                 .dateOfBirth(req.dateOfBirth())
+                .marketingConsent(Boolean.TRUE.equals(req.marketingConsent()))
+                .marketingConsentUpdatedAt(LocalDateTime.now())
                 .build();
         member = userRepository.save(member);
 

@@ -96,3 +96,6 @@ app:
       min-age-hours: ${STORAGE_CLEANUP_MIN_AGE_HOURS:24}
       max-delete: ${STORAGE_CLEANUP_MAX_DELETE:200}
       dry-run: ${STORAGE_CLEANUP_DRY_RUN:false}
+  broadcast:
+    send-delay-ms: ${BROADCAST_SEND_DELAY_MS:150}
+    max-recipients: ${BROADCAST_MAX_RECIPIENTS:500}

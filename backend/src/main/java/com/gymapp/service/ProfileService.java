@@ -181,6 +181,6 @@ public class ProfileService {
                 imageRefs.toUrl(u.getPhoto()), imageRefs.toUrl(u.getSignature()), u.getRole().name(),
                 u.getEnrollmentDate(), u.getJoiningDate(),
                 u.getGender(), u.getDateOfBirth(), u.getIdProofKey() != null,
-                u.getRole() != Role.OWNER && u.isSelfEditUsed());
+                u.getRole() != Role.OWNER && u.isSelfEditUsed(), u.isMarketingConsent());
     }
 }

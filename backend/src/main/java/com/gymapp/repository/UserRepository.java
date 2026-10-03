@@ -1,5 +1,6 @@
 package com.gymapp.repository;
 
+import com.gymapp.entity.MembershipStatus;
 import com.gymapp.entity.Role;
 import com.gymapp.entity.User;
 import org.springframework.data.domain.Page;
@@ -8,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -124,4 +127,16 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     // Used by OrphanImageCleanupJob - ID proofs must count as "referenced" or they'd be deleted.
     @Query("SELECT u.idProofKey FROM User u WHERE u.idProofKey IS NOT NULL")
     List<String> findAllIdProofKeys();
+
+    // Broadcast audiences - accounts that can still log in, by role.
+    @Query("SELECT u FROM User u WHERE u.role IN :roles AND u.active = true")
+    List<User> findActiveByRoleIn(@Param("roles") Collection<Role> roles);
+
+    // Members whose plan is usable today - same rule as MembershipRepository.findCurrentlyUsable.
+    @Query("SELECT u FROM User u WHERE u.role = :role AND u.active = true AND EXISTS (" +
+            "SELECT 1 FROM Membership m WHERE m.member = u AND m.status = :status " +
+            "AND m.startDate <= :today AND m.endDate >= :today)")
+    List<User> findActiveMembersWithUsablePlan(@Param("role") Role role,
+                                               @Param("status") MembershipStatus status,
+                                               @Param("today") LocalDate today);
 }

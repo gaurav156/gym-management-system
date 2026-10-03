@@ -27,7 +27,8 @@ public class ProfileDtos {
             boolean idProofUploaded,
             // True once a Member/Trainer/Manager has used their one self-edit - the UI
             // disables the details fields. Always false for the Owner.
-            boolean detailsLocked
+            boolean detailsLocked,
+            boolean marketingConsent
     ) {}
 
     // Deliberately does not include email, password, or any of the staff-controlled dates -

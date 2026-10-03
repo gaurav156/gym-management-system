@@ -17,6 +17,7 @@ import TrainerDashboard from './pages/TrainerDashboard'
 import ProfileRouter from './pages/ProfileRouter'
 import InvoiceViewPage from './pages/InvoiceViewPage'
 import ProductInvoiceViewPage from './pages/ProductInvoiceViewPage'
+import UnsubscribePage from './pages/UnsubscribePage'
 
 export default function App() {
   return (
@@ -66,6 +67,8 @@ export default function App() {
           <Route path="/invoice/:paymentId" element={<InvoiceViewPage />} />
           <Route path="/product-invoice/:orderId" element={<ProductInvoiceViewPage />} />
         </Route>
+
+        <Route path="/unsubscribe" element={<UnsubscribePage />} />
       </Routes>
     </div>
   )

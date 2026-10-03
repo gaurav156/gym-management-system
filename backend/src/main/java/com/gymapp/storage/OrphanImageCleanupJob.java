@@ -1,5 +1,6 @@
 package com.gymapp.storage;
 
+import com.gymapp.repository.BroadcastRepository;
 import com.gymapp.repository.ExpenseRepository;
 import com.gymapp.repository.ProductRepository;
 import com.gymapp.repository.UserRepository;
@@ -23,7 +24,7 @@ import java.util.Set;
 // deletes, rolled-back transactions).
 //
 // EVERY place a stored key can live must be loaded into `referenced` below, one per
-// ImagePurpose: PHOTO + SIGNATURE + ID_PROOF (users), BILL (expenses), PRODUCT (product_images).
+// ImagePurpose: PHOTO + SIGNATURE + ID_PROOF (users), BILL (expenses), PRODUCT (product_images), BROADCAST_IMAGE / BROADCAST_ATTACHMENT (broadcast_assets).
 // A purpose that's listed but not referenced here gets its files deleted after
 // min-age-hours. When you add a new ImagePurpose, add its references here too.
 //
@@ -46,6 +47,7 @@ public class OrphanImageCleanupJob {
     private final UserRepository userRepository;
     private final ExpenseRepository expenseRepository;
     private final ProductRepository productRepository;
+    private final BroadcastRepository broadcastRepository;
 
     @Value("${app.storage.cleanup.min-age-hours:24}")
     private long minAgeHours;
@@ -59,11 +61,13 @@ public class OrphanImageCleanupJob {
     public OrphanImageCleanupJob(StorageService storage,
                                  UserRepository userRepository,
                                  ExpenseRepository expenseRepository,
-                                 ProductRepository productRepository) {
+                                 ProductRepository productRepository,
+                                 BroadcastRepository broadcastRepository) {
         this.storage = storage;
         this.userRepository = userRepository;
         this.expenseRepository = expenseRepository;
         this.productRepository = productRepository;
+        this.broadcastRepository = broadcastRepository;
     }
 
     @Scheduled(cron = "${app.storage.cleanup.cron:0 30 3 * * *}")
@@ -75,6 +79,7 @@ public class OrphanImageCleanupJob {
         referenced.addAll(userRepository.findAllIdProofKeys());
         referenced.addAll(expenseRepository.findAllBillKeys());
         referenced.addAll(productRepository.findAllImageKeys());
+        referenced.addAll(broadcastRepository.findAllAssetKeys());
 
         Instant cutoff = Instant.now().minus(minAgeHours, ChronoUnit.HOURS);
         List<String> orphans = new ArrayList<>();
