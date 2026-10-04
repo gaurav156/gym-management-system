@@ -12,6 +12,7 @@ import FinanceReportSection from '../components/owner/FinanceReportSection'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useConfirm } from '../hooks/useConfirm'
 import BroadcastsSection from '../components/owner/BroadcastsSection'
+import BackupSection from '../components/owner/BackupSection'
 
 type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
 
@@ -408,6 +409,9 @@ export default function OwnerDashboard() {
       </div>
       <div className="mt-8">
         <BroadcastsSection />
+      </div>
+      <div className="mt-8">
+        <BackupSection />
       </div>
       <ConfirmDialog {...dialogProps} />
     </div>
