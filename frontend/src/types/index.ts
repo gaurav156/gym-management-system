@@ -415,3 +415,16 @@ export interface BroadcastRecipient {
 }
 
 export interface BroadcastAttachmentInput { url: string; filename: string }
+
+export interface FinanceTransaction {
+  id: string
+  date: string
+  type: 'MEMBERSHIP' | 'STORE' | 'EXPENSE'
+  reference: string | null
+  person: string
+  branch: string
+  description: string | null
+  mode: string | null
+  income: number
+  expense: number
+}

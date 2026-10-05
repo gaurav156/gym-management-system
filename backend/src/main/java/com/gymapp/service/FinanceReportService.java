@@ -1,11 +1,9 @@
 package com.gymapp.service;
 
 import com.gymapp.dto.FinanceDtos.*;
+import com.gymapp.dto.PageDtos.PageResponse;
 import com.gymapp.entity.Branch;
-import com.gymapp.repository.BranchRepository;
-import com.gymapp.repository.ExpenseRepository;
-import com.gymapp.repository.PaymentRepository;
-import com.gymapp.repository.ProductOrderRepository;
+import com.gymapp.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +27,7 @@ public class FinanceReportService {
     // Above this many days, a CUSTOM range is bucketed by month instead of by day -
     // otherwise a multi-year custom range would return thousands of near-empty rows.
     private static final long CUSTOM_RANGE_DAILY_LIMIT_DAYS = 92;
+    private static final int MAX_PAGE_SIZE = 200;
 
     private static final DateTimeFormatter DAY_LABEL = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter MONTH_LABEL = DateTimeFormatter.ofPattern("MMM yyyy");
@@ -37,15 +36,17 @@ public class FinanceReportService {
     private final ProductOrderRepository productOrderRepository;
     private final ExpenseRepository expenseRepository;
     private final BranchRepository branchRepository;
+    private final FinanceTransactionRepository transactionRepository;
 
     public FinanceReportService(PaymentRepository paymentRepository,
                                 ProductOrderRepository productOrderRepository,
                                 ExpenseRepository expenseRepository,
-                                BranchRepository branchRepository) {
+                                BranchRepository branchRepository, FinanceTransactionRepository transactionRepository) {
         this.paymentRepository = paymentRepository;
         this.productOrderRepository = productOrderRepository;
         this.expenseRepository = expenseRepository;
         this.branchRepository = branchRepository;
+        this.transactionRepository = transactionRepository;
     }
 
     @Transactional(readOnly = true)
@@ -168,4 +169,23 @@ public class FinanceReportService {
     }
 
     private record DateRange(LocalDate from, LocalDate to) {}
+
+    // Paginated per-transaction view for the report's "show details" checkbox. Paging happens
+    // in SQL, so a yearly range with thousands of rows only ever loads one page.
+    @Transactional(readOnly = true)
+    public PageResponse<FinanceTransactionRow> listTransactions(FinanceReportQuery query, int page, int size) {
+        DateRange range = resolveRange(query);
+        if (query.branchId() != null && !branchRepository.existsById(query.branchId())) {
+            throw new IllegalArgumentException("Branch not found");
+        }
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        int safePage = Math.max(page, 0);
+
+        long total = transactionRepository.count(range.from(), range.to(), query.branchId());
+        List<FinanceTransactionRow> rows = transactionRepository.page(
+                range.from(), range.to(), query.branchId(), safeSize, (long) safePage * safeSize);
+
+        int totalPages = (int) Math.ceil(total / (double) safeSize);
+        return new PageResponse<>(rows, safePage, safeSize, total, totalPages, safePage + 1 >= totalPages);
+    }
 }

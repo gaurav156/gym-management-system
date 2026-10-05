@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -54,5 +55,20 @@ public class FinanceDtos {
             BigDecimal totalExpense,
             BigDecimal totalProfit,
             List<FinanceReportRow> breakdown
+    ) {}
+
+    // One row of the "show details" view. income/expense: exactly one is non-zero.
+    // type: MEMBERSHIP | STORE | EXPENSE. Expenses only have a date, so ts is midnight.
+    public record FinanceTransactionRow(
+            String id,
+            LocalDateTime date,
+            String type,
+            String reference,    // INV-... / PORD-... / null for expenses
+            String person,       // member/buyer, or the staff member who logged the expense
+            String branch,
+            String description,  // plan name / items / category + remark
+            String mode,
+            BigDecimal income,
+            BigDecimal expense
     ) {}
 }

@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api/client'
 import Spinner from '../Spinner'
-import type { Branch, FinanceGranularity, FinanceReportResponse } from '../../types'
+import { TableSkeleton } from '../Skeleton'
+import type { Branch, FinanceGranularity, FinanceReportResponse, FinanceTransaction, PageResponse } from '../../types'
 
 interface Props {
   branches: Branch[]
@@ -12,9 +13,25 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
 
+// Periods wide enough that a per-transaction view is useful. Add DAILY/MONTHLY here to offer it there too.
+const DETAILS_GRANULARITIES: FinanceGranularity[] = ['QUARTERLY', 'YEARLY', 'CUSTOM']
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200]
+const DEFAULT_PAGE_SIZE = 50
+
+const TYPE_LABELS: Record<FinanceTransaction['type'], string> = {
+  MEMBERSHIP: 'Membership', STORE: 'Store', EXPENSE: 'Expense',
+}
+const TYPE_CLASS: Record<FinanceTransaction['type'], string> = {
+  MEMBERSHIP: 'bg-blue-50 text-blue-700', STORE: 'bg-purple-50 text-purple-700', EXPENSE: 'bg-red-50 text-red-700',
+}
+
 function currentYearOptions(): number[] {
   const current = new Date().getFullYear()
   return Array.from({ length: 6 }, (_, i) => current - i)
+}
+
+function supportsDetails(g: string): boolean {
+  return DETAILS_GRANULARITIES.includes(g as FinanceGranularity)
 }
 
 export default function FinanceReportSection({ branches }: Props) {
@@ -34,7 +51,22 @@ export default function FinanceReportSection({ branches }: Props) {
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState('')
 
+  // "Show details" - per-transaction rows, paged by the server.
+  const [showDetails, setShowDetails] = useState(false)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const [transactions, setTransactions] = useState<FinanceTransaction[]>([])
+  const [txLoading, setTxLoading] = useState(false)
+  const [txPage, setTxPage] = useState(0)
+  const [txTotalPages, setTxTotalPages] = useState(1)
+  const [txTotalElements, setTxTotalElements] = useState(0)
+
+  // The params of the report currently on screen. Paging/page-size changes use these, not the
+  // live form, so editing the form without clicking "Generate" can't change what's being paged.
+  const appliedParams = useRef<Record<string, string | number> | null>(null)
+  const txTicket = useRef(0)
+
   const yearOptions = currentYearOptions()
+  const detailsActive = showDetails && !!report && supportsDetails(report.granularity)
 
   function buildParams(): Record<string, string | number> {
     const params: Record<string, string | number> = { granularity }
@@ -55,18 +87,50 @@ export default function FinanceReportSection({ branches }: Props) {
     return true
   }
 
+  function loadTransactions(page = 0, size = pageSize) {
+    const params = appliedParams.current
+    if (!params) return
+    const ticket = ++txTicket.current
+    setTxLoading(true)
+    api.get<PageResponse<FinanceTransaction>>('/api/finance/transactions', { params: { ...params, page, size } })
+      .then((res) => {
+        if (ticket !== txTicket.current) return
+        setTransactions(res.data.content)
+        setTxTotalPages(res.data.totalPages)
+        setTxTotalElements(res.data.totalElements)
+        setTxPage(res.data.page)
+      })
+      .catch((err) => {
+        if (ticket === txTicket.current) setError(err.response?.data?.error || 'Failed to load transactions')
+      })
+      .finally(() => { if (ticket === txTicket.current) setTxLoading(false) })
+  }
+
   async function generateReport() {
     setError('')
     if (!validateCustomRange()) return
+    const params = buildParams()
     setLoading(true)
     try {
-      const { data } = await api.get<FinanceReportResponse>('/api/finance/report', { params: buildParams() })
+      const { data } = await api.get<FinanceReportResponse>('/api/finance/report', { params })
+      appliedParams.current = params
       setReport(data)
+      if (showDetails && supportsDetails(data.granularity)) loadTransactions(0)
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load report')
     } finally {
       setLoading(false)
     }
+  }
+
+  function handleShowDetailsChange(checked: boolean) {
+    setShowDetails(checked)
+    if (checked && report && supportsDetails(report.granularity)) loadTransactions(0)
+  }
+
+  function handlePageSizeChange(size: number) {
+    setPageSize(size)
+    loadTransactions(0, size)
   }
 
   async function downloadExcel() {
@@ -92,6 +156,12 @@ export default function FinanceReportSection({ branches }: Props) {
 
   // Load a sensible default (this month, all branches) as soon as the section mounts.
   useEffect(() => { generateReport() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function formatWhen(t: FinanceTransaction): string {
+    // Expenses only carry a date, so don't show a misleading 12:00 AM time.
+    const d = new Date(t.date)
+    return t.type === 'EXPENSE' ? d.toLocaleDateString() : d.toLocaleString()
+  }
 
   return (
     <div className="rounded-lg border border-gray-200 p-6">
@@ -209,6 +279,13 @@ export default function FinanceReportSection({ branches }: Props) {
         </button>
       </div>
 
+      {supportsDetails(granularity) && (
+        <label className="mt-3 flex items-center gap-1.5 text-xs text-gray-600">
+          <input type="checkbox" checked={showDetails} onChange={(e) => handleShowDetailsChange(e.target.checked)} />
+          Show details (every transaction in this period instead of the monthly summary)
+        </label>
+      )}
+
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
       {report && (
@@ -238,35 +315,100 @@ export default function FinanceReportSection({ branches }: Props) {
             </div>
           </div>
 
-          <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-gray-500">
-                  <th className="pb-2 pr-4">Period</th>
-                  <th className="pb-2 pr-4">Membership</th>
-                  <th className="pb-2 pr-4">Store</th>
-                  <th className="pb-2 pr-4">Total income</th>
-                  <th className="pb-2 pr-4">Expenses</th>
-                  <th className="pb-2">Profit</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {report.breakdown.map((row) => (
-                  <tr key={row.label}>
-                    <td className="py-2 pr-4">{row.label}</td>
-                    <td className="py-2 pr-4 text-gray-500">₹{row.membershipIncome.toFixed(2)}</td>
-                    <td className="py-2 pr-4 text-gray-500">₹{row.productIncome.toFixed(2)}</td>
-                    <td className="py-2 pr-4">₹{row.totalIncome.toFixed(2)}</td>
-                    <td className="py-2 pr-4 text-red-600">₹{row.totalExpense.toFixed(2)}</td>
-                    <td className={`py-2 ${row.profit >= 0 ? 'text-green-700' : 'text-red-600'}`}>₹{row.profit.toFixed(2)}</td>
+          {detailsActive ? (
+            <div className="mt-6">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-gray-500">
+                      <th className="pb-2 pr-4">Date</th>
+                      <th className="pb-2 pr-4">Type</th>
+                      <th className="pb-2 pr-4">Reference</th>
+                      <th className="pb-2 pr-4">Member / by</th>
+                      <th className="pb-2 pr-4">Branch</th>
+                      <th className="pb-2 pr-4">Description</th>
+                      <th className="pb-2 pr-4">Mode</th>
+                      <th className="pb-2 pr-4 text-right">Income</th>
+                      <th className="pb-2 text-right">Expense</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {txLoading ? (
+                      <TableSkeleton rows={6} columns={9} />
+                    ) : transactions.map((t) => (
+                      <tr key={`${t.type}-${t.id}`}>
+                        <td className="whitespace-nowrap py-2 pr-4 text-gray-500">{formatWhen(t)}</td>
+                        <td className="py-2 pr-4">
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${TYPE_CLASS[t.type]}`}>
+                            {TYPE_LABELS[t.type]}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap py-2 pr-4 text-gray-500">{t.reference ?? '—'}</td>
+                        <td className="py-2 pr-4">{t.person}</td>
+                        <td className="py-2 pr-4 text-gray-500">{t.branch}</td>
+                        <td className="max-w-[220px] truncate py-2 pr-4 text-gray-500" title={t.description ?? ''}>{t.description ?? '—'}</td>
+                        <td className="py-2 pr-4 text-gray-500">{t.mode ? t.mode.replace('_', ' ') : '—'}</td>
+                        <td className="py-2 pr-4 text-right text-green-700">{t.income > 0 ? `₹${t.income.toFixed(2)}` : '—'}</td>
+                        <td className="py-2 text-right text-red-600">{t.expense > 0 ? `₹${t.expense.toFixed(2)}` : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!txLoading && transactions.length === 0 && (
+                  <p className="py-4 text-sm text-gray-400">No transactions in this period.</p>
+                )}
+              </div>
+
+              {txTotalElements > 0 && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+                  <label className="flex items-center gap-1.5">
+                    Rows per page
+                    <select value={pageSize} onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                      className="rounded-md border border-gray-300 px-2 py-1 text-xs">
+                      {PAGE_SIZE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </label>
+                  <span>Page {txPage + 1} of {txTotalPages} ({txTotalElements} total)</span>
+                  <div className="space-x-2">
+                    <button disabled={txPage === 0 || txLoading} onClick={() => loadTransactions(txPage - 1)}
+                      className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                    <button disabled={txPage + 1 >= txTotalPages || txLoading} onClick={() => loadTransactions(txPage + 1)}
+                      className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-500">
+                    <th className="pb-2 pr-4">Period</th>
+                    <th className="pb-2 pr-4">Membership</th>
+                    <th className="pb-2 pr-4">Store</th>
+                    <th className="pb-2 pr-4">Total income</th>
+                    <th className="pb-2 pr-4">Expenses</th>
+                    <th className="pb-2">Profit</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {report.breakdown.length === 0 && (
-              <p className="py-4 text-sm text-gray-400">No income or expenses in this period.</p>
-            )}
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {report.breakdown.map((row) => (
+                    <tr key={row.label}>
+                      <td className="py-2 pr-4">{row.label}</td>
+                      <td className="py-2 pr-4 text-gray-500">₹{row.membershipIncome.toFixed(2)}</td>
+                      <td className="py-2 pr-4 text-gray-500">₹{row.productIncome.toFixed(2)}</td>
+                      <td className="py-2 pr-4">₹{row.totalIncome.toFixed(2)}</td>
+                      <td className="py-2 pr-4 text-red-600">₹{row.totalExpense.toFixed(2)}</td>
+                      <td className={`py-2 ${row.profit >= 0 ? 'text-green-700' : 'text-red-600'}`}>₹{row.profit.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {report.breakdown.length === 0 && (
+                <p className="py-4 text-sm text-gray-400">No income or expenses in this period.</p>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

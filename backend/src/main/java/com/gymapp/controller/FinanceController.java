@@ -1,6 +1,7 @@
 package com.gymapp.controller;
 
 import com.gymapp.dto.FinanceDtos.*;
+import com.gymapp.dto.PageDtos.PageResponse;
 import com.gymapp.service.FinanceExcelExportService;
 import com.gymapp.service.FinanceReportService;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -67,5 +68,22 @@ public class FinanceController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(excel);
+    }
+
+    @GetMapping("/transactions")
+    @PreAuthorize("hasRole('OWNER')")
+    public PageResponse<FinanceTransactionRow> transactions(
+            @RequestParam ReportGranularity granularity,
+            @RequestParam(required = false) UUID branchId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DATE) LocalDate date,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer quarter,
+            @RequestParam(required = false) @DateTimeFormat(iso = DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DATE) LocalDate toDate,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return financeReportService.listTransactions(
+                new FinanceReportQuery(granularity, branchId, date, year, month, quarter, fromDate, toDate), page, size);
     }
 }
