@@ -68,21 +68,36 @@ public class FinanceTransactionRepository {
         return n == null ? 0 : n;
     }
 
-    public List<FinanceTransactionRow> page(LocalDate from, LocalDate to, UUID branchId, int limit, long offset) {
+    public List<FinanceTransactionRow> page(LocalDate from, LocalDate to, UUID branchId,
+                                            boolean ascending, int limit, long offset) {
         MapSqlParameterSource p = params(from, to, branchId).addValue("limit", limit).addValue("offset", offset);
-        return jdbc.query("SELECT * FROM (" + UNION + ") t ORDER BY ts DESC, id LIMIT :limit OFFSET :offset", p,
-                (rs, i) -> new FinanceTransactionRow(
-                        rs.getString("id"),
-                        rs.getObject("ts", LocalDateTime.class),
-                        rs.getString("kind"),
-                        rs.getString("reference"),
-                        rs.getString("person"),
-                        rs.getString("branch"),
-                        rs.getString("description"),
-                        rs.getString("mode"),
-                        rs.getBigDecimal("income"),
-                        rs.getBigDecimal("expense")));
+        return jdbc.query("SELECT * FROM (" + UNION + ") t " + orderBy(ascending) + " LIMIT :limit OFFSET :offset",
+                p, ROW_MAPPER);
     }
+
+    // Every row in the range, unpaginated - used by the Excel export.
+    public List<FinanceTransactionRow> all(LocalDate from, LocalDate to, UUID branchId, boolean ascending) {
+        return jdbc.query("SELECT * FROM (" + UNION + ") t " + orderBy(ascending),
+                params(from, to, branchId), ROW_MAPPER);
+    }
+
+    // id as tie-breaker keeps paging stable when several rows share a timestamp.
+    private static String orderBy(boolean ascending) {
+        return ascending ? "ORDER BY ts ASC, id" : "ORDER BY ts DESC, id";
+    }
+
+    private static final org.springframework.jdbc.core.RowMapper<FinanceTransactionRow> ROW_MAPPER = (rs, i) ->
+            new FinanceTransactionRow(
+                    rs.getString("id"),
+                    rs.getObject("ts", LocalDateTime.class),
+                    rs.getString("kind"),
+                    rs.getString("reference"),
+                    rs.getString("person"),
+                    rs.getString("branch"),
+                    rs.getString("description"),
+                    rs.getString("mode"),
+                    rs.getBigDecimal("income"),
+                    rs.getBigDecimal("expense"));
 
     private MapSqlParameterSource params(LocalDate from, LocalDate to, UUID branchId) {
         return new MapSqlParameterSource()

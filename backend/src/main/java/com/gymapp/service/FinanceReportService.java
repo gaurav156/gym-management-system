@@ -173,19 +173,32 @@ public class FinanceReportService {
     // Paginated per-transaction view for the report's "show details" checkbox. Paging happens
     // in SQL, so a yearly range with thousands of rows only ever loads one page.
     @Transactional(readOnly = true)
-    public PageResponse<FinanceTransactionRow> listTransactions(FinanceReportQuery query, int page, int size) {
+    public PageResponse<FinanceTransactionRow> listTransactions(FinanceReportQuery query, int page, int size,
+                                                                boolean ascending) {
         DateRange range = resolveRange(query);
-        if (query.branchId() != null && !branchRepository.existsById(query.branchId())) {
-            throw new IllegalArgumentException("Branch not found");
-        }
+        assertBranchExists(query);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         int safePage = Math.max(page, 0);
 
         long total = transactionRepository.count(range.from(), range.to(), query.branchId());
         List<FinanceTransactionRow> rows = transactionRepository.page(
-                range.from(), range.to(), query.branchId(), safeSize, (long) safePage * safeSize);
+                range.from(), range.to(), query.branchId(), ascending, safeSize, (long) safePage * safeSize);
 
         int totalPages = (int) Math.ceil(total / (double) safeSize);
         return new PageResponse<>(rows, safePage, safeSize, total, totalPages, safePage + 1 >= totalPages);
+    }
+
+    // Unpaginated - only for the Excel export.
+    @Transactional(readOnly = true)
+    public List<FinanceTransactionRow> listAllTransactions(FinanceReportQuery query, boolean ascending) {
+        DateRange range = resolveRange(query);
+        assertBranchExists(query);
+        return transactionRepository.all(range.from(), range.to(), query.branchId(), ascending);
+    }
+
+    private void assertBranchExists(FinanceReportQuery query) {
+        if (query.branchId() != null && !branchRepository.existsById(query.branchId())) {
+            throw new IllegalArgumentException("Branch not found");
+        }
     }
 }

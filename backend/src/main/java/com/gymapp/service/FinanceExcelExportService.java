@@ -2,6 +2,7 @@ package com.gymapp.service;
 
 import com.gymapp.dto.FinanceDtos.FinanceReportResponse;
 import com.gymapp.dto.FinanceDtos.FinanceReportRow;
+import com.gymapp.dto.FinanceDtos.FinanceTransactionRow;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Component;
@@ -9,13 +10,20 @@ import org.springframework.stereotype.Component;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.List;
 
 // Builds the Owner's "Download Excel" export for the Income & Profit report - same data
 // FinanceReportService already computed, just laid out as a spreadsheet instead of JSON.
+// When the "show details" box is checked, a second "Transactions" sheet lists every row.
 @Component
 public class FinanceExcelExportService {
 
     public byte[] export(FinanceReportResponse report) {
+        return export(report, null);
+    }
+
+    // transactions == null -> summary sheet only.
+    public byte[] export(FinanceReportResponse report, List<FinanceTransactionRow> transactions) {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
@@ -64,11 +72,71 @@ public class FinanceExcelExportService {
                 sheet.autoSizeColumn(i);
             }
 
+            if (transactions != null) {
+                writeTransactionsSheet(workbook, transactions, boldStyle, currencyStyle);
+            }
+
             workbook.write(out);
             return out.toByteArray();
         } catch (IOException e) {
             throw new RuntimeException("Failed to generate Excel report", e);
         }
+    }
+
+    private void writeTransactionsSheet(XSSFWorkbook workbook, List<FinanceTransactionRow> transactions,
+                                        CellStyle boldStyle, CellStyle currencyStyle) {
+        Sheet sheet = workbook.createSheet("Transactions");
+        DataFormat fmt = workbook.createDataFormat();
+        CellStyle dateTimeStyle = workbook.createCellStyle();
+        dateTimeStyle.setDataFormat(fmt.getFormat("yyyy-mm-dd hh:mm"));
+        CellStyle dateStyle = workbook.createCellStyle();
+        dateStyle.setDataFormat(fmt.getFormat("yyyy-mm-dd"));
+
+        String[] headers = {"Date", "Type", "Reference", "Member / By", "Branch", "Description", "Mode", "Income", "Expense"};
+        Row headerRow = sheet.createRow(0);
+        for (int i = 0; i < headers.length; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+            cell.setCellStyle(boldStyle);
+        }
+        sheet.createFreezePane(0, 1);
+
+        int r = 1;
+        for (FinanceTransactionRow t : transactions) {
+            Row row = sheet.createRow(r++);
+
+            // Expenses only carry a date, so don't show a misleading 00:00 time for them.
+            Cell dateCell = row.createCell(0);
+            if ("EXPENSE".equals(t.type())) {
+                dateCell.setCellValue(t.date().toLocalDate());
+                dateCell.setCellStyle(dateStyle);
+            } else {
+                dateCell.setCellValue(t.date());
+                dateCell.setCellStyle(dateTimeStyle);
+            }
+
+            row.createCell(1).setCellValue(typeLabel(t.type()));
+            row.createCell(2).setCellValue(t.reference() == null ? "" : t.reference());
+            row.createCell(3).setCellValue(t.person() == null ? "" : t.person());
+            row.createCell(4).setCellValue(t.branch() == null ? "" : t.branch());
+            row.createCell(5).setCellValue(t.description() == null ? "" : t.description());
+            row.createCell(6).setCellValue(t.mode() == null ? "" : t.mode().replace("_", " "));
+            setCurrency(row.createCell(7), t.income(), currencyStyle);
+            setCurrency(row.createCell(8), t.expense(), currencyStyle);
+        }
+
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+        }
+    }
+
+    private String typeLabel(String type) {
+        return switch (type) {
+            case "MEMBERSHIP" -> "Membership";
+            case "STORE" -> "Store";
+            case "EXPENSE" -> "Expense";
+            default -> type;
+        };
     }
 
     private int writeTitleRow(Sheet sheet, int r, String title, CellStyle style) {

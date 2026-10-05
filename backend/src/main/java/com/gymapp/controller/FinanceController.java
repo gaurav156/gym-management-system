@@ -12,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.format.annotation.DateTimeFormat.ISO.DATE;
@@ -58,12 +59,18 @@ public class FinanceController {
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer quarter,
             @RequestParam(required = false) @DateTimeFormat(iso = DATE) LocalDate fromDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DATE) LocalDate toDate) {
-        FinanceReportResponse report = financeReportService.generateReport(
-                new FinanceReportQuery(granularity, branchId, date, year, month, quarter, fromDate, toDate));
-        byte[] excel = financeExcelExportService.export(report);
+            @RequestParam(required = false) @DateTimeFormat(iso = DATE) LocalDate toDate,
+            @RequestParam(defaultValue = "false") boolean details,
+            @RequestParam(defaultValue = "ASC") String sort) {
+        FinanceReportQuery query = new FinanceReportQuery(granularity, branchId, date, year, month, quarter, fromDate, toDate);
+        FinanceReportResponse report = financeReportService.generateReport(query);
+        List<FinanceTransactionRow> transactions = details
+                ? financeReportService.listAllTransactions(query, !"DESC".equalsIgnoreCase(sort))
+                : null;
+        byte[] excel = financeExcelExportService.export(report, transactions);
 
-        String filename = "income-profit-" + report.fromDate() + "-to-" + report.toDate() + ".xlsx";
+        String filename = "income-profit-" + report.fromDate() + "-to-" + report.toDate()
+                + (details ? "-details" : "") + ".xlsx";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
@@ -82,8 +89,10 @@ public class FinanceController {
             @RequestParam(required = false) @DateTimeFormat(iso = DATE) LocalDate fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DATE) LocalDate toDate,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size) {
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(defaultValue = "ASC") String sort) {
         return financeReportService.listTransactions(
-                new FinanceReportQuery(granularity, branchId, date, year, month, quarter, fromDate, toDate), page, size);
+                new FinanceReportQuery(granularity, branchId, date, year, month, quarter, fromDate, toDate),
+                page, size, !"DESC".equalsIgnoreCase(sort));
     }
 }

@@ -8,6 +8,8 @@ interface Props {
   branches: Branch[]
 }
 
+type TxSort = 'ASC' | 'DESC'
+
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -68,6 +70,8 @@ export default function FinanceReportSection({ branches }: Props) {
   const yearOptions = currentYearOptions()
   const detailsActive = showDetails && !!report && supportsDetails(report.granularity)
 
+  const [txSort, setTxSort] = useState<TxSort>('ASC') // oldest first by default
+
   function buildParams(): Record<string, string | number> {
     const params: Record<string, string | number> = { granularity }
     if (branchId) params.branchId = branchId
@@ -87,12 +91,12 @@ export default function FinanceReportSection({ branches }: Props) {
     return true
   }
 
-  function loadTransactions(page = 0, size = pageSize) {
+  function loadTransactions(page = 0, size = pageSize, sort = txSort) {
     const params = appliedParams.current
     if (!params) return
     const ticket = ++txTicket.current
     setTxLoading(true)
-    api.get<PageResponse<FinanceTransaction>>('/api/finance/transactions', { params: { ...params, page, size } })
+    api.get<PageResponse<FinanceTransaction>>('/api/finance/transactions', { params: { ...params, page, size, sort } })
       .then((res) => {
         if (ticket !== txTicket.current) return
         setTransactions(res.data.content)
@@ -133,16 +137,25 @@ export default function FinanceReportSection({ branches }: Props) {
     loadTransactions(0, size)
   }
 
+  function handleSortChange(sort: TxSort) {
+    setTxSort(sort)
+    loadTransactions(0, pageSize, sort)
+  }
+
   async function downloadExcel() {
     setError('')
     if (!validateCustomRange()) return
     setDownloading(true)
     try {
-      const res = await api.get('/api/finance/report/export', { params: buildParams(), responseType: 'blob' })
+      const wantDetails = showDetails && supportsDetails(granularity)
+      const res = await api.get('/api/finance/report/export', {
+        params: { ...buildParams(), ...(wantDetails ? { details: true, sort: txSort } : {}) },
+        responseType: 'blob',
+      })
       const url = URL.createObjectURL(new Blob([res.data]))
       const link = document.createElement('a')
       link.href = url
-      link.download = `income-profit-${granularity.toLowerCase()}.xlsx`
+      link.download = `income-profit-${granularity.toLowerCase()}${wantDetails ? '-details' : ''}.xlsx`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -282,7 +295,7 @@ export default function FinanceReportSection({ branches }: Props) {
       {supportsDetails(granularity) && (
         <label className="mt-3 flex items-center gap-1.5 text-xs text-gray-600">
           <input type="checkbox" checked={showDetails} onChange={(e) => handleShowDetailsChange(e.target.checked)} />
-          Show details (every transaction in this period instead of the monthly summary)
+          Show details (every transaction in this period instead of the monthly summary; also included in the Excel download)
         </label>
       )}
 
@@ -317,6 +330,16 @@ export default function FinanceReportSection({ branches }: Props) {
 
           {detailsActive ? (
             <div className="mt-6">
+              <div className="mb-3 flex items-center justify-end">
+                <label className="flex items-center gap-1.5 text-xs text-gray-500">
+                  Sort by date
+                  <select value={txSort} onChange={(e) => handleSortChange(e.target.value as TxSort)}
+                    className="rounded-md border border-gray-300 px-2 py-1 text-xs">
+                    <option value="ASC">Oldest first</option>
+                    <option value="DESC">Newest first</option>
+                  </select>
+                </label>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
