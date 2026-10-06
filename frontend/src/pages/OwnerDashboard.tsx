@@ -15,6 +15,16 @@ import BroadcastsSection from '../components/owner/BroadcastsSection'
 import BackupSection from '../components/owner/BackupSection'
 
 type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
+type Tab = 'FINANCE' | 'BRANCHES' | 'PLANS' | 'PRODUCTS' | 'BROADCASTS' | 'BACKUP'
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'FINANCE', label: 'Income & Profit' },
+  { key: 'BRANCHES', label: 'Branches & Accounts' },
+  { key: 'PLANS', label: 'Plans & Coupons' },
+  { key: 'PRODUCTS', label: 'Products' },
+  { key: 'BROADCASTS', label: 'Broadcasts' },
+  { key: 'BACKUP', label: 'Backup & Export' },
+]
 
 const ACCOUNT_ROLES: { value: AccountRole; label: string }[] = [
   { value: 'MEMBER', label: 'Member' },
@@ -45,6 +55,8 @@ function BranchCheckboxes({ branches, selected, onChange }: {
 }
 
 export default function OwnerDashboard() {
+  const [activeTab, setActiveTab] = useState<Tab>('FINANCE')
+
   const [branches, setBranches] = useState<Branch[]>([])
   const [branchesLoading, setBranchesLoading] = useState(true)
   const [creatingBranch, setCreatingBranch] = useState(false)
@@ -235,184 +247,211 @@ export default function OwnerDashboard() {
         Go to branch operations (check-in, plans, purchases, attendance, crowd report) →
       </Link>
 
-      <div className="mt-8">
-        <FinanceReportSection branches={branches} />
+      <div className="mt-6 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
+        <div className="flex min-w-max gap-1">
+          {TABS.map((tab) => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              className={`-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-4 py-2 text-sm ${
+                activeTab === tab.key ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="mt-8 grid gap-8 sm:grid-cols-2">
-        <div className="rounded-lg border border-gray-200 p-6">
-          <h2 className="font-medium">Create a branch</h2>
-          <form onSubmit={createBranch} className="mt-4 space-y-3">
-            <input placeholder="Branch name" required value={branchName} onChange={(e) => setBranchName(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <input placeholder="Address" value={branchAddress} onChange={(e) => setBranchAddress(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <input placeholder="Phone" value={branchPhone} onChange={(e) => setBranchPhone(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <button disabled={creatingBranch}
-              className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
-              {creatingBranch && <Spinner className="h-4 w-4" />}
-              {creatingBranch ? 'Adding...' : 'Add branch'}
-            </button>
-          </form>
-        </div>
+      <div className="mt-6">
+        {activeTab === 'FINANCE' && (
+          <FinanceReportSection branches={branches} />
+        )}
 
-        <div className="rounded-lg border border-gray-200 p-6">
-          <h2 className="font-medium">Create an account</h2>
-          <p className="mt-1 text-xs text-gray-500">
-            Owner accounts can't be created directly - create the account, then promote it from
-            the Staff or Members tab (requires email verification).
-          </p>
-          <form onSubmit={createAccount} className="mt-4 space-y-3">
-            <select value={accountRole} onChange={(e) => setAccountRole(e.target.value as AccountRole)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
-              {ACCOUNT_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-            </select>
-            <input placeholder="Full name" required value={accountName} onChange={(e) => setAccountName(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <input placeholder="Email" type="email" required value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <input placeholder="Phone (optional)" value={accountPhone} onChange={(e) => setAccountPhone(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <PersonalDetailsFields compact gender={accountGender} dateOfBirth={accountDob}
-              onGenderChange={setAccountGender} onDateOfBirthChange={setAccountDob} />
-            <input placeholder="Temporary password" type="password" required minLength={6} value={accountPassword}
-              onChange={(e) => setAccountPassword(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <BranchCheckboxes branches={activeBranches} selected={accountBranchIds} onChange={setAccountBranchIds} />
-            <button disabled={creatingAccount}
-              className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
-              {creatingAccount && <Spinner className="h-4 w-4" />}
-              {creatingAccount ? 'Creating...' : 'Create account'}
-            </button>
-            {accountMessage && <p className="text-sm text-gray-600">{accountMessage}</p>}
-          </form>
-        </div>
+        {activeTab === 'BRANCHES' && (
+          <>
+            <div className="grid gap-8 sm:grid-cols-2">
+              <div className="rounded-lg border border-gray-200 p-6">
+                <h2 className="font-medium">Create a branch</h2>
+                <form onSubmit={createBranch} className="mt-4 space-y-3">
+                  <input placeholder="Branch name" required value={branchName} onChange={(e) => setBranchName(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                  <input placeholder="Address" value={branchAddress} onChange={(e) => setBranchAddress(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                  <input placeholder="Phone" value={branchPhone} onChange={(e) => setBranchPhone(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                  <button disabled={creatingBranch}
+                    className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
+                    {creatingBranch && <Spinner className="h-4 w-4" />}
+                    {creatingBranch ? 'Adding...' : 'Add branch'}
+                  </button>
+                </form>
+              </div>
 
-        <div className="rounded-lg border border-gray-200 p-6">
-          <h2 className="font-medium">Membership plans</h2>
-          <p className="mt-1 text-xs text-gray-500">Chain-wide - the same plans apply at every branch.</p>
-          <form onSubmit={createPlan} className="mt-4 space-y-3">
-            <input placeholder="Plan name (e.g. 3 Month)" required value={planName} onChange={(e) => setPlanName(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <input type="number" min={1} placeholder="Duration (months)" required value={planMonths}
-              onChange={(e) => setPlanMonths(Number(e.target.value))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <input type="number" min={0} placeholder="Price" required value={planPrice}
-              onChange={(e) => setPlanPrice(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <input type="number" min={0} placeholder="Discount price (optional)" value={planDiscountPrice}
-              onChange={(e) => setPlanDiscountPrice(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />  
-            <button disabled={creatingPlan}
-              className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
-              {creatingPlan && <Spinner className="h-4 w-4" />}
-              {creatingPlan ? 'Adding...' : 'Add plan'}
-            </button>
-          </form>
-          {planError && <p className="text-sm text-red-600">{planError}</p>}
-          {plansLoading ? (
-            <div className="mt-4 space-y-2">
-              <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
-              <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
-              <div className="h-4 w-2/3 animate-pulse rounded bg-gray-200" />
+              <div className="rounded-lg border border-gray-200 p-6">
+                <h2 className="font-medium">Create an account</h2>
+                <p className="mt-1 text-xs text-gray-500">
+                  Owner accounts can't be created directly - create the account, then promote it from
+                  the Staff or Members tab (requires email verification).
+                </p>
+                <form onSubmit={createAccount} className="mt-4 space-y-3">
+                  <select value={accountRole} onChange={(e) => setAccountRole(e.target.value as AccountRole)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+                    {ACCOUNT_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  </select>
+                  <input placeholder="Full name" required value={accountName} onChange={(e) => setAccountName(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                  <input placeholder="Email" type="email" required value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                  <input placeholder="Phone (optional)" value={accountPhone} onChange={(e) => setAccountPhone(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                  <PersonalDetailsFields compact gender={accountGender} dateOfBirth={accountDob}
+                    onGenderChange={setAccountGender} onDateOfBirthChange={setAccountDob} />
+                  <input placeholder="Temporary password" type="password" required minLength={6} value={accountPassword}
+                    onChange={(e) => setAccountPassword(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                  <BranchCheckboxes branches={activeBranches} selected={accountBranchIds} onChange={setAccountBranchIds} />
+                  <button disabled={creatingAccount}
+                    className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
+                    {creatingAccount && <Spinner className="h-4 w-4" />}
+                    {creatingAccount ? 'Creating...' : 'Create account'}
+                  </button>
+                  {accountMessage && <p className="text-sm text-gray-600">{accountMessage}</p>}
+                </form>
+              </div>
             </div>
-          ) : (
-            <ul className="mt-4 divide-y divide-gray-100 text-sm">
-              {plans.map((p) => (
-                <li key={p.id} className="flex justify-between py-2">
-                  <span>{p.name} <span className="text-xs text-gray-400">({p.durationMonths} month{p.durationMonths > 1 ? 's' : ''})</span></span>
-                  <span className="text-gray-500">₹{p.price}</span>
-                  <span className="text-gray-500">
-                    {p.discountActive ? <><span className="line-through">₹{p.price}</span> ₹{p.effectivePrice}</> : `₹${p.price}`}
-                  </span>
-                </li>
-              ))}
-              {plans.length === 0 && <li className="py-2 text-gray-400">No plans yet - add one above.</li>}
-            </ul>
-          )}
-        </div>
-      </div>
 
-      <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">All branches</h2>
-        {branchEditMessage && <p className="mt-2 text-sm text-red-600">{branchEditMessage}</p>}
-        {branchesLoading ? (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <CardSkeleton />
-            <CardSkeleton />
-          </div>
-        ) : (
-        <ul className="mt-3 divide-y divide-gray-100 text-sm">
-          {branches.map((b) => (
-            <li key={b.id} className="py-2">
-              {editingBranchId === b.id ? (
-                <div className="space-y-2">
-                  <input value={editBranchName} onChange={(e) => setEditBranchName(e.target.value)}
-                    placeholder="Branch name"
-                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
-                  <input value={editBranchAddress} onChange={(e) => setEditBranchAddress(e.target.value)}
-                    placeholder="Address"
-                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
-                  <input value={editBranchPhone} onChange={(e) => setEditBranchPhone(e.target.value)}
-                    placeholder="Phone"
-                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
-                  <div className="space-x-2">
-                    <button onClick={() => saveEditBranch(b.id)} disabled={savingBranchEdit}
-                      className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
-                      {savingBranchEdit && <Spinner className="h-3 w-3" />}
-                      {savingBranchEdit ? 'Saving...' : 'Save'}
-                    </button>
-                    <button onClick={cancelEditBranch} disabled={savingBranchEdit}
-                      className="text-xs text-gray-500 hover:underline disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
-                  </div>
+            <div className="mt-8 rounded-lg border border-gray-200 p-6">
+              <h2 className="font-medium">All branches</h2>
+              {branchEditMessage && <p className="mt-2 text-sm text-red-600">{branchEditMessage}</p>}
+              {branchesLoading ? (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <CardSkeleton />
+                  <CardSkeleton />
                 </div>
               ) : (
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className={b.active ? '' : 'text-gray-400'}>
-                      {b.name}
-                      {!b.active && <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">Inactive</span>}
-                    </p>
-                    <p className="text-xs text-gray-500">{b.address}</p>
-                    <p className="text-xs text-gray-400">{b.phone || 'No phone on file'}</p>
-                    {b.deletable === false && (
-                      <p className="text-[10px] text-gray-400">Has recorded activity - can be deactivated but not deleted.</p>
-                    )}
-                  </div>
-                  <div className="flex flex-shrink-0 items-center gap-3 text-xs">
-                    <button onClick={() => startEditBranch(b)} className="text-gray-600 hover:underline">Edit</button>
-                    <button onClick={() => toggleBranchActive(b)}
-                      className={b.active ? 'text-amber-600 hover:underline' : 'text-green-700 hover:underline'}>
-                      {b.active ? 'Deactivate' : 'Reactivate'}
-                    </button>
-                    {b.deletable && (
-                      <button onClick={() => deleteBranch(b)} className="text-red-600 hover:underline">Delete</button>
-                    )}
-                  </div>
-                </div>
+                <ul className="mt-3 divide-y divide-gray-100 text-sm">
+                  {branches.map((b) => (
+                    <li key={b.id} className="py-2">
+                      {editingBranchId === b.id ? (
+                        <div className="space-y-2">
+                          <input value={editBranchName} onChange={(e) => setEditBranchName(e.target.value)}
+                            placeholder="Branch name"
+                            className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+                          <input value={editBranchAddress} onChange={(e) => setEditBranchAddress(e.target.value)}
+                            placeholder="Address"
+                            className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+                          <input value={editBranchPhone} onChange={(e) => setEditBranchPhone(e.target.value)}
+                            placeholder="Phone"
+                            className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+                          <div className="space-x-2">
+                            <button onClick={() => saveEditBranch(b.id)} disabled={savingBranchEdit}
+                              className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
+                              {savingBranchEdit && <Spinner className="h-3 w-3" />}
+                              {savingBranchEdit ? 'Saving...' : 'Save'}
+                            </button>
+                            <button onClick={cancelEditBranch} disabled={savingBranchEdit}
+                              className="text-xs text-gray-500 hover:underline disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className={b.active ? '' : 'text-gray-400'}>
+                              {b.name}
+                              {!b.active && <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">Inactive</span>}
+                            </p>
+                            <p className="text-xs text-gray-500">{b.address}</p>
+                            <p className="text-xs text-gray-400">{b.phone || 'No phone on file'}</p>
+                            {b.deletable === false && (
+                              <p className="text-[10px] text-gray-400">Has recorded activity - can be deactivated but not deleted.</p>
+                            )}
+                          </div>
+                          <div className="flex flex-shrink-0 items-center gap-3 text-xs">
+                            <button onClick={() => startEditBranch(b)} className="text-gray-600 hover:underline">Edit</button>
+                            <button onClick={() => toggleBranchActive(b)}
+                              className={b.active ? 'text-amber-600 hover:underline' : 'text-green-700 hover:underline'}>
+                              {b.active ? 'Deactivate' : 'Reactivate'}
+                            </button>
+                            {b.deletable && (
+                              <button onClick={() => deleteBranch(b)} className="text-red-600 hover:underline">Delete</button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                  {branches.length === 0 && <li className="py-2 text-gray-400">No branches yet - add one above.</li>}
+                </ul>
               )}
-            </li>
-          ))}
-          {branches.length === 0 && <li className="py-2 text-gray-400">No branches yet - add one above.</li>}
-        </ul>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'PLANS' && (
+          <div className="space-y-8">
+            <div className="rounded-lg border border-gray-200 p-6">
+              <h2 className="font-medium">Membership plans</h2>
+              <p className="mt-1 text-xs text-gray-500">Chain-wide - the same plans apply at every branch.</p>
+              <form onSubmit={createPlan} className="mt-4 grid gap-3 sm:grid-cols-2">
+                <input placeholder="Plan name (e.g. 3 Month)" required value={planName} onChange={(e) => setPlanName(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                <input type="number" min={1} placeholder="Duration (months)" required value={planMonths}
+                  onChange={(e) => setPlanMonths(Number(e.target.value))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                <input type="number" min={0} placeholder="Price" required value={planPrice}
+                  onChange={(e) => setPlanPrice(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                <input type="number" min={0} placeholder="Discount price (optional)" value={planDiscountPrice}
+                  onChange={(e) => setPlanDiscountPrice(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                <div>
+                  <button disabled={creatingPlan}
+                    className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
+                    {creatingPlan && <Spinner className="h-4 w-4" />}
+                    {creatingPlan ? 'Adding...' : 'Add plan'}
+                  </button>
+                </div>
+              </form>
+              {planError && <p className="mt-2 text-sm text-red-600">{planError}</p>}
+              {plansLoading ? (
+                <div className="mt-4 space-y-2">
+                  <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-gray-200" />
+                </div>
+              ) : (
+                <ul className="mt-4 divide-y divide-gray-100 text-sm">
+                  {plans.map((p) => (
+                    <li key={p.id} className="flex justify-between py-2">
+                      <span>{p.name} <span className="text-xs text-gray-400">({p.durationMonths} month{p.durationMonths > 1 ? 's' : ''})</span></span>
+                      <span className="text-gray-500">
+                        {p.discountActive ? <><span className="line-through">₹{p.price}</span> ₹{p.effectivePrice}</> : `₹${p.price}`}
+                      </span>
+                    </li>
+                  ))}
+                  {plans.length === 0 && <li className="py-2 text-gray-400">No plans yet - add one above.</li>}
+                </ul>
+              )}
+            </div>
+
+            <CouponsSection />
+          </div>
+        )}
+
+        {activeTab === 'PRODUCTS' && (
+          <div className="space-y-8">
+            <ProductCategoriesSection />
+            <ProductCatalogSection branches={activeBranches} />
+          </div>
+        )}
+
+        {activeTab === 'BROADCASTS' && (
+          <BroadcastsSection />
+        )}
+
+        {activeTab === 'BACKUP' && (
+          <BackupSection />
         )}
       </div>
-      <div className="mt-8">
-        <ProductCatalogSection branches={activeBranches} />
-      </div>
-      <div className="mt-8">
-        <ProductCategoriesSection />
-      </div>
-      <div className="mt-8">
-        <CouponsSection />
-      </div>
-      <div className="mt-8">
-        <BroadcastsSection />
-      </div>
-      <div className="mt-8">
-        <BackupSection />
-      </div>
+
       <ConfirmDialog {...dialogProps} />
     </div>
   )
