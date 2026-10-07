@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { api } from '../api/client'
 import Spinner from './Spinner'
+import { useScrollLock } from '../hooks/useScrollLock'
 
 const RESEND_COOLDOWN_SECONDS = 60
 
@@ -59,6 +60,8 @@ export default function RoleChangeOtpDialog({ target, onClose, onDone }: Props) 
     }, 1000)
   }
 
+  useScrollLock(!!target)
+
   if (!target) return null
 
   const isPromotion = target.newRole === 'OWNER'
@@ -98,8 +101,8 @@ export default function RoleChangeOtpDialog({ target, onClose, onDone }: Props) 
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
-      onClick={() => !busy && onClose()} role="dialog" aria-modal="true">
-      <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      role="dialog" aria-modal="true">
+      <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
         <h3 className="text-base font-semibold text-gray-900">
           {isPromotion ? `Make ${target.name} an Owner` : `Change ${target.name}'s role to ${roleLabel(target.newRole)}`}
         </h3>

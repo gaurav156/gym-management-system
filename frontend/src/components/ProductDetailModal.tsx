@@ -2,6 +2,7 @@ import { PointerEvent, useRef, useState } from 'react'
 import ProductImage from './ProductImage'
 import { renderRichText } from '../utils/richText'
 import type { Product } from '../types'
+import { useScrollLock } from '../hooks/useScrollLock'
 
 interface Props {
   product: Product
@@ -64,11 +65,12 @@ export default function ProductDetailModal({ product, onClose, isStaffView }: Pr
     return null
   }
 
+  useScrollLock()
+
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose} role="dialog" aria-modal="true">
-      <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}>
+      role="dialog" aria-modal="true">
+      <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-xl">
 
         <div className="flex flex-shrink-0 items-start justify-between gap-3 border-b border-gray-100 px-6 py-4">
           {/* break-words, not truncate - a long product name now wraps onto more than one
@@ -96,7 +98,7 @@ export default function ProductDetailModal({ product, onClose, isStaffView }: Pr
           <button onClick={onClose} className="flex-shrink-0 text-gray-400 hover:text-gray-600">✕</button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4"> 
           <div
             className="relative flex aspect-square w-full touch-pan-y select-none items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-gray-50"
             onPointerDown={onPointerDown}

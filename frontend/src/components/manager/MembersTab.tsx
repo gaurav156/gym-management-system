@@ -16,6 +16,7 @@ import ProductPurchaseHistoryTab from '../ProductPurchaseHistoryTab'
 import PersonalDetailsFields from '../PersonalDetailsFields'
 import IdProofField from '../IdProofField'
 import { genderLabel, formatDobWithAge } from '../../utils/person'
+import { useScrollLock } from '../../hooks/useScrollLock'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -447,6 +448,8 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const modalTotalPages = Math.max(1, Math.ceil(detailMemberships.length / MODAL_PAGE_SIZE))
   const pagedDetailMemberships = detailMemberships.slice((modalPage - 1) * MODAL_PAGE_SIZE, modalPage * MODAL_PAGE_SIZE)
 
+  useScrollLock(!!detailMember || !!payTarget)
+
   return (
     <div>
       <div className="rounded-lg border border-gray-200 p-6">
@@ -532,10 +535,8 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       </div>
 
       {detailMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => { setDetailMemberId(null); cancelEdit() }}>
-          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 lg:max-w-4xl"
-            onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-lg bg-white p-6 lg:max-w-4xl">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <Avatar src={detailMember.photo} name={detailMember.name} className="h-12 w-12" textClassName="text-lg" />
@@ -941,8 +942,8 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
         }}
       />
       {payTarget && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={() => !paying && setPayTarget(null)}>
-          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
             <h3 className="text-base font-semibold text-gray-900">Record payment</h3>
             <p className="mt-1 text-sm text-gray-600">Balance due: ₹{payTarget.balanceDue}</p>
             <div className="mt-3 space-y-3">

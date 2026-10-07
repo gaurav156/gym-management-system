@@ -10,6 +10,7 @@ import { TableSkeleton } from '../Skeleton'
 import type { Product, ProductOrder, ProductCategory, ProductOrderInvoice, MemberSummary, StaffSummary, PageResponse } from '../../types'
 import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, BanIcon } from '../icons/ActionIcons'
+import { useScrollLock } from '../../hooks/useScrollLock'
 
 const ORDER_PAGE_SIZE = 10
 const PRODUCT_PAGE_SIZE = 8
@@ -274,6 +275,8 @@ export default function StoreTab({ selectedBranch }: Props) {
     }
   }
 
+  useScrollLock(!!cancelTarget)
+
   return (
     <div>
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
@@ -514,8 +517,8 @@ export default function StoreTab({ selectedBranch }: Props) {
       </div>
 
       {cancelTarget && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={() => !cancelling && setCancelTarget(null)}>
-          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
             <h3 className="text-base font-semibold text-gray-900">Cancel order {cancelTarget.invoiceNumber}</h3>
             <p className="mt-2 text-sm text-gray-600">Stock will be restored for every item. Record the cash refund given to {cancelTarget.memberName}.</p>
             <div className="mt-4 space-y-3">

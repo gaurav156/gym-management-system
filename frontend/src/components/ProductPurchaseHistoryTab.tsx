@@ -5,6 +5,7 @@ import RowActionsMenu from './RowActionsMenu'
 import Spinner from './Spinner'
 import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, BanIcon } from './icons/ActionIcons'
 import type { ProductOrder, ProductOrderInvoice, PageResponse } from '../types'
+import { useScrollLock } from '../hooks/useScrollLock'
 
 const PAGE_SIZE = 5
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
@@ -94,6 +95,8 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
     }
   }
 
+  useScrollLock(!!cancelTarget)
+
   return (
     <div className="mt-4">
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
@@ -154,9 +157,8 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
       )}
 
       {cancelTarget && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
-          onClick={() => !cancelling && setCancelTarget(null)}>
-          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
             <h3 className="text-base font-semibold text-gray-900">Cancel order {cancelTarget.invoiceNumber}</h3>
             <p className="mt-2 text-sm text-gray-600">
               Stock will be restored for every item. Record the cash refund given.

@@ -3,6 +3,7 @@ import { api } from '../../api/client'
 import { TableSkeleton } from '../Skeleton'
 import { audienceLabel, CHANNEL_LABELS, TYPE_LABELS } from './broadcastConstants'
 import type { Broadcast, BroadcastRecipient, PageResponse } from '../../types'
+import { useScrollLock } from '../../hooks/useScrollLock'
 
 const PAGE_SIZE = 8
 
@@ -33,11 +34,13 @@ export default function BroadcastDetailModal({ broadcast, onClose }: Props) {
 
   useEffect(() => { load(0, failedOnly) }, [failedOnly]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useScrollLock()
+
   const pending = broadcast.totalRecipients - broadcast.sentCount - broadcast.failedCount
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-lg bg-white p-6">
         <div className="flex items-start justify-between">
           <div className="min-w-0">
             <h3 className="break-words text-lg font-medium">{broadcast.subject ?? `${CHANNEL_LABELS[broadcast.channel]} broadcast`}</h3>

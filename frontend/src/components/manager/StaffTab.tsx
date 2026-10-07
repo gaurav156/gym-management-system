@@ -12,6 +12,7 @@ import ProductPurchaseHistoryTab from '../ProductPurchaseHistoryTab'
 import PersonalDetailsFields from '../PersonalDetailsFields'
 import IdProofField from '../IdProofField'
 import { genderLabel, formatDobWithAge } from '../../utils/person'
+import { useScrollLock } from '../../hooks/useScrollLock'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -330,6 +331,8 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
 
   const roleOptions = detailStaff ? CHANGEABLE_ROLES.filter((r) => r !== detailStaff.role) : []
 
+  useScrollLock(!!detailStaff)
+  
   return (
     <div>
       <div className="rounded-lg border border-gray-200 p-6">
@@ -425,10 +428,8 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       </div>
 
       {detailStaff && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setDetailStaffId(null)}>
-          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 lg:max-w-4xl"
-            onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-lg bg-white p-6 lg:max-w-4xl">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <Avatar src={detailStaff.photo} name={detailStaff.name} className="h-12 w-12" textClassName="text-lg" />
