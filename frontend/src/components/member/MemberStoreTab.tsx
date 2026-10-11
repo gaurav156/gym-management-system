@@ -5,6 +5,7 @@ import ProductImage from '../ProductImage'
 import { viewProductInvoice, printProductInvoice, downloadProductInvoice } from '../../utils/productInvoice'
 import type { Product, ProductOrder, ProductCategory, Branch, ProductOrderInvoice, PageResponse } from '../../types'
 import { useAuthStore } from '../../store/authStore'
+import { toast, getErrorMessage } from '../../store/toastStore'
 
 const PRODUCT_PAGE_SIZE = 9
 const SHOW_ALL_SIZE = 500
@@ -27,14 +28,12 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
   const [showAll, setShowAll] = useState(false)
 
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null)
-  const [cartMessage, setCartMessage] = useState('')
 
   const [orders, setOrders] = useState<ProductOrder[]>([])
   const [ordersLoading, setOrdersLoading] = useState(true)
   const [orderPage, setOrderPage] = useState(0)
   const [orderTotalPages, setOrderTotalPages] = useState(1)
   const [orderTotalElements, setOrderTotalElements] = useState(0)
-  const [invoiceError, setInvoiceError] = useState('')
 
   useEffect(() => {
     // Owner has implicit access to every branch (no branch_assignments row of their
@@ -102,14 +101,13 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
   }
 
   async function handleInvoiceAction(orderId: string, action: 'view' | 'print' | 'download') {
-    setInvoiceError('')
     try {
       const { data } = await api.get<ProductOrderInvoice>(`/api/product-orders/${orderId}/invoice`)
       if (action === 'view') await viewProductInvoice(data)
       else if (action === 'print') await printProductInvoice(data)
       else await downloadProductInvoice(data)
     } catch (err: any) {
-      setInvoiceError(err.response?.data?.error || 'Failed to load invoice')
+      toast.error(getErrorMessage(err, 'Failed to load invoice'))
     }
   }
 
@@ -140,7 +138,6 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
         </div>
 
         {branches.length === 0 && <p className="mt-2 text-xs text-gray-400">No branch assigned yet.</p>}
-        {cartMessage && <p className="mt-3 text-sm text-gray-600">{cartMessage}</p>}
 
         {productsLoading ? (
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -168,7 +165,7 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
                     </button>
                     <button
                       disabled={!!p.outOfStock}
-                      onClick={() => setCartMessage('Online checkout is coming soon - for now, purchase this at the front desk of any branch.')}
+                      onClick={() => toast.info('Online checkout is coming soon - for now, purchase this at the front desk of any branch.')}
                       className="min-w-0 flex-1 rounded-md bg-brand px-2 py-1.5 text-xs font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50">
                       Add to cart
                     </button>
@@ -195,7 +192,6 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">Your purchases</h2>
-        {invoiceError && <p className="mt-2 text-sm text-red-600">{invoiceError}</p>}
         {ordersLoading ? (
           <div className="mt-3 space-y-2">
             <div className="h-4 w-full animate-pulse rounded bg-gray-200" />

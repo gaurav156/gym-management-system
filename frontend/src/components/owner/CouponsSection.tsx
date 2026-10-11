@@ -6,6 +6,7 @@ import { useConfirm } from '../../hooks/useConfirm'
 import type { Coupon, DiscountType } from '../../types'
 import RowActionsMenu from '../RowActionsMenu'
 import { PencilIcon, BanIcon, CheckIcon, TrashIcon } from '../icons/ActionIcons'
+import { toast, getErrorMessage } from '../../store/toastStore'
 
 interface CouponFormState {
   code: string
@@ -45,15 +46,12 @@ export default function CouponsSection() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState<CouponFormState>(emptyForm)
-  const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<CouponFormState>(emptyForm)
-  const [editError, setEditError] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
 
-  const [listMessage, setListMessage] = useState('')
   const { confirm, dialogProps } = useConfirm()
 
   function loadCoupons() {
@@ -63,17 +61,16 @@ export default function CouponsSection() {
 
   useEffect(() => { loadCoupons() }, [])
 
-  function validateForm(f: CouponFormState, setError: (m: string) => void): boolean {
-    if (!f.code.trim()) { setError('Enter a code.'); return false }
-    if (!f.discountValue || Number.isNaN(Number(f.discountValue))) { setError('Enter a valid discount value.'); return false }
-    if (f.maxDiscountAmount && Number.isNaN(Number(f.maxDiscountAmount))) { setError('Enter a valid max discount amount.'); return false }
+  function validateForm(f: CouponFormState): boolean {
+    if (!f.code.trim()) { toast.warning('Enter a code.'); return false }
+    if (!f.discountValue || Number.isNaN(Number(f.discountValue))) { toast.warning('Enter a valid discount value.'); return false }
+    if (f.maxDiscountAmount && Number.isNaN(Number(f.maxDiscountAmount))) { toast.warning('Enter a valid max discount amount.'); return false }
     return true
   }
 
   async function createCoupon(e: FormEvent) {
     e.preventDefault()
-    setFormError('')
-    if (!validateForm(form, setFormError)) return
+    if (!validateForm(form)) return
     setSubmitting(true)
     try {
       await api.post('/api/coupons/manage', {
@@ -88,11 +85,12 @@ export default function CouponsSection() {
         maxRedemptions: form.maxRedemptions ? Number(form.maxRedemptions) : null,
         appliesTo: form.appliesTo
       })
+      toast.success('Coupon created.')
       setForm(emptyForm)
       setCreating(false)
       loadCoupons()
     } catch (err: any) {
-      setFormError(err.response?.data?.error || 'Failed to create coupon')
+      toast.error(getErrorMessage(err, 'Failed to create coupon'))
     } finally {
       setSubmitting(false)
     }
@@ -101,12 +99,10 @@ export default function CouponsSection() {
   function startEdit(c: Coupon) {
     setEditingId(c.id)
     setEditForm(toFormState(c))
-    setEditError('')
   }
 
   async function saveEdit(id: string) {
-    setEditError('')
-    if (!validateForm(editForm, setEditError)) return
+    if (!validateForm(editForm)) return
     setSavingEdit(true)
     try {
       await api.put(`/api/coupons/manage/${id}`, {
@@ -121,22 +117,27 @@ export default function CouponsSection() {
         maxRedemptions: editForm.maxRedemptions ? Number(editForm.maxRedemptions) : null,
         appliesTo: editForm.appliesTo
       })
+      toast.success('Coupon updated.')
       setEditingId(null)
       loadCoupons()
     } catch (err: any) {
-      setEditError(err.response?.data?.error || 'Failed to update coupon')
+      toast.error(getErrorMessage(err, 'Failed to update coupon'))
     } finally {
       setSavingEdit(false)
     }
   }
 
   async function toggleActive(c: Coupon) {
-    await api.put(`/api/coupons/manage/${c.id}`, { active: !c.active })
-    loadCoupons()
+    try {
+      await api.put(`/api/coupons/manage/${c.id}`, { active: !c.active })
+      toast.success(c.active ? 'Coupon deactivated.' : 'Coupon reactivated.')
+      loadCoupons()
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to update coupon'))
+    }
   }
 
   function deleteCoupon(c: Coupon) {
-    setListMessage('')
     confirm({
       title: 'Delete coupon',
       message: `Permanently delete "${c.code}"? This only works if it's never been redeemed - otherwise deactivate it instead. This cannot be undone.`,
@@ -145,9 +146,10 @@ export default function CouponsSection() {
       onConfirm: async () => {
         try {
           await api.delete(`/api/coupons/manage/${c.id}`)
+          toast.success('Coupon deleted.')
           loadCoupons()
         } catch (err: any) {
-          setListMessage(err.response?.data?.error || 'Failed to delete coupon')
+          toast.error(getErrorMessage(err, 'Failed to delete coupon'))
         }
       },
     })
@@ -194,7 +196,7 @@ export default function CouponsSection() {
           <h2 className="font-medium">Coupons</h2>
           <p className="mt-1 text-xs text-gray-500">Applied at checkout on the front desk.</p>
         </div>
-        <button onClick={() => { setCreating((v) => !v); setFormError('') }}
+        <button onClick={() => { setCreating((v) => !v)}}
           className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark">
           {creating ? 'Cancel' : 'Add coupon'}
         </button>
@@ -242,7 +244,6 @@ export default function CouponsSection() {
               First-time buyers only
             </label>
           </div>
-          {formError && <p className="text-sm text-red-600">{formError}</p>}
           <button disabled={submitting}
             className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
             {submitting && <Spinner className="h-4 w-4" />}
@@ -250,8 +251,6 @@ export default function CouponsSection() {
           </button>
         </form>
       )}
-
-      {listMessage && <p className="mt-3 text-sm text-red-600">{listMessage}</p>}
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-left text-sm">
@@ -297,7 +296,6 @@ export default function CouponsSection() {
                           First-time buyers only
                         </label>
                       </div>
-                      {editError && <p className="text-sm text-red-600">{editError}</p>}
                       <div className="space-x-2">
                         <button onClick={() => saveEdit(c.id)} disabled={savingEdit}
                           className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">

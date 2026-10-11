@@ -18,12 +18,14 @@ import ProfileRouter from './pages/ProfileRouter'
 import InvoiceViewPage from './pages/InvoiceViewPage'
 import ProductInvoiceViewPage from './pages/ProductInvoiceViewPage'
 import UnsubscribePage from './pages/UnsubscribePage'
+import ToastContainer from './components/ToastContainer'
 
 export default function App() {
   return (
     <div className="min-h-screen bg-gray-50">
       <ScrollToTop />
       <Navbar />
+      <ToastContainer />
       <Routes>
         <Route path="/" element={<LandingPage />} />
 

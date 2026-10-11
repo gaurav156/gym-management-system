@@ -3,6 +3,7 @@ import { api } from '../../api/client'
 import Spinner from '../Spinner'
 import { TableSkeleton } from '../Skeleton'
 import type { Branch, FinanceGranularity, FinanceReportResponse, FinanceTransaction, PageResponse } from '../../types'
+import { toast, getErrorMessage } from '../../store/toastStore'
 
 interface Props {
   branches: Branch[]
@@ -51,7 +52,6 @@ export default function FinanceReportSection({ branches }: Props) {
   const [report, setReport] = useState<FinanceReportResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [downloading, setDownloading] = useState(false)
-  const [error, setError] = useState('')
 
   // "Show details" - per-transaction rows, paged by the server.
   const [showDetails, setShowDetails] = useState(false)
@@ -85,7 +85,7 @@ export default function FinanceReportSection({ branches }: Props) {
 
   function validateCustomRange(): boolean {
     if (granularity === 'CUSTOM' && (!fromDate || !toDate)) {
-      setError('Select both a from and to date.')
+      toast.warning('Select both a from and to date.')
       return false
     }
     return true
@@ -105,13 +105,12 @@ export default function FinanceReportSection({ branches }: Props) {
         setTxPage(res.data.page)
       })
       .catch((err) => {
-        if (ticket === txTicket.current) setError(err.response?.data?.error || 'Failed to load transactions')
+        if (ticket === txTicket.current) toast.error(getErrorMessage(err, 'Failed to load transactions'))
       })
       .finally(() => { if (ticket === txTicket.current) setTxLoading(false) })
   }
 
   async function generateReport() {
-    setError('')
     if (!validateCustomRange()) return
     const params = buildParams()
     setLoading(true)
@@ -121,7 +120,7 @@ export default function FinanceReportSection({ branches }: Props) {
       setReport(data)
       if (showDetails && supportsDetails(data.granularity)) loadTransactions(0)
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load report')
+      toast.error(getErrorMessage(err, 'Failed to load report'))
     } finally {
       setLoading(false)
     }
@@ -143,7 +142,6 @@ export default function FinanceReportSection({ branches }: Props) {
   }
 
   async function downloadExcel() {
-    setError('')
     if (!validateCustomRange()) return
     setDownloading(true)
     try {
@@ -161,7 +159,7 @@ export default function FinanceReportSection({ branches }: Props) {
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to download report')
+      toast.error(getErrorMessage(err, 'Failed to download report'))
     } finally {
       setDownloading(false)
     }
@@ -298,8 +296,6 @@ export default function FinanceReportSection({ branches }: Props) {
           Show details (every transaction in this period instead of the monthly summary; also included in the Excel download)
         </label>
       )}
-
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
       {report && (
         <>

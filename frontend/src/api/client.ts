@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
+import { toast } from '../store/toastStore'
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080',
@@ -17,6 +18,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
+    if (!err.response) {
+      toast.error('Network error - please check your connection and try again.')
+    }
     const hadUser = !!useAuthStore.getState().user
 
     // 401 = no valid, unexpired JWT at all on this request - almost always because the

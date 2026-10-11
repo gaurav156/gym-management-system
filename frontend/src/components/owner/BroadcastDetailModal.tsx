@@ -4,6 +4,7 @@ import { TableSkeleton } from '../Skeleton'
 import { audienceLabel, CHANNEL_LABELS, TYPE_LABELS } from './broadcastConstants'
 import type { Broadcast, BroadcastRecipient, PageResponse } from '../../types'
 import { useScrollLock } from '../../hooks/useScrollLock'
+import { toast, getErrorMessage } from '../../store/toastStore'
 
 const PAGE_SIZE = 8
 
@@ -29,6 +30,8 @@ export default function BroadcastDetailModal({ broadcast, onClose }: Props) {
       setTotalPages(res.data.totalPages)
       setTotalElements(res.data.totalElements)
       setPage(res.data.page)
+    }).catch((err) => {
+      toast.error(getErrorMessage(err, 'Failed to load recipients'))
     }).finally(() => setLoading(false))
   }
 

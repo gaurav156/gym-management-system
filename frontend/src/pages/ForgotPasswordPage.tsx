@@ -4,12 +4,11 @@ import { api } from '../api/client'
 import Spinner from '../components/Spinner'
 import Turnstile from '../components/Turnstile'
 import type { OtpChannel } from '../types'
+import { toast, getErrorMessage } from '../store/toastStore'
 
 export default function ForgotPasswordPage() {
   const [identifier, setIdentifier] = useState('')
   const [channel, setChannel] = useState<OtpChannel>('EMAIL')
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [sending, setSending] = useState(false)
   const [captchaRequired, setCaptchaRequired] = useState(false)
@@ -20,16 +19,16 @@ export default function ForgotPasswordPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (sending) return
-    setError(''); setMessage(''); setSending(true)
+    setSending(true)
     try {
       const { data } = await api.post('/api/auth/password-reset/request-otp', {
         identifier, channel, captchaToken: captchaRequired ? captchaToken : undefined,
       })
-      setMessage(data.message)
+      toast.info(data.message)
       setSubmitted(true)
     } catch (err: any) {
       const needsCaptcha = err.response?.data?.captchaRequired
-      setError(err.response?.data?.error || 'Failed to send code')
+      toast.error(getErrorMessage(err, 'Failed to send code'))
       if (needsCaptcha) setCaptchaRequired(true)
       if (captchaRequired || needsCaptcha) {
         setCaptchaToken('')
@@ -76,9 +75,6 @@ export default function ForgotPasswordPage() {
         {captchaRequired && (
           <Turnstile key={captchaKey} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />
         )}
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {message && <p className="text-sm text-green-700">{message}</p>}
 
         <button type="submit" disabled={sending || (captchaRequired && !captchaToken)}
           className="flex w-full items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">

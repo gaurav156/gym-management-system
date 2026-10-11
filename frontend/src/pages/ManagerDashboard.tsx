@@ -8,6 +8,7 @@ import MembersTab from '../components/manager/MembersTab'
 import StaffTab from '../components/manager/StaffTab'
 import StoreTab from '../components/manager/StoreTab'
 import type { Branch, LastCheckinEntry } from '../types'
+import { toast, getErrorMessage } from '../store/toastStore'
 
 type Tab = 'ATTENDANCE' | 'PAYMENTS' | 'STORE' | 'EXPENSES' | 'MEMBERS' | 'STAFF'
 
@@ -15,7 +16,6 @@ export default function ManagerDashboard() {
   const user = useAuthStore((s) => s.user)
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranch, setSelectedBranch] = useState('')
-  const [branchLoadError, setBranchLoadError] = useState('')
   const [allBranches, setAllBranches] = useState<Branch[]>([])
   const [lastCheckins, setLastCheckins] = useState<Record<string, string>>({})
   const [activeTab, setActiveTab] = useState<Tab>('ATTENDANCE')
@@ -34,7 +34,7 @@ export default function ManagerDashboard() {
         if (res.data.length > 0) setSelectedBranch((res.data.find((b) => b.active) ?? res.data[0]).id)
       })
       .catch((err) => {
-        setBranchLoadError(err.response?.data?.error || 'Failed to load branches - check the backend logs.')
+        toast.error(getErrorMessage(err, 'Failed to load branches - check the backend logs.'))
       })
   }, [user])
 
@@ -75,7 +75,6 @@ export default function ManagerDashboard() {
       <h1 className="text-2xl font-semibold">
         {user?.role === 'OWNER' ? 'Branch operations (Owner view)' : 'Manager dashboard'}
       </h1>
-      {branchLoadError && <p className="mt-2 text-sm text-red-600">{branchLoadError}</p>}
 
       {branches.length > 1 && (
         <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}

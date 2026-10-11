@@ -13,6 +13,7 @@ import type { Gender, Profile, AttendanceLogEntry, PageResponse } from '../types
 import Avatar from '../components/Avatar'
 import MemberStoreTab from '../components/member/MemberStoreTab'
 import MarketingPreferenceSection from '../components/MarketingPreferenceSection'
+import { toast, getErrorMessage } from '../store/toastStore'
 
 const PAGE_SIZE = 5
 
@@ -33,12 +34,9 @@ export default function StaffProfilePage() {
     const [dob, setDob] = useState('')
     const [idProofPending, setIdProofPending] = useState<string | null>(null)
     const { confirm, dialogProps } = useConfirm()
-    const [message, setMessage] = useState('')
-    const [error, setError] = useState('')
     const [saving, setSaving] = useState(false)
 
     const [attendance, setAttendance] = useState<AttendanceLogEntry[]>([])
-    const [attendanceError, setAttendanceError] = useState('')
     const [attendancePage, setAttendancePage] = useState(0)
     const [attendanceTotalPages, setAttendanceTotalPages] = useState(1)
     const [attendanceTotalElements, setAttendanceTotalElements] = useState(0)
@@ -66,7 +64,7 @@ export default function StaffProfilePage() {
         setAttendanceTotalElements(res.data.totalElements)
         setAttendancePage(res.data.page)
         })
-        .catch((err) => setAttendanceError(err.response?.data?.error || 'Failed to load your attendance log'))
+        .catch((err) => toast.error(getErrorMessage(err, 'Failed to load your attendance log')))
         .finally(() => setAttendanceLoaded(true))
     }
 
@@ -89,7 +87,6 @@ export default function StaffProfilePage() {
     }
 
     async function save() {
-        setMessage(''); setError('')
         setSaving(true)
         try {
             const { data } = await api.put<Profile>('/api/profile/me', {
@@ -100,9 +97,9 @@ export default function StaffProfilePage() {
             setGender(data.gender ?? '')
             setDob(data.dateOfBirth ?? '')
             setIdProofPending(null)
-            setMessage('Profile updated.')
+            toast.success('Profile updated.')
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Failed to update profile')
+            toast.error(getErrorMessage(err, 'Failed to update profile'))
         } finally {
             setSaving(false)
         }
@@ -172,7 +169,7 @@ export default function StaffProfilePage() {
                         {locked && (
                             <div className="flex flex-col items-center gap-3">
                                 <Avatar src={photo} name={profile.name} className="h-24 w-24" textClassName="text-2xl" />
-                                <PhotoUploadButton onLoaded={setPhoto} onError={setError} label="Upload photo" />
+                                <PhotoUploadButton onLoaded={setPhoto} label="Upload photo" />
                                 {photo && (
                                     <button type="button" onClick={() => setPhoto(null)} className="text-xs text-red-600 hover:underline">
                                         Remove photo
@@ -206,7 +203,7 @@ export default function StaffProfilePage() {
                             onGenderChange={setGender} onDateOfBirthChange={setDob} />
                         <IdProofField personId={profile.id} uploaded={profile.idProofUploaded} pendingKey={idProofPending}
                             canChange={profile.role === 'OWNER' || !profile.idProofUploaded}
-                            onUploaded={setIdProofPending} onError={setError} />
+                            onUploaded={setIdProofPending} onError={toast.error} />
                         {locked && (
                             <p className="text-xs text-gray-500">You've already used your one-time update - ask the Owner to change your details. Your signature can still be changed.</p>
                         )}
@@ -222,7 +219,7 @@ export default function StaffProfilePage() {
                                         No signature yet
                                     </div>
                                 )}
-                                <PhotoUploadButton onLoaded={setSignature} onError={setError} label="Upload signature" size="sm" purpose="SIGNATURE" />
+                                <PhotoUploadButton onLoaded={setSignature} label="Upload signature" size="sm" purpose="SIGNATURE" />
                                 {signature && (
                                     <button type="button" onClick={() => setSignature(null)} className="text-xs text-red-600 hover:underline">
                                         Remove signature
@@ -230,9 +227,6 @@ export default function StaffProfilePage() {
                                 )}
                             </div>
                         </div>
-
-                        {error && <p className="text-sm text-red-600">{error}</p>}
-                        {message && <p className="text-sm text-green-700">{message}</p>}
 
                         <button type="submit" disabled={saving}
                             className="flex w-full items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
@@ -262,7 +256,6 @@ export default function StaffProfilePage() {
                     <div className="rounded-lg border border-gray-200 p-6">
                         <h2 className="font-medium">Your attendance log</h2>
                         <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
-                        {attendanceError && <p className="mt-2 text-sm text-red-600">{attendanceError}</p>}
                         {!attendanceLoaded ? (
                             <div className="mt-4 space-y-3">
                                 <div className="h-4 w-full animate-pulse rounded bg-gray-200" />

@@ -6,6 +6,7 @@ import Spinner from '../components/Spinner'
 import Turnstile from '../components/Turnstile'
 import PersonalDetailsFields from '../components/PersonalDetailsFields'
 import type { AuthUser, Branch, Gender } from '../types'
+import { toast, getErrorMessage } from '../store/toastStore'
 
 const RESEND_COOLDOWN_SECONDS = 60
 
@@ -21,8 +22,6 @@ export default function RegisterPage() {
   const [dob, setDob] = useState('')
 
   const [step, setStep] = useState<'FORM' | 'OTP'>('FORM')
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
   const [sendingOtp, setSendingOtp] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
@@ -61,7 +60,7 @@ export default function RegisterPage() {
 
   function onAuthError(err: any) {
     const needsCaptcha = err.response?.data?.captchaRequired
-    setError(err.response?.data?.error || 'Something went wrong')
+    toast.error(getErrorMessage(err, 'Something went wrong'))
     if (needsCaptcha) setCaptchaRequired(true)
     if (captchaRequired || needsCaptcha) {
       setCaptchaToken('')
@@ -72,12 +71,12 @@ export default function RegisterPage() {
   async function requestOtp(e: FormEvent) {
     e.preventDefault()
     if (sendingOtp) return
-    setError(''); setMessage(''); setSendingOtp(true)
+    setSendingOtp(true)
     try {
       const { data } = await api.post('/api/auth/register/request-otp', {
         email, captchaToken: captchaRequired ? captchaToken : undefined,
       })
-      setMessage(data.message)
+      toast.success(data.message)
       setStep('OTP')
       startCooldown()
     } catch (err: any) {
@@ -89,12 +88,12 @@ export default function RegisterPage() {
 
   async function resendOtp() {
     if (sendingOtp || resendCooldown > 0) return
-    setError(''); setMessage(''); setSendingOtp(true)
+    setSendingOtp(true)
     try {
       const { data } = await api.post('/api/auth/register/request-otp', {
         email, captchaToken: captchaRequired ? captchaToken : undefined,
       })
-      setMessage(data.message)
+      toast.success(data.message)
       setOtp('')
       startCooldown()
     } catch (err: any) {
@@ -107,7 +106,7 @@ export default function RegisterPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (submitting) return
-    setError(''); setSubmitting(true)
+    setSubmitting(true)
     try {
       const { data } = await api.post<AuthUser>('/api/auth/register', {
         name, email, phone, password, branchId, otp,
@@ -171,7 +170,6 @@ export default function RegisterPage() {
             <Turnstile key={captchaKey} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />
           )}
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
           <button type="submit" disabled={sendingOtp || (captchaRequired && !captchaToken)}
             className="flex w-full items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60">
             {sendingOtp && <Spinner />}
@@ -182,15 +180,12 @@ export default function RegisterPage() {
 
       {step === 'OTP' && (
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          {message && <p className="text-sm text-green-700">{message}</p>}
           <div>
             <label className="block text-sm font-medium text-gray-700">6-digit code</label>
             <input required disabled={submitting} maxLength={6} value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
               className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 tracking-widest focus:border-brand focus:outline-none disabled:bg-gray-50" />
           </div>
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
 
           <button type="submit" disabled={submitting}
             className="flex w-full items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60">
@@ -203,7 +198,7 @@ export default function RegisterPage() {
               className="text-brand hover:underline disabled:cursor-not-allowed disabled:text-gray-400 disabled:no-underline">
               {resendCooldown > 0 ? `Resend code (${resendCooldown}s)` : 'Resend code'}
             </button>
-            <button type="button" onClick={() => { setStep('FORM'); setOtp(''); setError(''); setMessage('') }}
+            <button type="button" onClick={() => { setStep('FORM'); setOtp('') }}
               className="text-gray-500 hover:underline">
               Edit details
             </button>

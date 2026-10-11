@@ -6,6 +6,7 @@ import Spinner from './Spinner'
 import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, BanIcon } from './icons/ActionIcons'
 import type { ProductOrder, ProductOrderInvoice, PageResponse } from '../types'
 import { useScrollLock } from '../hooks/useScrollLock'
+import { toast, getErrorMessage } from '../store/toastStore'
 
 const PAGE_SIZE = 5
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
@@ -24,15 +25,12 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [totalElements, setTotalElements] = useState(0)
-  const [error, setError] = useState('')
-  const [sendMessage, setSendMessage] = useState('')
 
   const [cancelTarget, setCancelTarget] = useState<ProductOrder | null>(null)
   const [refundAmount, setRefundAmount] = useState('')
   const [refundMode, setRefundMode] = useState('CASH')
   const [refundNote, setRefundNote] = useState('')
   const [cancelling, setCancelling] = useState(false)
-  const [cancelError, setCancelError] = useState('')
 
   function load(p = 0) {
     setLoading(true)
@@ -49,36 +47,33 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
   useEffect(() => { load(0) }, [personId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleInvoiceAction(orderId: string, action: 'view' | 'print' | 'download') {
-    setError('')
     try {
       const { data } = await api.get<ProductOrderInvoice>(`/api/product-orders/${orderId}/invoice`)
       if (action === 'view') await viewProductInvoice(data)
       else if (action === 'print') await printProductInvoice(data)
       else await downloadProductInvoice(data)
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load invoice')
+      toast.error(getErrorMessage(err, 'Failed to load invoice'))
     }
   }
 
   async function handleSendAction(orderId: string, channel: 'email' | 'whatsapp') {
-    setError(''); setSendMessage('')
     try {
       const { data } = await api.post<{ message: string }>(`/api/product-orders/${orderId}/send-${channel}`)
-      setSendMessage(data.message)
+      toast.success(data.message)
     } catch (err: any) {
-      setError(err.response?.data?.error || `Failed to send via ${channel}`)
+      toast.error(getErrorMessage(err, `Failed to send via ${channel}`))
     }
   }
 
   function openCancelDialog(order: ProductOrder) {
-    setCancelTarget(order); setRefundAmount(String(order.totalAmount)); setRefundMode('CASH'); setRefundNote(''); setCancelError('')
+    setCancelTarget(order); setRefundAmount(String(order.totalAmount)); setRefundMode('CASH'); setRefundNote('')
   }
 
   async function submitCancel() {
     if (!cancelTarget) return
-    setCancelError('')
     if (!refundAmount || Number.isNaN(Number(refundAmount)) || Number(refundAmount) <= 0) {
-      setCancelError('Enter a valid refund amount.')
+      toast.warning('Enter a valid refund amount.')
       return
     }
     setCancelling(true)
@@ -86,10 +81,11 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
       await api.post(`/api/product-orders/${cancelTarget.id}/cancel`, {
         refundAmount: Number(refundAmount), refundMode, refundNote: refundNote || null,
       })
+      toast.success('Order cancelled and refunded.')
       setCancelTarget(null)
       load(page)
     } catch (err: any) {
-      setCancelError(err.response?.data?.error || 'Failed to cancel order')
+      toast.error(getErrorMessage(err, 'Failed to cancel order'))
     } finally {
       setCancelling(false)
     }
@@ -99,7 +95,6 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
 
   return (
     <div className="mt-4">
-      {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
@@ -143,7 +138,6 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
         </table>
       </div>
       {!loading && orders.length === 0 && <p className="py-4 text-sm text-gray-400">No product purchases yet.</p>}
-      {sendMessage && <p className="mt-2 text-sm text-green-700">{sendMessage}</p>}
       {totalElements > 0 && (
         <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
           <span>Page {page + 1} of {totalPages} ({totalElements} total)</span>
@@ -181,7 +175,6 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
                 <textarea value={refundNote} onChange={(e) => setRefundNote(e.target.value)} rows={2}
                   className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
               </div>
-              {cancelError && <p className="text-sm text-red-600">{cancelError}</p>}
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <button disabled={cancelling} onClick={() => setCancelTarget(null)}

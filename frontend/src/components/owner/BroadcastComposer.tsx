@@ -11,6 +11,7 @@ import type {
   BroadcastAttachmentInput, BroadcastAudience, BroadcastChannel, BroadcastFormat, BroadcastPreview,
   BroadcastType, ChannelAvailability,
 } from '../../types'
+import { toast, getErrorMessage } from '../../store/toastStore'
 
 const SMS_MAX = 600
 const MAX_ATTACHMENTS = 3
@@ -46,8 +47,6 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
   const previewTicket = useRef(0)
 
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
   const [testSending, setTestSending] = useState(false)
   const htmlRef = useRef<HTMLTextAreaElement>(null)
   const { confirm, dialogProps } = useConfirm()
@@ -101,7 +100,7 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
     const handle = setTimeout(() => {
       api.post<{ html: string; text: string }>('/api/owner/broadcasts/render', payload)
         .then((res) => { if (ticket === previewTicket.current) { setPreviewHtml(res.data.html); setPreviewError('') } })
-        .catch((err) => { if (ticket === previewTicket.current) setPreviewError(err.response?.data?.error || 'Preview failed') })
+        .catch((err) => { if (ticket === previewTicket.current) toast.error(getErrorMessage(err, 'Preview failed')) })
         .finally(() => { if (ticket === previewTicket.current) setPreviewLoading(false) })
     }, 600)
     return () => clearTimeout(handle)
@@ -136,7 +135,6 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    setError(''); setMessage('')
     if (!canSend || !counts) return
 
     const notes: string[] = []
@@ -155,24 +153,23 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
           await api.post('/api/owner/broadcasts', payload)
           setSubject(''); setDesignerBody(''); setHtmlBody(''); setPlainBody('')
           setBannerUrl(null); setAttachments([])
-          setMessage('Broadcast queued - delivery is in progress, see the history below.')
+          toast.success('Broadcast queued - delivery is in progress, see the history below.')
           onSent()
         } catch (err: any) {
-          setError(err.response?.data?.error || 'Failed to send broadcast')
+          toast.error(getErrorMessage(err, 'Failed to send broadcast'))
         }
       },
     })
   }
 
   async function sendTest() {
-    setError(''); setMessage('')
-    if (!body.trim() || !subject.trim()) { setError('Add a subject and a message first.'); return }
+    if (!body.trim() || !subject.trim()) { toast.warning('Add a subject and a message first.'); return }
     setTestSending(true)
     try {
       const { data } = await api.post<{ message: string }>('/api/owner/broadcasts/test', payload)
-      setMessage(data.message)
+      toast.success(data.message)
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to send test email')
+      toast.error(getErrorMessage(err, 'Failed to send test email'))
     } finally {
       setTestSending(false)
     }
@@ -260,13 +257,13 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
             <div className="mt-1 flex flex-wrap items-center gap-2">
               {bannerUrl && <img src={bannerUrl} alt="" className="h-14 rounded border border-gray-200 object-cover" />}
               <PhotoUploadButton purpose="BROADCAST_IMAGE" size="sm" label={bannerUrl ? 'Replace banner' : 'Upload banner'}
-                onLoaded={(url) => setBannerUrl(url)} onError={setError} />
+                onLoaded={(url) => setBannerUrl(url)} />
               {bannerUrl && <button type="button" onClick={() => setBannerUrl(null)} className="text-xs text-red-600 hover:underline">Remove</button>}
             </div>
           </div>
 
           <DescriptionEditor value={designerBody} onChange={setDesignerBody} rows={10}
-            showPreview={false} enableButtons enableImages accent={accent} onError={setError} />
+            showPreview={false} enableButtons enableImages accent={accent} onError={toast.error} />
           <p className="text-[11px] text-gray-400">
             Put the cursor on a line (or select several) and click the align buttons to left / centre / right it - this works
             for text, headings, images and buttons. Type <code>{'{{name}}'}</code> to insert each person's name.
@@ -290,7 +287,7 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
               {BROADCAST_TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
             <PhotoUploadButton purpose="BROADCAST_IMAGE" size="sm" label="Insert image"
-              onLoaded={(url) => insertImageIntoHtml(url)} onError={setError} />
+              onLoaded={(url) => insertImageIntoHtml(url)} />
           </div>
           <textarea ref={htmlRef} value={htmlBody} onChange={(e) => setHtmlBody(e.target.value)} rows={14} spellCheck={false}
             placeholder="<table>...</table> - use inline style=&quot;...&quot; attributes"
@@ -325,7 +322,7 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
             ))}
             {attachments.length < MAX_ATTACHMENTS && (
               <PhotoUploadButton purpose="BROADCAST_ATTACHMENT" accept="image/*,application/pdf" size="sm" label="Add attachment"
-                onLoaded={(url, filename) => setAttachments((list) => [...list, { url, filename }])} onError={setError} />
+                onLoaded={(url, filename) => setAttachments((list) => [...list, { url, filename }])} />
             )}
           </div>
         </div>
@@ -360,8 +357,6 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {message && <p className="text-sm text-green-700">{message}</p>}
       {anySending && <p className="text-xs text-amber-600">Another broadcast is still sending - you can send the next one when it finishes.</p>}
 
       <div className="flex flex-wrap items-center gap-3">

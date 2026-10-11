@@ -6,6 +6,7 @@ import { TableSkeleton } from '../Skeleton'
 import Spinner from '../Spinner'
 import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon } from '../icons/ActionIcons'
+import { toast, getErrorMessage } from '../../store/toastStore'
 
 const PAGE_SIZE = 10
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
@@ -30,7 +31,6 @@ export default function PaymentsTab({ selectedBranch }: Props) {
   const [purchasePlanId, setPurchasePlanId] = useState('')
   const [purchaseMode, setPurchaseMode] = useState('CASH')
   const [purchaseStartDate, setPurchaseStartDate] = useState('')
-  const [purchaseMessage, setPurchaseMessage] = useState('')
   const [purchasing, setPurchasing] = useState(false)
   const [purchaseFullPayment, setPurchaseFullPayment] = useState(true)
   const [purchaseAmountPaid, setPurchaseAmountPaid] = useState('')
@@ -59,9 +59,6 @@ export default function PaymentsTab({ selectedBranch }: Props) {
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [memberDropdownOpen, setMemberDropdownOpen] = useState(false)
   const memberDropdownRef = useRef<HTMLDivElement>(null)
-
-  const [invoiceError, setInvoiceError] = useState('')
-  const [sendMessage, setSendMessage] = useState('')
 
   useEffect(() => {
     api.get<Plan[]>('/api/plans').then((res) => setPlans(res.data))
@@ -131,13 +128,12 @@ export default function PaymentsTab({ selectedBranch }: Props) {
 
   async function recordPurchase(e: FormEvent) {
     e.preventDefault()
-    setPurchaseMessage('')
     if (!purchaseMemberId || !purchasePlanId) {
-      setPurchaseMessage('Select a member and a plan.')
+      toast.warning('Select a member and a plan.')
       return
     }
     if (!selectedBranch) {
-      setPurchaseMessage('No branch selected.')
+      toast.warning('No branch selected.')
       return
     }
     setPurchasing(true)
@@ -155,39 +151,36 @@ export default function PaymentsTab({ selectedBranch }: Props) {
         },
         { params: { memberId: purchaseMemberId } }
       )
-      setPurchaseMessage(`Recorded - valid until ${data.endDate}.`)
+      toast.success(`Recorded - valid until ${data.endDate}.`)
       setPurchaseMemberId(''); setPurchasePlanId(''); setPurchaseStartDate('')
       setPurchaseFullPayment(true); setPurchaseAmountPaid(''); setPurchaseBalanceDueDate('')
       setPurchaseCouponCode(''); setPurchaseCouponStatus(null)
       setSelectedMember(null)
       loadPayments(0)
     } catch (err: any) {
-      setPurchaseMessage(err.response?.data?.error || 'Failed to record purchase')
+      toast.error(getErrorMessage(err, 'Failed to record purchase'))
     } finally {
       setPurchasing(false)
     }
   }
 
   async function handleInvoiceAction(paymentId: string, action: 'view' | 'print' | 'download') {
-    setInvoiceError('')
     try {
       const { data } = await api.get<InvoiceResponse>(`/api/payments/${paymentId}/invoice`)
       if (action === 'view') await viewInvoice(data)
       else if (action === 'print') await printInvoice(data)
       else await downloadInvoice(data)
     } catch (err: any) {
-      setInvoiceError(err.response?.data?.error || 'Failed to load invoice') // or setLoadError in MemberDashboard
+      toast.error(getErrorMessage(err, 'Failed to load invoice')) // or setLoadError in MemberDashboard
     }
   }
 
   async function handleSendAction(paymentId: string, channel: 'email' | 'whatsapp') {
-    setInvoiceError('')
-    setSendMessage('')
     try {
       const { data } = await api.post<{ message: string }>(`/api/payments/${paymentId}/send-${channel}`)
-      setSendMessage(data.message)
+      toast.success(data.message)
     } catch (err: any) {
-      setInvoiceError(err.response?.data?.error || `Failed to send via ${channel}`)
+      toast.error(getErrorMessage(err, `Failed to send via ${channel}`))
     }
   }
 
@@ -304,7 +297,6 @@ export default function PaymentsTab({ selectedBranch }: Props) {
               {purchasing && <Spinner className="h-4 w-4" />}
               {purchasing ? 'Recording...' : 'Record purchase'}
             </button>
-            {purchaseMessage && <p className="text-sm text-gray-700">{purchaseMessage}</p>}
           </form>
         </div>
 
@@ -364,8 +356,6 @@ export default function PaymentsTab({ selectedBranch }: Props) {
             </tbody>
           </table>
         </div>
-        {invoiceError && <p className="mt-2 text-sm text-red-600">{invoiceError}</p>}
-        {sendMessage && <p className="mt-2 text-sm text-green-700">{sendMessage}</p>}
         {!paymentsLoading && payments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
         {paymentTotalElements > 0 && (
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">

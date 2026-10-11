@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { toast, getErrorMessage } from '../store/toastStore'
 
 interface ConfirmOptions {
   title: string
@@ -22,8 +23,10 @@ export function useConfirm() {
     setLoading(true)
     try {
       await pending.onConfirm()
-      setPending(null)
+    } catch (err) {
+      toast.error(getErrorMessage(err))
     } finally {
+      setPending(null)
       setLoading(false)
     }
   }

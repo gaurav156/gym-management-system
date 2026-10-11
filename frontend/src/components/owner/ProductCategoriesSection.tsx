@@ -4,12 +4,12 @@ import Spinner from '../Spinner'
 import ConfirmDialog from '../ConfirmDialog'
 import { useConfirm } from '../../hooks/useConfirm'
 import type { ProductCategory } from '../../types'
+import { toast, getErrorMessage } from '../../store/toastStore'
 
 export default function ProductCategoriesSection() {
   const [categories, setCategories] = useState<ProductCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [name, setName] = useState('')
-  const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const { confirm, dialogProps } = useConfirm()
 
@@ -22,15 +22,15 @@ export default function ProductCategoriesSection() {
 
   async function createCategory(e: FormEvent) {
     e.preventDefault()
-    setError('')
-    if (!name.trim()) { setError('Enter a category name.'); return }
+    if (!name.trim()) { toast.warning('Enter a category name.'); return }
     setSubmitting(true)
     try {
       await api.post('/api/product-categories', { name: name.trim() })
+      toast.success('Category added.')
       setName('')
       load()
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create category')
+      toast.error(getErrorMessage(err, 'Failed to create category'))
     } finally {
       setSubmitting(false)
     }
@@ -44,6 +44,7 @@ export default function ProductCategoriesSection() {
       danger: true,
       onConfirm: async () => {
         await api.delete(`/api/product-categories/${c.id}`)
+        toast.success('Category deleted.')
         load()
       },
     })
@@ -64,7 +65,6 @@ export default function ProductCategoriesSection() {
           {submitting ? 'Adding...' : 'Add'}
         </button>
       </form>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {!loading && categories.map((c) => (

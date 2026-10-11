@@ -1,6 +1,7 @@
 import { ChangeEvent, useId, useState } from 'react'
 import { handleEditPhotoChange, type ImagePurpose } from '../utils/photo'
 import Spinner from './Spinner'
+import { toast } from '../store/toastStore'
 
 function UploadIcon() {
   return (
@@ -14,7 +15,7 @@ function UploadIcon() {
 
 interface Props {
   onLoaded: (url: string, filename: string) => void
-  onError: (msg: string) => void
+  onError?: (msg: string) => void
   label?: string
   size?: 'sm' | 'md'
   purpose?: ImagePurpose
@@ -30,7 +31,7 @@ export default function PhotoUploadButton({ onLoaded, onError, label = 'Upload p
   async function handleChange(e: ChangeEvent<HTMLInputElement>) {
     setUploading(true)
     try {
-      await handleEditPhotoChange(e, onLoaded, onError, purpose)
+      await handleEditPhotoChange(e, onLoaded, onError ?? ((m) => toast.error(m)), purpose)
     } finally {
       setUploading(false)
     }

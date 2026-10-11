@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import PhotoUploadButton from '../PhotoUploadButton'
 import { renderRichText } from '../../utils/richText'
+import { toast } from '../../store/toastStore'
 
 type Align = 'left' | 'center' | 'right' | 'justify'
 const ALIGN_OPEN = /^:::(left|center|right|justify)$/
@@ -61,7 +62,6 @@ export default function DescriptionEditor({
   const [btnUrl, setBtnUrl] = useState('')
   const [btnBg, setBtnBg] = useState(accent && HEX.test(accent) ? accent : '#e11d48')
   const [btnText, setBtnText] = useState('#ffffff')
-  const [btnError, setBtnError] = useState('')
   const [imageWidth, setImageWidth] = useState('')
 
   // Every formatting action goes through this: capture scrollTop before mutating the
@@ -205,11 +205,10 @@ export default function DescriptionEditor({
   }
 
   function insertButton() {
-    setBtnError('')
     const label = btnLabel.replace(/\|/g, '/').trim()
     const url = btnUrl.trim()
-    if (!label) { setBtnError('Enter the button text.'); return }
-    if (!/^(https?:\/\/|mailto:|tel:).+/i.test(url)) { setBtnError('The link must start with https://, mailto: or tel:'); return }
+    if (!label) { toast.warning('Enter the button text.'); return }
+    if (!/^(https?:\/\/|mailto:|tel:).+/i.test(url)) { toast.warning('The link must start with https://, mailto: or tel:'); return }
     insertLine(`@button ${label} | ${url} | ${btnBg} | ${btnText}`)
     setBtnLabel(''); setBtnUrl('')
   }
@@ -259,7 +258,7 @@ export default function DescriptionEditor({
               <option value="200">Small</option>
             </select>
             <PhotoUploadButton purpose="BROADCAST_IMAGE" size="sm" label="Add image"
-              onLoaded={insertImage} onError={(m) => onError?.(m)} />
+              onLoaded={insertImage} onError={(m) => (onError ? onError(m) : toast.error(m))} />  
           </>
         )}
       </div>
@@ -291,7 +290,6 @@ export default function DescriptionEditor({
             Add several in a row to put them side by side - leave a blank line between two to stack them. Use the align
             buttons to left / centre / right them.
           </p>
-          {btnError && <p className="text-xs text-red-600">{btnError}</p>}
         </div>
       )}
 

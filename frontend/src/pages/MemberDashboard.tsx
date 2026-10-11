@@ -9,6 +9,7 @@ import type { Membership, Plan, Payment, Branch, AttendanceLogEntry, HourlyCount
 import { viewInvoice, printInvoice, downloadInvoice } from '../utils/invoice'
 import type { InvoiceResponse } from '../types'
 import MemberStoreTab from '../components/member/MemberStoreTab'
+import { toast, getErrorMessage } from '../store/toastStore'
 
 const PAGE_SIZE = 5
 
@@ -24,8 +25,6 @@ export default function MemberDashboard() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranch, setSelectedBranch] = useState('')
   const [summary, setSummary] = useState<HourlyCount[]>([])
-  const [message, setMessage] = useState('')
-  const [loadError, setLoadError] = useState('')
 
   const [payments, setPayments] = useState<Payment[]>([])
   const [paymentsLoading, setPaymentsLoading] = useState(true)
@@ -49,7 +48,7 @@ export default function MemberDashboard() {
         setPaymentTotalElements(res.data.totalElements)
         setPaymentPage(res.data.page)
       })
-      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your payment history'))
+      .catch((err) => toast.error(getErrorMessage(err, 'Failed to load your payment history')))
       .finally(() => setPaymentsLoading(false))
   }
   
@@ -63,7 +62,7 @@ export default function MemberDashboard() {
         setAttendanceTotalElements(res.data.totalElements)
         setAttendancePage(res.data.page)
       })
-      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your attendance log'))
+      .catch((err) => toast.error(getErrorMessage(err, 'Failed to load your attendance log')))
       .finally(() => setAttendanceLoading(false))
   }
 
@@ -72,21 +71,20 @@ export default function MemberDashboard() {
     setMembershipLoading(true)
     api.get<Membership[]>('/api/memberships/mine', { params: { memberId: user.userId } })
       .then((res) => setMemberships(res.data))
-      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your memberships'))
+      .catch((err) => toast.error(getErrorMessage(err, 'Failed to load your memberships')))
       .finally(() => setMembershipLoading(false))
     loadPayments(0)
     loadAttendance(0)
   }
 
   async function handleInvoiceAction(paymentId: string, action: 'view' | 'print' | 'download') {
-    setLoadError('')
     try {
       const { data } = await api.get<InvoiceResponse>(`/api/payments/${paymentId}/invoice`)
       if (action === 'view') await viewInvoice(data)
       else if (action === 'print') await printInvoice(data)
       else await downloadInvoice(data)
     } catch (err: any) {
-      setLoadError(err.response?.data?.error || 'Failed to load invoice')
+      toast.error(getErrorMessage(err, 'Failed to load invoice'))
     }
   }
 
@@ -103,7 +101,7 @@ export default function MemberDashboard() {
     setPlansLoading(true)
     api.get<Plan[]>('/api/plans')
       .then((res) => setPlans(res.data))
-      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load plans'))
+      .catch((err) => toast.error(getErrorMessage(err, 'Failed to load plans')))
       .finally(() => setPlansLoading(false))
 
     api.get<Branch[]>('/api/branches/mine', { params: { userId: user.userId } })
@@ -111,7 +109,7 @@ export default function MemberDashboard() {
         setBranches(res.data)
         if (res.data.length > 0) setSelectedBranch(res.data[0].id)
       })
-      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your branches'))
+      .catch((err) => toast.error(getErrorMessage(err, 'Failed to load your branches')))
 
     return () => window.removeEventListener('focus', onFocus)
   }, [user])
@@ -140,7 +138,6 @@ export default function MemberDashboard() {
           </button>
         )}
       </div>
-      {loadError && <p className="mt-2 text-sm text-red-600">{loadError}</p>}
 
       <div className="mt-6 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
         <div className="flex min-w-max gap-1">
@@ -225,7 +222,6 @@ export default function MemberDashboard() {
                 </>
               )}
             </div>
-            {message && <p className="mt-4 text-sm text-gray-700">{message}</p>}
           </div>
 
           <div className="mt-8 rounded-lg border border-gray-200 p-6">

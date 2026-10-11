@@ -1,18 +1,19 @@
 import { useState } from 'react'
 import { api } from '../api/client'
+import { toast, getErrorMessage } from '../store/toastStore'
 
 export default function MarketingPreferenceSection({ initial }: { initial: boolean }) {
   const [consent, setConsent] = useState(initial)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
 
   async function toggle(next: boolean) {
-    setSaving(true); setError('')
+    setSaving(true);
     try {
       await api.put('/api/profile/me/marketing-consent', { consent: next })
       setConsent(next)
+      toast.success(next ? 'You will now receive offers and updates.' : 'You have unsubscribed from promotions.')
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to update preference')
+      toast.error(getErrorMessage(err, 'Failed to update preference'))
     } finally {
       setSaving(false)
     }
@@ -29,7 +30,6 @@ export default function MarketingPreferenceSection({ initial }: { initial: boole
           </span>
         </span>
       </label>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </div>
   )
 }

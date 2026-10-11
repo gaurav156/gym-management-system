@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import Spinner from '../components/Spinner'
 import type { OtpChannel } from '../types'
+import { toast, getErrorMessage } from '../store/toastStore'
 
 export default function ResetPasswordPage() {
   const location = useLocation()
@@ -14,16 +15,13 @@ export default function ResetPasswordPage() {
   const [otp, setOtp] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
   const [resetting, setResetting] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (resetting) return
-    setError(''); setMessage('')
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.')
+      toast.warning('Passwords do not match.')
       return
     }
     setResetting(true)
@@ -31,10 +29,10 @@ export default function ResetPasswordPage() {
       const { data } = await api.post('/api/auth/password-reset/confirm', {
         identifier, channel, otp, newPassword,
       })
-      setMessage(data.message)
+      toast.success(data.message)
       setTimeout(() => navigate('/login'), 1500)
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to reset password')
+      toast.error(getErrorMessage(err, 'Failed to reset password'))
       setResetting(false)
     }
     // Deliberately not resetting `resetting` in a finally block on the success path -
@@ -75,9 +73,6 @@ export default function ResetPasswordPage() {
           <input required disabled={resetting} type="password" minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none disabled:bg-gray-50" />
         </div>
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {message && <p className="text-sm text-green-700">{message}</p>}
 
         <button type="submit" disabled={resetting}
           className="flex w-full items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">

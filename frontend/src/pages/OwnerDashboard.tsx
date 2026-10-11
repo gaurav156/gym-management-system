@@ -13,6 +13,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { useConfirm } from '../hooks/useConfirm'
 import BroadcastsSection from '../components/owner/BroadcastsSection'
 import BackupSection from '../components/owner/BackupSection'
+import { toast, getErrorMessage } from '../store/toastStore'
 
 type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
 type Tab = 'FINANCE' | 'BRANCHES' | 'PLANS' | 'PRODUCTS' | 'BROADCASTS' | 'BACKUP'
@@ -68,7 +69,6 @@ export default function OwnerDashboard() {
   const [editBranchName, setEditBranchName] = useState('')
   const [editBranchAddress, setEditBranchAddress] = useState('')
   const [editBranchPhone, setEditBranchPhone] = useState('')
-  const [branchEditMessage, setBranchEditMessage] = useState('')
   const [savingBranchEdit, setSavingBranchEdit] = useState(false)
 
   const [accountRole, setAccountRole] = useState<AccountRole>('MEMBER')
@@ -79,7 +79,6 @@ export default function OwnerDashboard() {
   const [accountDob, setAccountDob] = useState('')
   const [accountPassword, setAccountPassword] = useState('')
   const [accountBranchIds, setAccountBranchIds] = useState<string[]>([])
-  const [accountMessage, setAccountMessage] = useState('')
   const [creatingAccount, setCreatingAccount] = useState(false)
 
   const [plans, setPlans] = useState<Plan[]>([])
@@ -87,7 +86,6 @@ export default function OwnerDashboard() {
   const [planName, setPlanName] = useState('')
   const [planMonths, setPlanMonths] = useState(1)
   const [planPrice, setPlanPrice] = useState('')
-  const [planError, setPlanError] = useState('')
   const [creatingPlan, setCreatingPlan] = useState(false)
   const [planDiscountPrice, setPlanDiscountPrice] = useState('')
 
@@ -95,7 +93,6 @@ export default function OwnerDashboard() {
   const activeBranches = branches.filter((b) => b.active)
 
   function toggleBranchActive(b: Branch) {
-    setBranchEditMessage('')
     confirm({
       title: b.active ? 'Deactivate branch' : 'Reactivate branch',
       message: b.active
@@ -106,16 +103,16 @@ export default function OwnerDashboard() {
       onConfirm: async () => {
         try {
           await api.post(`/api/branches/${b.id}/${b.active ? 'deactivate' : 'reactivate'}`)
+          toast.success(b.active ? 'Branch deactivated.' : 'Branch reactivated.')
           loadBranches()
         } catch (err: any) {
-          setBranchEditMessage(err.response?.data?.error || 'Failed to update branch')
+          toast.error(getErrorMessage(err, 'Failed to update branch'))
         }
       },
     })
   }
 
   function deleteBranch(b: Branch) {
-    setBranchEditMessage('')
     confirm({
       title: 'Delete branch',
       message: `Permanently delete "${b.name}"? This cannot be undone.`,
@@ -124,9 +121,10 @@ export default function OwnerDashboard() {
       onConfirm: async () => {
         try {
           await api.delete(`/api/branches/${b.id}`)
+          toast.success('Branch deleted.')
           loadBranches()
         } catch (err: any) {
-          setBranchEditMessage(err.response?.data?.error || 'Failed to delete branch')
+          toast.error(getErrorMessage(err, 'Failed to delete branch'))
         }
       },
     })
@@ -145,7 +143,10 @@ export default function OwnerDashboard() {
     try {
       await api.post('/api/branches', { name: branchName, address: branchAddress, phone: branchPhone || null })
       setBranchName(''); setBranchAddress(''); setBranchPhone('')
+      toast.success('Branch added.')
       loadBranches()
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to add branch'))
     } finally {
       setCreatingBranch(false)
     }
@@ -156,7 +157,6 @@ export default function OwnerDashboard() {
     setEditBranchName(b.name)
     setEditBranchAddress(b.address)
     setEditBranchPhone(b.phone ?? '')
-    setBranchEditMessage('')
   }
 
   function cancelEditBranch() {
@@ -164,7 +164,6 @@ export default function OwnerDashboard() {
   }
 
   async function saveEditBranch(id: string) {
-    setBranchEditMessage('')
     setSavingBranchEdit(true)
     try {
       await api.put(`/api/branches/${id}`, {
@@ -172,10 +171,11 @@ export default function OwnerDashboard() {
         address: editBranchAddress,
         phone: editBranchPhone || null,
       })
+      toast.success('Branch updated.')
       setEditingBranchId(null)
       loadBranches()
     } catch (err: any) {
-      setBranchEditMessage(err.response?.data?.error || 'Failed to update branch')
+      toast.error(getErrorMessage(err, 'Failed to update branch'))
     } finally {
       setSavingBranchEdit(false)
     }
@@ -183,9 +183,8 @@ export default function OwnerDashboard() {
 
   async function createAccount(e: FormEvent) {
     e.preventDefault()
-    setAccountMessage('')
     if (accountBranchIds.length === 0) {
-      setAccountMessage('Select at least one branch.')
+      toast.warning('Select at least one branch.')
       return
     }
     setCreatingAccount(true)
@@ -201,10 +200,10 @@ export default function OwnerDashboard() {
         branchIds: accountBranchIds,
       })
       const label = ACCOUNT_ROLES.find((r) => r.value === accountRole)?.label ?? accountRole
-      setAccountMessage(`${label} account created for ${accountName} - check-in PIN ${data.checkinPin}`)
+      toast.success(`${label} account created for ${accountName} - check-in PIN ${data.checkinPin}`, { duration: 0 })
       setAccountName(''); setAccountEmail(''); setAccountPhone(''); setAccountGender(''); setAccountDob(''); setAccountPassword(''); setAccountBranchIds([])
     } catch (err: any) {
-      setAccountMessage(err.response?.data?.error || 'Failed to create account')
+      toast.error(getErrorMessage(err, 'Failed to create account'))
     } finally {
       setCreatingAccount(false)
     }
@@ -219,9 +218,8 @@ export default function OwnerDashboard() {
 
   async function createPlan(e: FormEvent) {
     e.preventDefault()
-    setPlanError('')
     if (!planPrice || Number.isNaN(Number(planPrice))) {
-      setPlanError('Enter a valid price.')
+      toast.warning('Enter a valid price.')
       return
     }
     setCreatingPlan(true)
@@ -233,7 +231,7 @@ export default function OwnerDashboard() {
       setPlanName(''); setPlanPrice(''); setPlanDiscountPrice('')
       loadPlans()
     } catch (err: any) {
-      setPlanError(err.response?.data?.error || 'Failed to create plan')
+      toast.error(getErrorMessage(err, 'Failed to create plan'))
     } finally {
       setCreatingPlan(false)
     }
@@ -313,14 +311,12 @@ export default function OwnerDashboard() {
                     {creatingAccount && <Spinner className="h-4 w-4" />}
                     {creatingAccount ? 'Creating...' : 'Create account'}
                   </button>
-                  {accountMessage && <p className="text-sm text-gray-600">{accountMessage}</p>}
                 </form>
               </div>
             </div>
 
             <div className="mt-8 rounded-lg border border-gray-200 p-6">
               <h2 className="font-medium">All branches</h2>
-              {branchEditMessage && <p className="mt-2 text-sm text-red-600">{branchEditMessage}</p>}
               {branchesLoading ? (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <CardSkeleton />
@@ -410,7 +406,6 @@ export default function OwnerDashboard() {
                   </button>
                 </div>
               </form>
-              {planError && <p className="mt-2 text-sm text-red-600">{planError}</p>}
               {plansLoading ? (
                 <div className="mt-4 space-y-2">
                   <div className="h-4 w-full animate-pulse rounded bg-gray-200" />

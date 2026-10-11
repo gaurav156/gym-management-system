@@ -1,4 +1,5 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
+import { toast, getErrorMessage } from '../store/toastStore'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
@@ -9,25 +10,33 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
-  const [error, setError] = useState('')
   const [captchaRequired, setCaptchaRequired] = useState(false)
   const [captchaToken, setCaptchaToken] = useState('')
   const [captchaKey, setCaptchaKey] = useState(0) // bump to force a fresh widget/token
   const setUser = useAuthStore((s) => s.setUser)
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // Set by the api client's response interceptor. These are mutually exclusive: a
   // simply-expired token comes back as 401 ("session-expired"); a still-valid token
   // whose role no longer has access comes back as 403 ("access-changed") - see
   // api/client.ts and SecurityConfig for how the two are told apart.
   const reason = searchParams.get('reason')
-  const sessionExpired = reason === 'session-expired'
-  const accessChanged = reason === 'access-changed'
+
+  // Set by the api client's response interceptor (see api/client.ts). The param is removed
+  // afterwards so a page refresh doesn't show the toast again.
+  useEffect(() => {
+    if (!reason) return
+    if (reason === 'session-expired') {
+      toast.info('Your session has expired - please log in again.', { title: 'Session expired' })
+    } else if (reason === 'access-changed') {
+      toast.warning('Your account access has changed - please log in again to continue.', { title: 'Access changed' })
+    }
+    setSearchParams({}, { replace: true })
+  }, [reason, setSearchParams])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    setError('')
     try {
       const { data } = await api.post<AuthUser>('/api/auth/login', {
         email, password, rememberMe, captchaToken: captchaRequired ? captchaToken : undefined,
@@ -40,7 +49,7 @@ export default function LoginPage() {
       navigate(path)
     } catch (err: any) {
       const needsCaptcha = err.response?.data?.captchaRequired
-      setError(err.response?.data?.error || 'Login failed')
+      toast.error(getErrorMessage(err, 'Login failed'))
       if (needsCaptcha) setCaptchaRequired(true)
       // A Turnstile token is single-use regardless of outcome - force a fresh widget for
       // the next attempt whenever one was in play for this submission.
@@ -54,18 +63,6 @@ export default function LoginPage() {
   return (
     <div className="mx-auto max-w-sm px-4 py-16">
       <h1 className="text-2xl font-semibold">Log in</h1>
-
-      {sessionExpired && (
-        <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700">
-          Your session has expired - please log in again.
-        </div>
-      )}
-      {accessChanged && (
-        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
-          Your account access has changed - please log in again to continue.
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Email</label>
@@ -94,7 +91,6 @@ export default function LoginPage() {
           <Turnstile key={captchaKey} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />
         )}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
         <button type="submit" disabled={captchaRequired && !captchaToken}
           className="w-full rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60">
           Log in

@@ -3,6 +3,7 @@ import { api } from '../../api/client'
 import Spinner from '../Spinner'
 import ConfirmDialog from '../ConfirmDialog'
 import { useConfirm } from '../../hooks/useConfirm'
+import { toast, getErrorMessage } from '../../store/toastStore'
 
 type Preset = 'ALL' | 'LAST_6_MONTHS' | 'LAST_12_MONTHS' | 'CUSTOM'
 type ImportMode = 'MERGE' | 'REPLACE'
@@ -36,8 +37,6 @@ export default function BackupSection() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [busy, setBusy] = useState<'backup' | 'excel' | 'import' | null>(null)
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
 
   const [file, setFile] = useState<File | null>(null)
   const [mode, setMode] = useState<ImportMode>('MERGE')
@@ -53,12 +52,11 @@ export default function BackupSection() {
   }
 
   function rangeValid(): boolean {
-    if (preset === 'CUSTOM' && (!from || !to)) { setError('Select both a start and an end date.'); return false }
+    if (preset === 'CUSTOM' && (!from || !to)) { toast.warning('Select both a start and an end date.'); return false }
     return true
   }
 
   async function download(kind: 'backup' | 'excel') {
-    setError(''); setMessage('')
     if (!rangeValid()) return
     setBusy(kind)
     try {
@@ -73,9 +71,9 @@ export default function BackupSection() {
       a.href = url; a.download = name
       document.body.appendChild(a); a.click(); document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      setMessage(kind === 'backup' ? 'Backup downloaded.' : 'Excel file downloaded.')
+      toast.success(kind === 'backup' ? 'Backup downloaded.' : 'Excel file downloaded.')
     } catch (err: any) {
-      setError(await blobError(err, 'Download failed'))
+      toast.error(await blobError(err, 'Download failed'))
     } finally {
       setBusy(null)
     }
@@ -83,7 +81,7 @@ export default function BackupSection() {
 
   async function runImport() {
     if (!file) return
-    setError(''); setMessage(''); setResult(null)
+    setResult(null)
     setBusy('import')
     try {
       // A File is a Blob, so the browser streams it from disk - it is never read into memory.
@@ -93,19 +91,18 @@ export default function BackupSection() {
         timeout: 0, maxBodyLength: Infinity, maxContentLength: Infinity,
       })
       setResult(data)
-      setMessage('Import completed.')
+      toast.success('Import completed.')
       setPassword('')
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Import failed - nothing was changed.')
+      toast.error(getErrorMessage(err, 'Import failed - nothing was changed.'))
     } finally {
       setBusy(null)
     }
   }
 
   function handleImport() {
-    setError(''); setMessage('')
-    if (!file) { setError('Choose a backup (.zip) file first.'); return }
-    if (!password) { setError('Enter your password to confirm.'); return }
+    if (!file) { toast.warning('Choose a backup (.zip) file first.'); return }
+    if (!password) { toast.warning('Enter your password to confirm.'); return }
     confirm({
       title: mode === 'REPLACE' ? 'Replace ALL data?' : 'Import backup?',
       message: mode === 'REPLACE'
@@ -193,9 +190,6 @@ export default function BackupSection() {
           {busy === 'import' ? 'Importing...' : 'Import'}
         </button>
       </div>
-
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-      {message && <p className="mt-3 text-sm text-green-700">{message}</p>}
 
       {result && (
         <div className="mt-3 overflow-x-auto">

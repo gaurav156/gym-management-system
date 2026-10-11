@@ -10,6 +10,7 @@ import Avatar from '../components/Avatar'
 import { useConfirm } from '../hooks/useConfirm'
 import type { Gender, Profile } from '../types'
 import MarketingPreferenceSection from '../components/MarketingPreferenceSection'
+import { toast, getErrorMessage } from '../store/toastStore'
 
 const norm = (s: string | null | undefined) => (s ?? '').trim()
 
@@ -22,8 +23,6 @@ export default function ProfilePage() {
   const [gender, setGender] = useState<Gender | ''>('')
   const [dob, setDob] = useState('')
   const [idProofPending, setIdProofPending] = useState<string | null>(null)
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const { confirm, dialogProps } = useConfirm()
 
@@ -48,7 +47,6 @@ export default function ProfilePage() {
   }
 
   async function save() {
-    setMessage(''); setError('')
     setSaving(true)
     try {
       const { data } = await api.put<Profile>('/api/profile/me', {
@@ -58,9 +56,9 @@ export default function ProfilePage() {
         idProof: idProofPending ?? undefined,
       })
       applyProfile(data)
-      setMessage('Profile updated.')
+      toast.success('Profile updated.')
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to update profile')
+      toast.error(getErrorMessage(err, 'Failed to update profile'))
     } finally {
       setSaving(false)
     }
@@ -103,7 +101,7 @@ export default function ProfilePage() {
           <Avatar src={photo} name={profile.name} className="h-24 w-24" textClassName="text-2xl" />
           {!locked && (
             <>
-              <PhotoUploadButton onLoaded={setPhoto} onError={setError} label="Upload photo" />
+              <PhotoUploadButton onLoaded={setPhoto} label="Upload photo" />
               {photo && (
                 <button type="button" onClick={() => setPhoto(null)} className="text-xs text-red-600 hover:underline">
                   Remove photo
@@ -135,7 +133,7 @@ export default function ProfilePage() {
           onGenderChange={setGender} onDateOfBirthChange={setDob} />
 
         <IdProofField personId={profile.id} uploaded={profile.idProofUploaded} pendingKey={idProofPending}
-          canChange={!profile.idProofUploaded} onUploaded={setIdProofPending} onError={setError} />
+          canChange={!profile.idProofUploaded} onUploaded={setIdProofPending} onError={toast.error} />
         {profile.idProofUploaded && (
           <p className="-mt-2 text-xs text-gray-400">Once submitted, your ID proof can only be changed by the Owner or a Manager.</p>
         )}
@@ -154,9 +152,6 @@ export default function ProfilePage() {
               className="mt-1 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-gray-500" />
           </div>
         )}
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {message && <p className="text-sm text-green-700">{message}</p>}
 
         {(!locked || idProofPending) && (
           <button type="submit" disabled={saving}

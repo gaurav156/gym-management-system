@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore'
 import HourlyCrowdChart from '../components/HourlyCrowdChart'
 import MemberStoreTab from '../components/member/MemberStoreTab'
 import type { Branch, AttendanceLogEntry, HourlyCount, PageResponse } from '../types'
+import { toast, getErrorMessage } from '../store/toastStore'
 
 const PAGE_SIZE = 5
 
@@ -17,7 +18,6 @@ export default function TrainerDashboard() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranch, setSelectedBranch] = useState('')
   const [summary, setSummary] = useState<HourlyCount[]>([])
-  const [loadError, setLoadError] = useState('')
 
   const [attendance, setAttendance] = useState<AttendanceLogEntry[]>([])
   const [attendanceLoading, setAttendanceLoading] = useState(true)
@@ -34,7 +34,7 @@ export default function TrainerDashboard() {
         setAttendanceTotalElements(res.data.totalElements)
         setAttendancePage(res.data.page)
       })
-      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your attendance log'))
+      .catch((err) => toast.error(getErrorMessage(err, 'Failed to load your attendance log')))
       .finally(() => setAttendanceLoading(false))
   }
 
@@ -52,7 +52,7 @@ export default function TrainerDashboard() {
         setBranches(res.data)
         if (res.data.length > 0) setSelectedBranch(res.data[0].id)
       })
-      .catch((err) => setLoadError(err.response?.data?.error || 'Failed to load your branches'))
+      .catch((err) => toast.error(getErrorMessage(err, 'Failed to load your branches')))
 
     return () => window.removeEventListener('focus', onFocus)
   }, [user])
@@ -72,7 +72,6 @@ export default function TrainerDashboard() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <h1 className="text-2xl font-semibold">Welcome, {user.name}</h1>
-      {loadError && <p className="mt-2 text-sm text-red-600">{loadError}</p>}
 
       <div className="mt-6 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
         <div className="flex min-w-max gap-1">

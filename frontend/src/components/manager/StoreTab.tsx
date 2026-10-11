@@ -11,6 +11,7 @@ import type { Product, ProductOrder, ProductCategory, ProductOrderInvoice, Membe
 import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, BanIcon } from '../icons/ActionIcons'
 import { useScrollLock } from '../../hooks/useScrollLock'
+import { toast, getErrorMessage } from '../../store/toastStore'
 
 const ORDER_PAGE_SIZE = 10
 const PRODUCT_PAGE_SIZE = 8
@@ -48,7 +49,6 @@ export default function StoreTab({ selectedBranch }: Props) {
   } | null>(null)
   const [checkingCoupon, setCheckingCoupon] = useState(false)
 
-  const [purchaseMessage, setPurchaseMessage] = useState('')
   const [purchasing, setPurchasing] = useState(false)
 
   const [orders, setOrders] = useState<ProductOrder[]>([])
@@ -56,15 +56,12 @@ export default function StoreTab({ selectedBranch }: Props) {
   const [orderPage, setOrderPage] = useState(0)
   const [orderTotalPages, setOrderTotalPages] = useState(1)
   const [orderTotalElements, setOrderTotalElements] = useState(0)
-  const [invoiceError, setInvoiceError] = useState('')
-  const [sendMessage, setSendMessage] = useState('')
 
   const [cancelTarget, setCancelTarget] = useState<ProductOrder | null>(null)
   const [refundAmount, setRefundAmount] = useState('')
   const [refundMode, setRefundMode] = useState('CASH')
   const [refundNote, setRefundNote] = useState('')
   const [cancelling, setCancelling] = useState(false)
-  const [cancelError, setCancelError] = useState('')
 
   const { confirm, dialogProps } = useConfirm()
 
@@ -206,10 +203,9 @@ export default function StoreTab({ selectedBranch }: Props) {
 
   async function recordPurchase(e: FormEvent) {
     e.preventDefault()
-    setPurchaseMessage('')
-    if (!selectedBuyer) { setPurchaseMessage('Select who this purchase is for.'); return }
-    if (cart.length === 0) { setPurchaseMessage('Add at least one product to the cart.'); return }
-    if (!selectedBranch) { setPurchaseMessage('No branch selected.'); return }
+    if (!selectedBuyer) { toast.warning('Select who this purchase is for.'); return }
+    if (cart.length === 0) { toast.warning('Add at least one product to the cart.'); return }
+    if (!selectedBranch) { toast.warning('No branch selected.'); return }
 
     setPurchasing(true)
     try {
@@ -219,59 +215,57 @@ export default function StoreTab({ selectedBranch }: Props) {
           items: cart.map((l) => ({ productId: l.product.id, quantity: l.quantity })) },
         { params: { memberId: selectedBuyer.id } }
       )
-      setPurchaseMessage(`Recorded - invoice ${data.invoiceNumber}, total ₹${data.totalAmount}.`)
+      toast.success(`Recorded - invoice ${data.invoiceNumber}, total ₹${data.totalAmount}.`)
       resetCart()
       loadProducts(productPage)
       loadOrders(0)
     } catch (err: any) {
-      setPurchaseMessage(err.response?.data?.error || 'Failed to record purchase')
+      toast.error(getErrorMessage(err, 'Failed to record purchase'))
     } finally {
       setPurchasing(false)
     }
   }
 
   function openCancelDialog(order: ProductOrder) {
-    setCancelTarget(order); setRefundAmount(String(order.totalAmount)); setRefundMode('CASH'); setRefundNote(''); setCancelError('')
+    setCancelTarget(order); setRefundAmount(String(order.totalAmount)); setRefundMode('CASH'); setRefundNote('');
   }
 
   async function submitCancel() {
     if (!cancelTarget) return
-    setCancelError('')
-    if (!refundAmount || Number.isNaN(Number(refundAmount)) || Number(refundAmount) <= 0) { setCancelError('Enter a valid refund amount.'); return }
+    if (!refundAmount || Number.isNaN(Number(refundAmount)) || Number(refundAmount) <= 0) { toast.warning('Enter a valid refund amount.'); return }
     setCancelling(true)
     try {
       await api.post(`/api/product-orders/${cancelTarget.id}/cancel`, {
         refundAmount: Number(refundAmount), refundMode, refundNote: refundNote || null,
       })
+      toast.success('Order cancelled and refunded.')
       setCancelTarget(null)
       loadOrders(orderPage)
       loadProducts(productPage)
     } catch (err: any) {
-      setCancelError(err.response?.data?.error || 'Failed to cancel order')
+      toast.error(getErrorMessage(err, 'Failed to cancel order'))
     } finally {
       setCancelling(false)
     }
   }
 
   async function handleInvoiceAction(orderId: string, action: 'view' | 'print' | 'download') {
-    setInvoiceError('')
     try {
       const { data } = await api.get<ProductOrderInvoice>(`/api/product-orders/${orderId}/invoice`)
       if (action === 'view') await viewProductInvoice(data)
       else if (action === 'print') await printProductInvoice(data)
       else await downloadProductInvoice(data)
     } catch (err: any) {
-      setInvoiceError(err.response?.data?.error || 'Failed to load invoice')
+      toast.error(getErrorMessage(err, 'Failed to load invoice'))
     }
   }
 
   async function handleSendAction(orderId: string, channel: 'email' | 'whatsapp') {
-    setInvoiceError(''); setSendMessage('')
     try {
       const { data } = await api.post<{ message: string }>(`/api/product-orders/${orderId}/send-${channel}`)
-      setSendMessage(data.message)
+      toast.success(data.message)
     } catch (err: any) {
-      setInvoiceError(err.response?.data?.error || `Failed to send via ${channel}`)
+      toast.error(getErrorMessage(err, `Failed to send via ${channel}`))
     }
   }
 
@@ -448,13 +442,11 @@ export default function StoreTab({ selectedBranch }: Props) {
               </button>
             </form>
           )}
-          {purchaseMessage && <p className="mt-3 text-sm text-gray-700">{purchaseMessage}</p>}
         </div>
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <h2 className="font-medium">Product order history</h2>
-        {invoiceError && <p className="mt-2 text-sm text-red-600">{invoiceError}</p>}
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -501,7 +493,6 @@ export default function StoreTab({ selectedBranch }: Props) {
             </tbody>
           </table>
           {!ordersLoading && orders.length === 0 && <p className="py-4 text-sm text-gray-400">No product orders recorded yet.</p>}
-          {sendMessage && <p className="mt-2 text-sm text-green-700">{sendMessage}</p>}
           {orderTotalElements > 0 && (
             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
               <span>Page {orderPage + 1} of {orderTotalPages} ({orderTotalElements} total)</span>
@@ -539,7 +530,6 @@ export default function StoreTab({ selectedBranch }: Props) {
                 <textarea value={refundNote} onChange={(e) => setRefundNote(e.target.value)} rows={2}
                   className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
               </div>
-              {cancelError && <p className="text-sm text-red-600">{cancelError}</p>}
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <button disabled={cancelling} onClick={() => setCancelTarget(null)}

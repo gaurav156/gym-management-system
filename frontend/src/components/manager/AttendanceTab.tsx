@@ -6,6 +6,7 @@ import HourlyCrowdChart from '../HourlyCrowdChart'
 import Spinner from '../Spinner'
 import { TableSkeleton } from '../Skeleton'
 import type { HourlyCount, TodayAttendanceEntry } from '../../types'
+import { toast, getErrorMessage } from '../../store/toastStore'
 
 const PAGE_SIZE = 10
 const SCAN_RETRY_COOLDOWN_MS = 2000
@@ -31,9 +32,7 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
   // Shared by both PIN and QR check-in, so the same "✅ Welcome, ..." / "❌ No active
   // membership - access denied" styling and copy shows regardless of which method was
   // used - staff shouldn't have to learn two different result formats.
-  const [resultOk, setResultOk] = useState(true)
-  const [resultMessage, setResultMessage] = useState('')
-  const [cameraError, setCameraError] = useState('')
+  const [hasScanned, setHasScanned] = useState(false)
 
   const [selectedDate, setSelectedDate] = useState(() => localDateISO())
   const isToday = selectedDate === localDateISO()
@@ -92,27 +91,23 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
   // that's no longer selected.
   useEffect(() => {
     setScanActive(false)
-    setResultMessage('')
-    setCameraError('')
+    setHasScanned(false)
   }, [selectedBranch, checkinMode])
 
   async function kioskCheckin(e: FormEvent) {
     e.preventDefault()
-    setResultMessage('')
     setCheckingIn(true)
     try {
       const { data } = await api.post('/api/attendance/checkin', {
         pin: checkinPin, branchId: selectedBranch, method: 'PIN',
       })
-      setResultOk(true)
-      setResultMessage(data.message)
+      toast.success(data.message)
       setCheckinPin('')
       loadTodayAttendance()
       loadSummary()
       onCheckinSuccess()
     } catch (err: any) {
-      setResultOk(false)
-      setResultMessage(err.response?.data?.error || 'Check-in failed')
+      toast.error(getErrorMessage(err, 'Check-in failed'))
     } finally {
       setCheckingIn(false)
     }
@@ -127,20 +122,18 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
   async function handleQrScan(decodedText: string) {
     if (scanLocked) return
     setScanLocked(true)
-    setResultMessage('Checking...')
     try {
       const { data } = await api.post('/api/attendance/checkin', {
         qrToken: decodedText, branchId: selectedBranch, method: 'QR',
       })
-      setResultOk(true)
-      setResultMessage(data.message)
+      toast.success(data.message); 
+      setHasScanned(true);
       setScanActive(false)
       loadTodayAttendance()
       loadSummary()
       onCheckinSuccess()
     } catch (err: any) {
-      setResultOk(false)
-      setResultMessage(err.response?.data?.error || 'Check-in failed')
+      toast.error(getErrorMessage(err, 'Check-in failed'))
       setTimeout(() => setScanLocked(false), SCAN_RETRY_COOLDOWN_MS)
       return
     }
@@ -148,8 +141,6 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
   }
 
   function startScanning() {
-    setCameraError('')
-    setResultMessage('')
     setScanActive(true)
   }
 
@@ -202,26 +193,18 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
               ) : !scanActive ? (
                 <button onClick={startScanning}
                   className="mt-4 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
-                  {resultMessage ? 'Scan next' : 'Start scanning'}
+                  {hasScanned ? 'Scan next' : 'Start scanning'}
                 </button>
               ) : (
                 <div className="mt-4">
-                  <QrScanner active={scanActive} onScan={handleQrScan} onCameraError={setCameraError} />
+                  <QrScanner active={scanActive} onScan={handleQrScan} />
                   <button onClick={() => setScanActive(false)}
                     className="mt-3 w-full rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">
                     Stop scanning
                   </button>
                 </div>
               )}
-
-              {cameraError && <p className="mt-3 text-sm text-red-600">{cameraError}</p>}
             </>
-          )}
-
-          {resultMessage && (
-            <p className={`mt-3 text-sm font-medium ${resultOk ? 'text-green-700' : 'text-red-600'}`}>
-              {resultOk ? '✅ ' : '❌ '}{resultMessage}
-            </p>
           )}
         </div>
 

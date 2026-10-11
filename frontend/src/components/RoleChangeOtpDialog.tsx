@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react'
 import { api } from '../api/client'
 import Spinner from './Spinner'
 import { useScrollLock } from '../hooks/useScrollLock'
+import { toast, getErrorMessage } from '../store/toastStore'
 
 const RESEND_COOLDOWN_SECONDS = 60
 
@@ -30,8 +31,6 @@ function roleLabel(role: string): string {
 export default function RoleChangeOtpDialog({ target, onClose, onDone }: Props) {
   const [step, setStep] = useState<'INTRO' | 'OTP'>('INTRO')
   const [otp, setOtp] = useState('')
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
@@ -43,7 +42,7 @@ export default function RoleChangeOtpDialog({ target, onClose, onDone }: Props) 
 
   // Fresh state every time the dialog opens for someone.
   useEffect(() => {
-    setStep('INTRO'); setOtp(''); setError(''); setMessage(''); setResendCooldown(0)
+    setStep('INTRO'); setOtp(''); setResendCooldown(0)
     stopCooldown()
   }, [target?.id, target?.newRole])
 
@@ -69,15 +68,15 @@ export default function RoleChangeOtpDialog({ target, onClose, onDone }: Props) 
 
   async function sendCode() {
     if (!target || sending || resendCooldown > 0) return
-    setError(''); setMessage(''); setSending(true)
+    setSending(true)
     try {
       const { data } = await api.post<{ message: string }>(`/api/owner/users/${target.id}/role/request-otp`)
-      setMessage(data.message)
+      toast.success(data.message)
       setOtp('')
       setStep('OTP')
       startCooldown()
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to send verification code')
+      toast.error(getErrorMessage(err, 'Failed to send verification code'))
     } finally {
       setSending(false)
     }
@@ -86,14 +85,15 @@ export default function RoleChangeOtpDialog({ target, onClose, onDone }: Props) 
   async function confirm(e: FormEvent) {
     e.preventDefault()
     if (!target || submitting) return
-    setError(''); setSubmitting(true)
+    setSubmitting(true)
     try {
       await api.put(`/api/owner/users/${target.id}/role`, {
         newRole: target.newRole, otp, branchIds: target.branchIds,
       })
+      toast.success(`${target.name}'s role changed to ${roleLabel(target.newRole)}.`)
       onDone()
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to change role')
+      toast.error(getErrorMessage(err, 'Failed to change role'))
     } finally {
       setSubmitting(false)
     }
@@ -117,9 +117,6 @@ export default function RoleChangeOtpDialog({ target, onClose, onDone }: Props) 
             <em> primary Owner's address</em> (the OWNER_EMAIL set on the server).
           </p>
         )}
-
-        {message && <p className="mt-3 text-sm text-green-700">{message}</p>}
-        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
         {step === 'INTRO' ? (
           <div className="mt-5 flex justify-end gap-2">

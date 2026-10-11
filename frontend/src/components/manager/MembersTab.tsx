@@ -17,6 +17,7 @@ import PersonalDetailsFields from '../PersonalDetailsFields'
 import IdProofField from '../IdProofField'
 import { genderLabel, formatDobWithAge } from '../../utils/person'
 import { useScrollLock } from '../../hooks/useScrollLock'
+import { toast, getErrorMessage } from '../../store/toastStore'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -44,7 +45,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [modalTab, setModalTab] = useState<'INFO' | 'MEMBERSHIPS' | 'PAYMENTS' | 'STORE' | 'ATTENDANCE' | 'BRANCHES'>('INFO')
   const [modalShowExpired, setModalShowExpired] = useState(false)
   const [modalPage, setModalPage] = useState(1)
-  const [memberModalMessage, setMemberModalMessage] = useState('')
 
   // Change Role + its history - Owner-only, so a Member can be promoted to Trainer/Manager.
   const [roleHistory, setRoleHistory] = useState<RoleHistoryEntry[]>([])
@@ -69,8 +69,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [editingMemberBranches, setEditingMemberBranches] = useState(false)
   const [memberBranchEditIds, setMemberBranchEditIds] = useState<string[]>([])
 
-  const [paymentSendMessage, setPaymentSendMessage] = useState('')
-
   const [detailPayments, setDetailPayments] = useState<Payment[]>([])
   const [detailPaymentsPage, setDetailPaymentsPage] = useState(0)
   const [detailPaymentsTotalPages, setDetailPaymentsTotalPages] = useState(1)
@@ -92,7 +90,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [payTarget, setPayTarget] = useState<MembershipAdmin | null>(null)
   const [payAmount, setPayAmount] = useState('')
   const [payMode, setPayMode] = useState('CASH')
-  const [payError, setPayError] = useState('')
   const [paying, setPaying] = useState(false)
 
   const isFirstSearchRun = useRef(true)
@@ -184,12 +181,10 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   }, [detailMemberId, modalShowExpired])
 
   useEffect(() => {
-    setMemberModalMessage('')
     if (!detailMemberId) return
     setModalTab('INFO')
     setEditingMemberInfo(false)
     setEditingMemberBranches(false)
-    setPaymentSendMessage('')
     setSelectedNewRole('')
     setRoleHistory([])
     loadDetailPayments(detailMemberId, 0)
@@ -198,10 +193,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     loadDetailMemberBranches(detailMemberId)
     loadRoleHistory(detailMemberId)
   }, [detailMemberId])
-
-  useEffect(() => {
-    setMemberModalMessage('')
-  }, [modalTab])
 
   // Refreshes both the branch-scoped table and the currently-open member modal's own
   // fetch - the modal derives from its own fetch (not the branch list), so an action
@@ -214,49 +205,46 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   }
 
   function openPayDialog(m: MembershipAdmin) {
-    setPayTarget(m); setPayAmount(String(m.balanceDue)); setPayMode('CASH'); setPayError('')
+    setPayTarget(m); setPayAmount(String(m.balanceDue)); setPayMode('CASH')
   }
 
   async function submitPayment() {
     if (!payTarget || !selectedBranch) return
-    setPayError('')
     if (!payAmount || Number.isNaN(Number(payAmount)) || Number(payAmount) <= 0) {
-      setPayError('Enter a valid amount.'); return
+      toast.warning('Enter a valid amount.'); return
     }
     setPaying(true)
     try {
       await api.post(`/api/memberships/${payTarget.id}/record-payment`, {
         amount: Number(payAmount), mode: payMode, branchId: selectedBranch,
       })
+      toast.success('Payment recorded.');
       setPayTarget(null)
       refreshMembershipViews()
     } catch (err: any) {
-      setPayError(err.response?.data?.error || 'Failed to record payment')
+      toast.error(getErrorMessage(err, 'Failed to record payment'))
     } finally {
       setPaying(false)
     }
   }
 
   async function handleInvoiceAction(paymentId: string, action: 'view' | 'print' | 'download') {
-    setMemberModalMessage('')
     try {
       const { data } = await api.get<InvoiceResponse>(`/api/payments/${paymentId}/invoice`)
       if (action === 'view') await viewInvoice(data)
       else if (action === 'print') await printInvoice(data)
       else await downloadInvoice(data)
     } catch (err: any) {
-      setMemberModalMessage(err.response?.data?.error || 'Failed to load invoice')
+      toast.error(getErrorMessage(err, 'Failed to load invoice'))
     }
   }
 
   async function handlePaymentSendAction(paymentId: string, channel: 'email' | 'whatsapp') {
-    setMemberModalMessage('')
-    setPaymentSendMessage('')
     try {
       const { data } = await api.post<{ message: string }>(`/api/payments/${paymentId}/send-${channel}`)
-      setPaymentSendMessage(data.message)
+      toast.success(data.message)
     } catch (err: any) {
-      setMemberModalMessage(err.response?.data?.error || `Failed to send via ${channel}`)
+      toast.error(getErrorMessage(err, `Failed to send via ${channel}`))
     }
   }
 
@@ -264,7 +252,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     setEditingId(m.id)
     setEditStartDate(m.startDate)
     setEditEndDate(m.endDate)
-    setMemberModalMessage('')
   }
 
   function cancelEdit() {
@@ -273,17 +260,17 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
 
   async function saveEdit(id: string) {
     if (editEndDate < editStartDate) {
-      setMemberModalMessage('End date cannot be before start date.')
+      toast.warning('End date cannot be before start date.')
       return
     }
-    setMemberModalMessage('')
     setSavingEdit(true)
     try {
       await api.put(`/api/memberships/${id}`, { startDate: editStartDate, endDate: editEndDate })
+      toast.success('Membership dates updated.')
       setEditingId(null)
       refreshMembershipViews()
     } catch (err: any) {
-      setMemberModalMessage(err.response?.data?.error || 'Failed to update')
+      toast.error(getErrorMessage(err, 'Failed to update'))
     } finally {
       setSavingEdit(false)
     }
@@ -296,30 +283,30 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       confirmLabel: 'Cancel membership',
       danger: true,
       onConfirm: async () => {
-        setMemberModalMessage('')
         await api.post(`/api/memberships/${id}/cancel`)
+        toast.success('Membership cancelled.')
         refreshMembershipViews()
       },
     })
   }
 
   async function pauseMembership(id: string) {
-    setMemberModalMessage('')
     try {
       await api.post(`/api/memberships/${id}/pause`)
+      toast.success('Membership paused.')
       refreshMembershipViews()
     } catch (err: any) {
-      setMemberModalMessage(err.response?.data?.error || 'Failed to pause')
+      toast.error(getErrorMessage(err, 'Failed to pause'))
     }
   }
 
   async function resumeMembership(id: string) {
-    setMemberModalMessage('')
     try {
       await api.post(`/api/memberships/${id}/resume`)
+      toast.success('Membership resumed.')
       refreshMembershipViews()
     } catch (err: any) {
-      setMemberModalMessage(err.response?.data?.error || 'Failed to resume')
+      toast.error(getErrorMessage(err, 'Failed to resume'))
     }
   }
 
@@ -332,7 +319,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     setMemberEditGender(m.gender ?? '')
     setMemberEditDob(m.dateOfBirth ?? '')
     setMemberEditIdProof(null)
-    setMemberModalMessage('')
   }
 
   async function saveMemberInfo(memberId: string) {
@@ -344,10 +330,11 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
         dateOfBirth: memberEditDob || undefined,
         idProof: memberEditIdProof ?? undefined,
       })
+      toast.success('Member details updated.')
       setEditingMemberInfo(false)
       loadMembers(memberPage, memberSearch, memberStatusFilter, memberSort)
     } catch (err: any) {
-      setMemberModalMessage(err.response?.data?.error || 'Failed to update member info')
+      toast.error(getErrorMessage(err, 'Failed to update member info'))
     } finally {
       setSavingMemberInfo(false)
     }
@@ -361,6 +348,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       danger: true,
       onConfirm: async () => {
         await api.delete(`/api/owner/users/${memberId}`)
+        toast.success('Account deleted.')
         setDetailMemberId(null)
         loadMembers(0, memberSearch, memberStatusFilter, memberSort)
         loadMemberships()
@@ -372,7 +360,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   // list entirely, so the modal closes and the branch-scoped lists refresh.
   function changeMemberRole(member: MemberSummary) {
     if (!selectedNewRole) { 
-      setMemberModalMessage('Select a role to change to.'); 
+      toast.warning('Select a role to change to.'); 
       return 
     }
 
@@ -391,6 +379,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
         setChangingRole(true)
         try {
           await api.put(`/api/owner/users/${member.id}/role`, { newRole: selectedNewRole })
+          toast.success('Role changed.')
           setDetailMemberId(null)
           loadMembers(0, memberSearch, memberStatusFilter, memberSort)
           loadMemberships()
@@ -403,17 +392,18 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
 
   async function saveMemberBranches(memberId: string) {
     if (memberBranchEditIds.length === 0) {
-      setMemberModalMessage('Select at least one branch.')
+      toast.warning('Select at least one branch.')
       return
     }
     setSavingMemberBranches(true)
     try {
       await api.put(`/api/branches/assignments/${memberId}`, { branchIds: memberBranchEditIds })
+      toast.success('Branches updated.')
       setEditingMemberBranches(false)
       loadDetailMemberBranches(memberId)
       loadMembers()
     } catch (err: any) {
-      setMemberModalMessage(err.response?.data?.error || 'Failed to update branch assignments')
+      toast.error(getErrorMessage(err, 'Failed to update branch assignments'))
     } finally {
       setSavingMemberBranches(false)
     }
@@ -563,8 +553,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
               </div>
             </div>
 
-            {memberModalMessage && <p className="mt-3 text-sm text-red-600">{memberModalMessage}</p>}
-
             {modalTab === 'INFO' && (
               <div className="mt-4 space-y-2 text-sm">
                 {editingMemberInfo ? (
@@ -572,7 +560,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                     <div className="flex items-center gap-3">
                       <Avatar src={memberEditPhoto} name={memberEditName} className="h-14 w-14" textClassName="text-lg" />
                       <div className="flex flex-col items-start gap-1.5">
-                        <PhotoUploadButton onLoaded={setMemberEditPhoto} onError={setMemberModalMessage} label="Change photo" size="sm" />
+                        <PhotoUploadButton onLoaded={setMemberEditPhoto} label="Change photo" size="sm" />
                         {memberEditPhoto && (
                           <button type="button" onClick={() => setMemberEditPhoto(null)}
                             className="text-xs text-red-600 hover:underline">Remove photo</button>
@@ -597,7 +585,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                     <PersonalDetailsFields compact gender={memberEditGender} dateOfBirth={memberEditDob}
                       onGenderChange={setMemberEditGender} onDateOfBirthChange={setMemberEditDob} />
                     <IdProofField compact personId={detailMember.id} uploaded={detailMember.idProofUploaded}
-                      pendingKey={memberEditIdProof} canChange onUploaded={setMemberEditIdProof} onError={setMemberModalMessage} />
+                      pendingKey={memberEditIdProof} canChange onUploaded={setMemberEditIdProof} onError={toast.error} />
                     <div className="space-x-2">
                       <button onClick={() => saveMemberInfo(detailMember.id)} disabled={savingMemberInfo}
                         className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
@@ -617,7 +605,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                     <p><span className="text-gray-500">Gender:</span> {genderLabel(detailMember.gender)}</p>
                     <p><span className="text-gray-500">Date of birth:</span> {formatDobWithAge(detailMember.dateOfBirth)}</p>
                     <IdProofField compact personId={detailMember.id} uploaded={detailMember.idProofUploaded}
-                      pendingKey={null} canChange={false} onUploaded={() => {}} onError={setMemberModalMessage} />
+                      pendingKey={null} canChange={false} onUploaded={() => {}} onError={toast.error} />
                     <p><span className="text-gray-500">Check-in PIN:</span> {detailMember.checkinPin ?? '—'}</p>
                     <p><span className="text-gray-500">Enrollment date:</span> {detailMember.enrollmentDate ?? 'Not enrolled yet'}</p>
                     <p><span className="text-gray-500">Last visit:</span> {
@@ -871,7 +859,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                   </table>
                 </div>
                 {detailAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
-                {paymentSendMessage && <p className="mt-2 text-sm text-green-700">{paymentSendMessage}</p>}
                 {detailAttendanceTotalElements > 0 && (
                   <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                     <span>Page {detailAttendancePage + 1} of {detailAttendanceTotalPages} ({detailAttendanceTotalElements} total)</span>
@@ -953,7 +940,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
                 {['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER'].map((m) => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
               </select>
-              {payError && <p className="text-sm text-red-600">{payError}</p>}
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button disabled={paying} onClick={() => setPayTarget(null)}

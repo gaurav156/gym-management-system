@@ -6,6 +6,7 @@ import ConfirmDialog from '../ConfirmDialog'
 import { useConfirm } from '../../hooks/useConfirm'
 import { TableSkeleton } from '../Skeleton'
 import type { Expense, ExpenseCategory, PageResponse, AuthUser } from '../../types'
+import { toast, getErrorMessage } from '../../store/toastStore'
 
 const PAGE_SIZE = 10
 
@@ -39,8 +40,6 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
   const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [remark, setRemark] = useState('')
   const [billUrl, setBillUrl] = useState<string | null>(null)
-  const [formError, setFormError] = useState('')
-  const [formMessage, setFormMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const { confirm, dialogProps } = useConfirm()
@@ -55,6 +54,8 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
       setExpenseTotalPages(res.data.totalPages)
       setExpenseTotalElements(res.data.totalElements)
       setExpensePage(res.data.page)
+    }).catch((err) => {
+      toast.error(getErrorMessage(err, 'Failed to load expenses'))
     }).finally(() => setExpensesLoading(false))
   }
 
@@ -69,13 +70,12 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
 
   async function recordExpense(e: FormEvent) {
     e.preventDefault()
-    setFormError(''); setFormMessage('')
     if (!selectedBranch) {
-      setFormError('No branch selected.')
+      toast.warning('No branch selected.')
       return
     }
     if (!amount || Number.isNaN(Number(amount)) || Number(amount) <= 0) {
-      setFormError('Enter a valid amount.')
+      toast.warning('Enter a valid amount.')
       return
     }
     setSubmitting(true)
@@ -88,11 +88,11 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
         remark: remark || null,
         billUrl: billUrl || null,
       })
-      setFormMessage('Expense recorded.')
+      toast.success('Expense recorded.')
       resetForm()
       loadExpenses(0)
-    } catch (err: any) {
-      setFormError(err.response?.data?.error || 'Failed to record expense')
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to record expense'))
     } finally {
       setSubmitting(false)
     }
@@ -105,8 +105,13 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
       confirmLabel: 'Delete',
       danger: true,
       onConfirm: async () => {
-        await api.delete(`/api/expenses/${id}`)
-        loadExpenses(expensePage)
+        try {
+          await api.delete(`/api/expenses/${id}`)
+          toast.success('Expense deleted.')
+          loadExpenses(expensePage)
+        } catch (err) {
+          toast.error(getErrorMessage(err, 'Failed to delete expense'))
+        }
       },
     })
   }
@@ -136,7 +141,7 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
             <div>
               <label className="text-xs text-gray-500">Bill / invoice (optional)</label>
               <div className="mt-1 flex items-center gap-2">
-                <PhotoUploadButton onLoaded={setBillUrl} onError={setFormError} label={billUrl ? 'Replace file' : 'Upload file'}
+                <PhotoUploadButton onLoaded={setBillUrl} onError={(msg) => toast.error(msg)} label={billUrl ? 'Replace file' : 'Upload file'}
                   size="sm" purpose="BILL" accept="image/*,application/pdf" />
                 {billUrl && (
                   <>
@@ -152,8 +157,6 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
               {submitting && <Spinner className="h-4 w-4" />}
               {submitting ? 'Recording...' : 'Record expense'}
             </button>
-            {formError && <p className="text-sm text-red-600">{formError}</p>}
-            {formMessage && <p className="text-sm text-green-700">{formMessage}</p>}
           </form>
         </div>
 

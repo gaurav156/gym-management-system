@@ -13,6 +13,7 @@ import PersonalDetailsFields from '../PersonalDetailsFields'
 import IdProofField from '../IdProofField'
 import { genderLabel, formatDobWithAge } from '../../utils/person'
 import { useScrollLock } from '../../hooks/useScrollLock'
+import { toast, getErrorMessage } from '../../store/toastStore'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -52,7 +53,6 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
 
   const [detailStaffId, setDetailStaffId] = useState<string | null>(null)
   const [staffModalTab, setStaffModalTab] = useState<'INFO' | 'ATTENDANCE' | 'BRANCHES' | 'STORE'>('INFO')
-  const [staffModalMessage, setStaffModalMessage] = useState('')
 
   const [editingStaffInfo, setEditingStaffInfo] = useState(false)
   const [staffEditName, setStaffEditName] = useState('')
@@ -137,7 +137,6 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   }
 
   useEffect(() => {
-    setStaffModalMessage('')
     setEditingStaffInfo(false)
     setEditingStaffBranches(false)
     setEditingStaffDates(false)
@@ -157,10 +156,6 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     }
   }, [detailStaffId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    setStaffModalMessage('')
-  }, [staffModalTab])
-
   function startEditStaffInfo(s: StaffSummary) {
     setEditingStaffInfo(true)
     setStaffEditName(s.name)
@@ -170,7 +165,6 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     setStaffEditGender(s.gender ?? '')
     setStaffEditDob(s.dateOfBirth ?? '')
     setStaffEditIdProof(null)
-    setStaffModalMessage('')
   }
 
   // Endpoint depends on role - Manager edits go through /api/managers/{id} (Owner-only
@@ -183,10 +177,11 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
         name: staffEditName, phone: staffEditPhone, address: staffEditAddress, photo: staffEditPhoto ?? '',
         gender: staffEditGender || undefined, dateOfBirth: staffEditDob || undefined, idProof: staffEditIdProof ?? undefined
       })
+      toast.success('Staff details updated.')
       setEditingStaffInfo(false)
       loadStaff(staffPage)
     } catch (err: any) {
-      setStaffModalMessage(err.response?.data?.error || 'Failed to update staff info')
+      toast.error(getErrorMessage(err, 'Failed to update staff info'))
     } finally {
       setSavingStaffInfo(false)
     }
@@ -196,7 +191,6 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     setEditingStaffDates(true)
     setJoiningDateInput(s.joiningDate ?? '')
     setLeftDateInput(s.leftDate ?? '')
-    setStaffModalMessage('')
   }
 
   // Same dates endpoint shape for Trainer and Manager now - only the path differs.
@@ -208,10 +202,11 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
         joiningDate: joiningDateInput || null,
         leftDate: leftDateInput || null,
       })
+      toast.success('Dates updated.')
       setEditingStaffDates(false)
       loadStaff(staffPage)
     } catch (err: any) {
-      setStaffModalMessage(err.response?.data?.error || 'Failed to update dates')
+      toast.error(getErrorMessage(err, 'Failed to update dates'))
     } finally {
       setSavingStaffDates(false)
     }
@@ -221,25 +216,27 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     const endpoint = s.role === 'MANAGER' ? `/api/managers/${s.id}/dates` : `/api/trainers/${s.id}/dates`
     try {
       await api.put(endpoint, { joiningDate: s.joiningDate, leftDate: null })
+      toast.success('Left date cleared.')
       loadStaff(staffPage)
     } catch (err: any) {
-      setStaffModalMessage(err.response?.data?.error || 'Failed to clear left date')
+      toast.error(getErrorMessage(err, 'Failed to clear left date'))
     }
   }
 
   async function saveStaffBranches(staffId: string) {
     if (staffBranchEditIds.length === 0) {
-      setStaffModalMessage('Select at least one branch.')
+      toast.warning('Select at least one branch.')
       return
     }
     setSavingStaffBranches(true)
     try {
       await api.put(`/api/branches/assignments/${staffId}`, { branchIds: staffBranchEditIds })
+      toast.success('Branches updated.')
       setEditingStaffBranches(false)
       loadDetailStaffBranches(staffId)
       loadStaff(staffPage)
     } catch (err: any) {
-      setStaffModalMessage(err.response?.data?.error || 'Failed to update branch assignments')
+      toast.error(getErrorMessage(err, 'Failed to update branch assignments'))
     } finally {
       setSavingStaffBranches(false)
     }
@@ -256,10 +253,11 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       onConfirm: async () => {
         try {
           await api.delete(`/api/owner/users/${staffId}`)
+          toast.success('Account deleted.')
           setDetailStaffId(null)
           loadStaff(0)
         } catch (err: any) {
-          setStaffModalMessage(err.response?.data?.error || 'Failed to delete account')
+          toast.error(getErrorMessage(err, 'Failed to delete account'))
         }
       },
     })
@@ -273,13 +271,13 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   // an Owner may have none and would otherwise disappear from this list).
   function changeRole(s: StaffSummary) {
     if (!selectedNewRole) {
-      setStaffModalMessage('Select a role to change to.')
+      toast.warning('Select a role to change to.')
       return
     }
 
     if (s.role === 'OWNER') {
       if (demotionBranchIds.length === 0) {
-        setStaffModalMessage('Select at least one branch to assign them to.')
+        toast.warning('Select at least one branch to assign them to.')
         return
       }
       setOtpTarget({ id: s.id, name: s.name, newRole: selectedNewRole, branchIds: demotionBranchIds })
@@ -299,13 +297,13 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       confirmLabel: 'Change role',
       onConfirm: async () => {
         setChangingRole(true)
-        setStaffModalMessage('')
         try {
           await api.put(`/api/owner/users/${s.id}/role`, { newRole: selectedNewRole })
+          toast.success('Role changed.')
           setDetailStaffId(null)
           loadStaff(0)
         } catch (err: any) {
-          setStaffModalMessage(err.response?.data?.error || 'Failed to change role')
+          toast.error(getErrorMessage(err, 'Failed to change role'))
         } finally {
           setChangingRole(false)
         }
@@ -459,8 +457,6 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
               </div>
             </div>
 
-            {staffModalMessage && <p className="mt-3 text-sm text-red-600">{staffModalMessage}</p>}
-
             {staffModalTab === 'INFO' && (
               <div className="mt-4 space-y-2 text-sm">
                 {editingStaffInfo ? (
@@ -468,7 +464,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                     <div className="flex items-center gap-3">
                       <Avatar src={staffEditPhoto} name={staffEditName} className="h-14 w-14" textClassName="text-lg" />
                       <div className="flex flex-col items-start gap-1.5">
-                        <PhotoUploadButton onLoaded={setStaffEditPhoto} onError={setStaffModalMessage} label="Change photo" size="sm" />
+                        <PhotoUploadButton onLoaded={setStaffEditPhoto} label="Change photo" size="sm" />
                         {staffEditPhoto && (
                           <button type="button" onClick={() => setStaffEditPhoto(null)}
                             className="text-xs text-red-600 hover:underline">Remove photo</button>
@@ -494,7 +490,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                       onGenderChange={setStaffEditGender} onDateOfBirthChange={setStaffEditDob} />
                     {canViewIdProof && (  
                       <IdProofField compact personId={detailStaff.id} uploaded={detailStaff.idProofUploaded}
-                        pendingKey={staffEditIdProof} canChange onUploaded={setStaffEditIdProof} onError={setStaffModalMessage} />
+                        pendingKey={staffEditIdProof} canChange onUploaded={setStaffEditIdProof} onError={toast.error} />
                     )}
                     <div className="space-x-2">
                       <button onClick={() => saveStaffInfo(detailStaff)} disabled={savingStaffInfo}
@@ -517,7 +513,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                     <p><span className="text-gray-500">Date of birth:</span> {formatDobWithAge(detailStaff.dateOfBirth)}</p>
                     {canViewIdProof && (
                       <IdProofField compact personId={detailStaff.id} uploaded={detailStaff.idProofUploaded}
-                        pendingKey={null} canChange={false} onUploaded={() => {}} onError={setStaffModalMessage} />
+                        pendingKey={null} canChange={false} onUploaded={() => {}} onError={toast.error} />
                     )}
                     <p><span className="text-gray-500">Check-in PIN:</span> {detailStaff.checkinPin ?? '—'}</p>
                     <p><span className="text-gray-500">Last visit:</span> {

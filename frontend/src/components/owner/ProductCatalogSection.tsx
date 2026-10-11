@@ -10,6 +10,7 @@ import { TableSkeleton } from '../Skeleton'
 import type { Product, ProductCategory, Branch, PageResponse } from '../../types'
 import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PencilIcon, BanIcon, CheckIcon, TrashIcon } from '../icons/ActionIcons'
+import { toast, getErrorMessage } from '../../store/toastStore'
 
 const PAGE_SIZE = 10
 
@@ -33,7 +34,6 @@ export default function ProductCatalogSection({ branches }: Props) {
   const [formImages, setFormImages] = useState<string[]>([])
   const [formCategoryIds, setFormCategoryIds] = useState<string[]>([])
   const [formStocks, setFormStocks] = useState<BranchStockInput[]>([])
-  const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -41,11 +41,9 @@ export default function ProductCatalogSection({ branches }: Props) {
   const [editImages, setEditImages] = useState<string[]>([])
   const [editCategoryIds, setEditCategoryIds] = useState<string[]>([])
   const [editStocks, setEditStocks] = useState<BranchStockInput[]>([])
-  const [editError, setEditError] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
 
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null)
-  const [listMessage, setListMessage] = useState('')
 
   const { confirm, dialogProps } = useConfirm()
 
@@ -76,20 +74,18 @@ export default function ProductCatalogSection({ branches }: Props) {
 
   function openCreate() {
     setCreating((v) => !v)
-    setFormError('')
     if (formStocks.length === 0) setFormStocks(blankStocks())
   }
 
   async function createProduct(e: FormEvent) {
     e.preventDefault()
-    setFormError('')
-    if (!form.price || Number.isNaN(Number(form.price))) { setFormError('Enter a valid price.'); return }
+    if (!form.price || Number.isNaN(Number(form.price))) { toast.warning('Enter a valid price.'); return }
     const branchStocks = formStocks
       .filter((s) => s.stockQuantity !== '')
       .map((s) => ({ branchId: s.branchId, stockQuantity: Number(s.stockQuantity) }))
-    if (branchStocks.length === 0) { setFormError('Enter stock for at least one branch.'); return }
+    if (branchStocks.length === 0) { toast.warning('Enter stock for at least one branch.'); return }
     if (branchStocks.some((s) => Number.isNaN(s.stockQuantity) || s.stockQuantity < 0)) {
-      setFormError('Stock quantities must be valid non-negative numbers.')
+      toast.warning('Stock quantities must be valid non-negative numbers.')
       return
     }
     setSubmitting(true)
@@ -105,11 +101,12 @@ export default function ProductCatalogSection({ branches }: Props) {
         branchStocks,
         categoryIds: formCategoryIds,
       })
+      toast.success('Product created.')
       setForm(emptyForm); setFormImages([]); setFormCategoryIds([]); setFormStocks(blankStocks())
       setCreating(false)
       loadProducts(0)
     } catch (err: any) {
-      setFormError(err.response?.data?.error || 'Failed to create product')
+      toast.error(getErrorMessage(err, 'Failed to create product'))
     } finally {
       setSubmitting(false)
     }
@@ -131,12 +128,10 @@ export default function ProductCatalogSection({ branches }: Props) {
       const existing = p.branchStocks.find((s) => s.branchId === b.id)
       return { branchId: b.id, stockQuantity: existing ? String(existing.stockQuantity) : '' }
     }))
-    setEditError('')
   }
 
   async function saveEdit(id: string) {
-    setEditError('')
-    if (!editForm.price || Number.isNaN(Number(editForm.price))) { setEditError('Enter a valid price.'); return }
+    if (!editForm.price || Number.isNaN(Number(editForm.price))) { toast.warning('Enter a valid price.'); return }
     setSavingEdit(true)
     try {
       await api.put(`/api/products/manage/${id}`, {
@@ -149,6 +144,7 @@ export default function ProductCatalogSection({ branches }: Props) {
         imageUrls: editImages,
         categoryIds: editCategoryIds,
       })
+      toast.success('Product updated.')
       const branchStocks = editStocks
         .filter((s) => s.stockQuantity !== '')
         .map((s) => ({ branchId: s.branchId, stockQuantity: Number(s.stockQuantity) }))
@@ -158,7 +154,7 @@ export default function ProductCatalogSection({ branches }: Props) {
       setEditingId(null)
       loadProducts(page)
     } catch (err: any) {
-      setEditError(err.response?.data?.error || 'Failed to update product')
+      toast.error(getErrorMessage(err, 'Failed to update product'))
     } finally {
       setSavingEdit(false)
     }
@@ -173,12 +169,15 @@ export default function ProductCatalogSection({ branches }: Props) {
         : `Reactivate "${p.name}"? It will appear in the catalog again.`,
       confirmLabel: action === 'deactivate' ? 'Deactivate' : 'Reactivate',
       danger: action === 'deactivate',
-      onConfirm: async () => { await api.put(`/api/products/manage/${p.id}`, { active: !p.active }); loadProducts(page) },
+      onConfirm: async () => { 
+        await api.put(`/api/products/manage/${p.id}`, { active: !p.active })
+        toast.success(p.active ? 'Product deactivated.' : 'Product reactivated.') 
+        loadProducts(page) 
+      },
     })
   }
 
   function deleteProduct(p: Product) {
-    setListMessage('')
     confirm({
       title: 'Delete product',
       message: `Permanently delete "${p.name}"? This only works if it's never been ordered - otherwise deactivate it instead. This cannot be undone.`,
@@ -187,9 +186,10 @@ export default function ProductCatalogSection({ branches }: Props) {
       onConfirm: async () => {
         try {
           await api.delete(`/api/products/manage/${p.id}`)
+          toast.success('Product deleted.')
           loadProducts(page)
         } catch (err: any) {
-          setListMessage(err.response?.data?.error || 'Failed to delete product')
+          toast.error(getErrorMessage(err, 'Failed to delete product'))
         }
       },
     })
@@ -292,12 +292,11 @@ export default function ProductCatalogSection({ branches }: Props) {
                     className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white shadow">✕</button>
                 </div>
               ))}
-              <PhotoUploadButton onLoaded={(url) => setFormImages((imgs) => [...imgs, url])} onError={setFormError}
+              <PhotoUploadButton onLoaded={(url) => setFormImages((imgs) => [...imgs, url])}
                 label="Add image" size="sm" purpose="PRODUCT" />
             </div>
           </div>
 
-          {formError && <p className="text-sm text-red-600">{formError}</p>}
           <button disabled={submitting}
             className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
             {submitting && <Spinner className="h-4 w-4" />}
@@ -315,8 +314,6 @@ export default function ProductCatalogSection({ branches }: Props) {
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
-
-      {listMessage && <p className="mt-3 text-sm text-red-600">{listMessage}</p>}
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-left text-sm">
@@ -384,10 +381,9 @@ export default function ProductCatalogSection({ branches }: Props) {
                                 className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white shadow">✕</button>
                             </div>
                           ))}
-                          <PhotoUploadButton onLoaded={(url) => setEditImages((imgs) => [...imgs, url])} onError={setEditError}
+                          <PhotoUploadButton onLoaded={(url) => setEditImages((imgs) => [...imgs, url])}
                             label="Add image" size="sm" purpose="PRODUCT" />
                         </div>
-                        {editError && <p className="text-sm text-red-600">{editError}</p>}
                         <div className="space-x-2">
                           <button onClick={() => saveEdit(p.id)} disabled={savingEdit}
                             className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">

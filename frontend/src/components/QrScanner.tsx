@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import type { CameraDevice } from 'html5-qrcode'
+import { toast } from '../store/toastStore'
 
 interface Props {
   active: boolean
@@ -68,7 +69,9 @@ export default function QrScanner({ active, onScan, onCameraError }: Props) {
           () => { /* fires continuously while no QR is in frame - expected, ignore */ }
         )
       } catch (err) {
-        onCameraError?.('Could not access the camera. Check browser permissions, or use PIN check-in instead.')
+        const message = 'Could not access the camera. Check browser permissions, or use PIN check-in instead.'
+        if (onCameraError) onCameraError(message)
+        else toast.error(message)
         console.error('QR scanner start failed:', err)
         html5QrRef.current = null
       } finally {
