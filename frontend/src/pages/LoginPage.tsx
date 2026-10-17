@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import Turnstile from '../components/Turnstile'
 import type { AuthUser } from '../types'
+import PasswordInput from '../components/PasswordInput'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -73,9 +74,10 @@ export default function LoginPage() {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Password</label>
-          <input
-            type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none"
+          <PasswordInput
+            required value={password} onChange={(e) => setPassword(e.target.value)}
+            wrapperClassName="mt-1"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none"
           />
           <div className="mt-1 text-right">
             <Link to="/forgot-password" className="text-xs text-brand hover:underline">Forgot password?</Link>

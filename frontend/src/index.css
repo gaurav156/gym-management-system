@@ -42,3 +42,6 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-toast-in { animation: none; }
 }
+
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear { display: none; }

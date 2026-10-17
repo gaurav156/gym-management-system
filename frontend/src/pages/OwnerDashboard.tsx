@@ -14,6 +14,7 @@ import { useConfirm } from '../hooks/useConfirm'
 import BroadcastsSection from '../components/owner/BroadcastsSection'
 import BackupSection from '../components/owner/BackupSection'
 import { toast, getErrorMessage } from '../store/toastStore'
+import PasswordInput from '../components/PasswordInput'
 
 type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
 type Tab = 'FINANCE' | 'BRANCHES' | 'PLANS' | 'PRODUCTS' | 'BROADCASTS' | 'BACKUP'
@@ -302,7 +303,7 @@ export default function OwnerDashboard() {
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
                   <PersonalDetailsFields compact gender={accountGender} dateOfBirth={accountDob}
                     onGenderChange={setAccountGender} onDateOfBirthChange={setAccountDob} />
-                  <input placeholder="Temporary password" type="password" required minLength={6} value={accountPassword}
+                  <PasswordInput placeholder="Temporary password" required minLength={6} value={accountPassword}
                     onChange={(e) => setAccountPassword(e.target.value)}
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
                   <BranchCheckboxes branches={activeBranches} selected={accountBranchIds} onChange={setAccountBranchIds} />

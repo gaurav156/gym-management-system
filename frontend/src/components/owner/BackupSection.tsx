@@ -4,6 +4,7 @@ import Spinner from '../Spinner'
 import ConfirmDialog from '../ConfirmDialog'
 import { useConfirm } from '../../hooks/useConfirm'
 import { toast, getErrorMessage } from '../../store/toastStore'
+import PasswordInput from '../PasswordInput'
 
 type Preset = 'ALL' | 'LAST_6_MONTHS' | 'LAST_12_MONTHS' | 'CUSTOM'
 type ImportMode = 'MERGE' | 'REPLACE'
@@ -180,7 +181,9 @@ export default function BackupSection() {
         </div>
         <div>
           <label className="block text-xs text-gray-500">Your password</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={input} />
+          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)}
+            wrapperClassName="mt-1"
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm" />
         </div>
         <button onClick={handleImport} disabled={busy !== null}
           className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-70 ${

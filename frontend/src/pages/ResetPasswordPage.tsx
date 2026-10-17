@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import Spinner from '../components/Spinner'
 import type { OtpChannel } from '../types'
 import { toast, getErrorMessage } from '../store/toastStore'
+import PasswordInput from '../components/PasswordInput'
 
 export default function ResetPasswordPage() {
   const location = useLocation()
@@ -65,13 +66,15 @@ export default function ResetPasswordPage() {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">New password</label>
-          <input required disabled={resetting} type="password" minLength={6} value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none disabled:bg-gray-50" />
+          <PasswordInput required disabled={resetting} minLength={6} value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+            wrapperClassName="mt-1"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none disabled:bg-gray-50" />  
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Confirm new password</label>
-          <input required disabled={resetting} type="password" minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none disabled:bg-gray-50" />
+          <PasswordInput required disabled={resetting} minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+            wrapperClassName="mt-1"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none disabled:bg-gray-50" />  
         </div>
 
         <button type="submit" disabled={resetting}

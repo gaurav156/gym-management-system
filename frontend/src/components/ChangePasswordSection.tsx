@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react'
 import { api } from '../api/client'
 import Spinner from './Spinner'
 import { toast, getErrorMessage } from '../store/toastStore'
+import PasswordInput from './PasswordInput'
 
 const RESEND_COOLDOWN_SECONDS = 60
 
@@ -119,21 +120,24 @@ export default function ChangePasswordSection() {
         <form onSubmit={requestOtp} className="mt-4 space-y-3">
           <div>
             <label className="block text-xs text-gray-500">Current password</label>
-            <input type="password" required disabled={sendingOtp} value={currentPassword}
+            <PasswordInput required disabled={sendingOtp} value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none disabled:bg-gray-50" />
+              wrapperClassName="mt-1"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none disabled:bg-gray-50" />  
           </div>
           <div>
             <label className="block text-xs text-gray-500">New password</label>
-            <input type="password" required minLength={6} disabled={sendingOtp} value={newPassword}
+            <PasswordInput required minLength={6} disabled={sendingOtp} value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none disabled:bg-gray-50" />
+              wrapperClassName="mt-1"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none disabled:bg-gray-50" />
           </div>
           <div>
             <label className="block text-xs text-gray-500">Confirm new password</label>
-            <input type="password" required minLength={6} disabled={sendingOtp} value={confirmPassword}
+            <PasswordInput required minLength={6} disabled={sendingOtp} value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none disabled:bg-gray-50" />
+              wrapperClassName="mt-1"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none disabled:bg-gray-50" />
           </div>
 
           <button type="submit" disabled={sendingOtp}
