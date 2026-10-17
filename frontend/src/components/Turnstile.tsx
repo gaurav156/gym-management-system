@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { isScrollLockActive } from '../hooks/useScrollLock'
 
 declare global {
   interface Window {
@@ -32,14 +33,33 @@ export default function Turnstile({ onVerify, onExpire }: Props) {
 
   useEffect(() => {
     if (!containerRef.current || !window.turnstile) return
+
+    // Remember the page's scroll styles so we can undo anything the challenge applies.
+    const html = document.documentElement
+    const body = document.body
+    const saved = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyPosition: body.style.position,
+      bodyTouchAction: body.style.touchAction,
+    }
+
     widgetIdRef.current = window.turnstile.render(containerRef.current, {
       sitekey: SITE_KEY,
       callback: onVerify,
       'expired-callback': onExpire,
     })
+
     return () => {
       if (widgetIdRef.current && window.turnstile) {
         window.turnstile.remove(widgetIdRef.current)
+      }
+      // Don't fight an app modal that legitimately locked scroll.
+      if (!isScrollLockActive()) {
+        html.style.overflow = saved.htmlOverflow
+        body.style.overflow = saved.bodyOverflow
+        body.style.position = saved.bodyPosition
+        body.style.touchAction = saved.bodyTouchAction
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

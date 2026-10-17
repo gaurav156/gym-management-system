@@ -19,3 +19,7 @@ export function useScrollLock(active = true) {
     }
   }, [active])
 }
+
+export function isScrollLockActive(): boolean {
+  return lockCount > 0
+}

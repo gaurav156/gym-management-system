@@ -8,6 +8,7 @@ export interface ToastItem {
   message: string
   title?: string
   duration: number // ms; 0 = stays until closed
+  createdAt: number
 }
 
 interface ToastOptions { title?: string; duration?: number }
@@ -17,11 +18,22 @@ interface ToastState {
   show: (type: ToastType, message: string, opts?: ToastOptions) => string
   dismiss: (id: string) => void
   clear: () => void
+  clearStale: (maxAgeMs: number) => void
 }
 
 const MAX_TOASTS = 4
 const DEFAULT_DURATION: Record<ToastType, number> = {
-  success: 4000, info: 4500, warning: 6000, error: 7000,
+  success: 4000,
+  info: 5000,
+  warning: 8000,
+  error: 0, // stays until closed
+}
+
+// Longer messages get more reading time (min 4s, max 12s).
+function durationFor(type: ToastType, message: string): number {
+  const base = DEFAULT_DURATION[type]
+  if (base === 0) return 0
+  return Math.min(12000, Math.max(base, 3000 + message.length * 60))
 }
 
 let counter = 0
@@ -34,12 +46,18 @@ export const useToastStore = create<ToastState>((set, get) => ({
     if (existing) return existing.id
 
     const id = `toast-${++counter}`
-    const item: ToastItem = { id, type, message, title: opts?.title, duration: opts?.duration ?? DEFAULT_DURATION[type] }
+    const item: ToastItem = {
+      id, type, message, title: opts?.title,
+      duration: opts?.duration ?? durationFor(type, message),
+      createdAt: Date.now(),
+    }
     set((s) => ({ toasts: [...s.toasts, item].slice(-MAX_TOASTS) }))
     return id
   },
   dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
   clear: () => set({ toasts: [] }),
+  clearStale: (maxAgeMs) =>
+    set((s) => ({ toasts: s.toasts.filter((t) => Date.now() - t.createdAt < maxAgeMs) })),
 }))
 
 // Usable anywhere (components, utils, axios interceptors): toast.error('...')
