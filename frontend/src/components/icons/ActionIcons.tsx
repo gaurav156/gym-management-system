@@ -1,6 +1,7 @@
 const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, className: 'h-4 w-4' }
 
 export function EyeIcon() { return <svg viewBox="0 0 24 24" {...common}><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" /><circle cx="12" cy="12" r="3" /></svg> }
+export function EyeOffIcon() { return <svg viewBox="0 0 24 24" {...common}><path d="M17.9 17.9A10.9 10.9 0 0 1 12 19c-7 0-11-7-11-7a19.8 19.8 0 0 1 5-5.9" /><path d="M9.9 5.2A10.4 10.4 0 0 1 12 5c7 0 11 7 11 7a19.9 19.9 0 0 1-3.2 4.2" /><path d="M14.1 14.1a3 3 0 1 1-4.2-4.2" /><path d="M1 1l22 22" /></svg> }
 export function PrinterIcon() { return <svg viewBox="0 0 24 24" {...common}><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2" /><rect x="6" y="14" width="12" height="7" /></svg> }
 export function DownloadIcon() { return <svg viewBox="0 0 24 24" {...common}><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16" /></svg> }
 export function MailIcon() { return <svg viewBox="0 0 24 24" {...common}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg> }

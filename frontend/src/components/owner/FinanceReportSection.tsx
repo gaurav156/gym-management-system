@@ -4,6 +4,7 @@ import Spinner from '../Spinner'
 import { TableSkeleton } from '../Skeleton'
 import type { Branch, FinanceGranularity, FinanceReportResponse, FinanceTransaction, PageResponse } from '../../types'
 import { toast, getErrorMessage } from '../../store/toastStore'
+import { EyeIcon, EyeOffIcon } from '../icons/ActionIcons'
 
 interface Props {
   branches: Branch[]
@@ -20,6 +21,7 @@ const MONTH_NAMES = [
 const DETAILS_GRANULARITIES: FinanceGranularity[] = ['QUARTERLY', 'YEARLY', 'CUSTOM']
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200]
 const DEFAULT_PAGE_SIZE = 50
+const MASK = '₹ XXXX'
 
 const TYPE_LABELS: Record<FinanceTransaction['type'], string> = {
   MEMBERSHIP: 'Membership', STORE: 'Store', EXPENSE: 'Expense',
@@ -39,6 +41,12 @@ function supportsDetails(g: string): boolean {
 
 export default function FinanceReportSection({ branches }: Props) {
   const today = new Date()
+
+  // Figures stay masked until the Owner explicitly reveals them, so nothing sensitive is
+  // visible to anyone glancing at the screen. Local state only - leaving this tab (the
+  // section unmounts) or reloading always returns to hidden.
+  const [revealed, setRevealed] = useState(false)
+  const money = (n: number) => (revealed ? `₹${n.toFixed(2)}` : MASK)
 
   const [granularity, setGranularity] = useState<FinanceGranularity>('MONTHLY')
   const [branchId, setBranchId] = useState('') // '' = all branches
@@ -176,10 +184,20 @@ export default function FinanceReportSection({ branches }: Props) {
 
   return (
     <div className="rounded-lg border border-gray-200 p-6">
-      <h2 className="font-medium">Income &amp; Profit</h2>
-      <p className="mt-1 text-xs text-gray-500">
-        Membership and store income minus logged expenses, for the period and branch you pick.
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-medium">Income &amp; Profit</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Membership and store income minus logged expenses, for the period and branch you pick.
+          </p>
+        </div>
+        <button type="button" onClick={() => setRevealed((v) => !v)}
+          aria-pressed={revealed}
+          className="flex flex-shrink-0 items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+          {revealed ? <EyeOffIcon /> : <EyeIcon />}
+          {revealed ? 'Hide figures' : 'Show figures'}
+        </button>
+      </div>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <div>
@@ -306,20 +324,22 @@ export default function FinanceReportSection({ branches }: Props) {
           <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div className="rounded-md border border-gray-200 p-4">
               <p className="text-xs text-gray-500">Membership income</p>
-              <p className="mt-1 text-lg font-semibold">₹{report.totalMembershipIncome.toFixed(2)}</p>
+              <p className="mt-1 text-lg font-semibold">{money(report.totalMembershipIncome)}</p>
             </div>
             <div className="rounded-md border border-gray-200 p-4">
               <p className="text-xs text-gray-500">Store income</p>
-              <p className="mt-1 text-lg font-semibold">₹{report.totalProductIncome.toFixed(2)}</p>
+              <p className="mt-1 text-lg font-semibold">{money(report.totalProductIncome)}</p>
             </div>
             <div className="rounded-md border border-gray-200 p-4">
               <p className="text-xs text-gray-500">Total expenses</p>
-              <p className="mt-1 text-lg font-semibold text-red-600">₹{report.totalExpense.toFixed(2)}</p>
+              <p className="mt-1 text-lg font-semibold text-red-600">{money(report.totalExpense)}</p>
             </div>
             <div className="rounded-md border border-gray-200 p-4">
               <p className="text-xs text-gray-500">Profit</p>
-              <p className={`mt-1 text-lg font-semibold ${report.totalProfit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                ₹{report.totalProfit.toFixed(2)}
+              <p className={`mt-1 text-lg font-semibold ${
+                !revealed ? 'text-gray-400' : report.totalProfit >= 0 ? 'text-green-700' : 'text-red-600'
+              }`}>
+                {money(report.totalProfit)}
               </p>
             </div>
           </div>
@@ -367,8 +387,8 @@ export default function FinanceReportSection({ branches }: Props) {
                         <td className="py-2 pr-4 text-gray-500">{t.branch}</td>
                         <td className="max-w-[220px] truncate py-2 pr-4 text-gray-500" title={t.description ?? ''}>{t.description ?? '—'}</td>
                         <td className="py-2 pr-4 text-gray-500">{t.mode ? t.mode.replace('_', ' ') : '—'}</td>
-                        <td className="py-2 pr-4 text-right text-green-700">{t.income > 0 ? `₹${t.income.toFixed(2)}` : '—'}</td>
-                        <td className="py-2 text-right text-red-600">{t.expense > 0 ? `₹${t.expense.toFixed(2)}` : '—'}</td>
+                        <td className="py-2 pr-4 text-right text-green-700">{t.income > 0 ? money(t.income) : '—'}</td>
+                        <td className="py-2 text-right text-red-600">{t.expense > 0 ? money(t.expense) : '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -414,11 +434,13 @@ export default function FinanceReportSection({ branches }: Props) {
                   {report.breakdown.map((row) => (
                     <tr key={row.label}>
                       <td className="py-2 pr-4">{row.label}</td>
-                      <td className="py-2 pr-4 text-gray-500">₹{row.membershipIncome.toFixed(2)}</td>
-                      <td className="py-2 pr-4 text-gray-500">₹{row.productIncome.toFixed(2)}</td>
-                      <td className="py-2 pr-4">₹{row.totalIncome.toFixed(2)}</td>
-                      <td className="py-2 pr-4 text-red-600">₹{row.totalExpense.toFixed(2)}</td>
-                      <td className={`py-2 ${row.profit >= 0 ? 'text-green-700' : 'text-red-600'}`}>₹{row.profit.toFixed(2)}</td>
+                      <td className="py-2 pr-4 text-gray-500">{money(row.membershipIncome)}</td>
+                      <td className="py-2 pr-4 text-gray-500">{money(row.productIncome)}</td>
+                      <td className="py-2 pr-4">{money(row.totalIncome)}</td>
+                      <td className="py-2 pr-4 text-red-600">{money(row.totalExpense)}</td>
+                      <td className={`py-2 ${!revealed ? 'text-gray-400' : row.profit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                        {money(row.profit)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
