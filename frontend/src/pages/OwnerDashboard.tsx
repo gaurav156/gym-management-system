@@ -16,6 +16,8 @@ import BackupSection from '../components/owner/BackupSection'
 import { toast, getErrorMessage } from '../store/toastStore'
 import PasswordInput from '../components/PasswordInput'
 import EditActions from '../components/EditActions'
+import ActionButton from '../components/ActionButton'
+import { PencilIcon, TrashIcon, PlayIcon, PauseIcon } from '../components/icons/ActionIcons'
 
 type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
 type Tab = 'FINANCE' | 'BRANCHES' | 'PLANS' | 'PRODUCTS' | 'BROADCASTS' | 'BACKUP'
@@ -357,13 +359,10 @@ export default function OwnerDashboard() {
                             )}
                           </div>
                           <div className="flex flex-shrink-0 items-center gap-3 text-xs">
-                            <button onClick={() => startEditBranch(b)} className="text-gray-600 hover:underline">Edit</button>
-                            <button onClick={() => toggleBranchActive(b)}
-                              className={b.active ? 'text-amber-600 hover:underline' : 'text-green-700 hover:underline'}>
-                              {b.active ? 'Deactivate' : 'Reactivate'}
-                            </button>
+                            <ActionButton icon={<PencilIcon />} onClick={() => startEditBranch(b)}>Edit</ActionButton>
+                            <ActionButton variant={b.active ? "warning" : "success"} icon={b.active ? <PauseIcon /> : <PlayIcon />} onClick={() => toggleBranchActive(b)}>{b.active ? 'Deactivate' : 'Reactivate'}</ActionButton>
                             {b.deletable && (
-                              <button onClick={() => deleteBranch(b)} className="text-red-600 hover:underline">Delete</button>
+                              <ActionButton variant="danger" className='text-red-600' icon={<TrashIcon />} onClick={() => deleteBranch(b)}>Delete</ActionButton>
                             )}
                           </div>
                         </div>

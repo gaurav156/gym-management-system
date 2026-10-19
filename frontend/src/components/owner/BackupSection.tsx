@@ -5,6 +5,7 @@ import ConfirmDialog from '../ConfirmDialog'
 import { useConfirm } from '../../hooks/useConfirm'
 import { toast, getErrorMessage } from '../../store/toastStore'
 import PasswordInput from '../PasswordInput'
+import FilePicker from '../FilePicker'
 
 type Preset = 'ALL' | 'LAST_6_MONTHS' | 'LAST_12_MONTHS' | 'CUSTOM'
 type ImportMode = 'MERGE' | 'REPLACE'
@@ -125,22 +126,22 @@ export default function BackupSection() {
         live in object storage and are not inside the file.
       </p>
 
-      <div className="mt-4 flex flex-wrap items-end gap-3">
-        <div>
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="min-w-0 w-full sm:w-auto">
           <label className="block text-xs text-gray-500">Data range</label>
-          <select value={preset} onChange={(e) => setPreset(e.target.value as Preset)} className={input}>
+          <select value={preset} onChange={(e) => setPreset(e.target.value as Preset)} className={`${input} w-full sm:w-auto`}>
             {PRESETS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
         </div>
         {preset === 'CUSTOM' && (
           <>
-            <div>
+            <div className="min-w-0 w-full sm:w-auto">
               <label className="block text-xs text-gray-500">From</label>
-              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={input} />
+              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={`${input} w-full sm:w-auto`} />
             </div>
-            <div>
+            <div className="min-w-0 w-full sm:w-auto">
               <label className="block text-xs text-gray-500">To</label>
-              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={input} />
+              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={`${input} w-full sm:w-auto`} />
             </div>
           </>
         )}
@@ -166,27 +167,27 @@ export default function BackupSection() {
         Moving to a new database? Start the app against it once so the tables are created, then use <em>Replace</em>.
         Both sides must run the same app version.
       </p>
-      <div className="mt-3 flex flex-wrap items-end gap-3">
-        <div>
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="min-w-0 sm:max-w-full">
           <label className="block text-xs text-gray-500">Backup file</label>
-          <input type="file" accept=".zip,application/zip" onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="mt-1 text-sm" />
+          <FilePicker file={file} onChange={setFile} accept=".zip,application/zip" label="Choose backup (.zip)" />
         </div>
-        <div>
+        <div className="min-w-0 w-full sm:w-auto">
           <label className="block text-xs text-gray-500">Mode</label>
-          <select value={mode} onChange={(e) => setMode(e.target.value as ImportMode)} className={input}>
+          <select value={mode} onChange={(e) => setMode(e.target.value as ImportMode)}
+            className={`${input} w-full min-w-0 sm:w-auto`}>
             <option value="MERGE">Merge - add missing rows, delete nothing</option>
             <option value="REPLACE">Replace - wipe this database first</option>
           </select>
         </div>
-        <div>
+        <div className="min-w-0 w-full sm:w-auto">
           <label className="block text-xs text-gray-500">Your password</label>
           <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)}
             wrapperClassName="mt-1"
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
         </div>
         <button onClick={handleImport} disabled={busy !== null}
-          className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-70 ${
+          className={`flex w-full items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto ${
             mode === 'REPLACE' ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-800 hover:bg-gray-900'
           }`}>
           {busy === 'import' && <Spinner className="h-4 w-4" />}

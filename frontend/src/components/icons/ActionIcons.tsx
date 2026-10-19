@@ -10,3 +10,9 @@ export function PencilIcon() { return <svg viewBox="0 0 24 24" {...common}><path
 export function TrashIcon() { return <svg viewBox="0 0 24 24" {...common}><path d="M3 6h18M8 6V4h8v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" /></svg> }
 export function BanIcon() { return <svg viewBox="0 0 24 24" {...common}><circle cx="12" cy="12" r="9" /><path d="M6 6l12 12" /></svg> }
 export function CheckIcon() { return <svg viewBox="0 0 24 24" {...common}><path d="M20 6L9 17l-5-5" /></svg> }
+export function CalendarIcon() { return <svg viewBox="0 0 24 24" {...common}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg> }
+export function PauseIcon() { return <svg viewBox="0 0 24 24" {...common}><path d="M8 5v14M16 5v14" /></svg> }
+export function PlayIcon() { return <svg viewBox="0 0 24 24" {...common}><path d="M7 4l13 8-13 8V4z" /></svg> }
+export function CoinIcon() { return <svg viewBox="0 0 24 24" {...common}><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5c.5-1 1.4-1.5 2.5-1.5 1.5 0 2.5.8 2.5 2s-1 1.7-2.5 2-2.5.8-2.5 2 1 2 2.5 2c1.1 0 2-.5 2.5-1.5M12 6v2M12 16v2" /></svg> }
+export function MapPinIcon() { return <svg viewBox="0 0 24 24" {...common}><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.3" /></svg> }
+export function UploadIcon() { return <svg viewBox="0 0 24 24" {...common}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5M12 3v12" /></svg> }

@@ -15,6 +15,8 @@ import { genderLabel, formatDobWithAge } from '../../utils/person'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { toast, getErrorMessage } from '../../store/toastStore'
 import EditActions from '../EditActions'
+import ActionButton from '../ActionButton'
+import { PencilIcon, TrashIcon, CalendarIcon, CheckIcon, MapPinIcon } from '../icons/ActionIcons'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -514,15 +516,17 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                     <p><span className="text-gray-500">Last visit:</span> {
                       lastCheckins[detailStaff.id] ? new Date(lastCheckins[detailStaff.id]).toLocaleString() : 'Never'
                     }</p>
-                    {canEditInfo && (
-                      <button onClick={() => startEditStaffInfo(detailStaff)}
-                        className="text-xs text-gray-600 hover:underline">Edit info</button>
-                    )}
-                    {canDelete && (
-                      <button onClick={() => deleteStaff(detailStaff.id, detailStaff.name)}
-                        className="ml-3 text-xs text-red-600 hover:underline">
-                        Delete account
-                      </button>
+                    {(canEditInfo || canDelete) && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {canEditInfo && (
+                          <ActionButton icon={<PencilIcon />} onClick={() => startEditStaffInfo(detailStaff)}>Edit info</ActionButton>
+                        )}
+                        {canDelete && (
+                          <ActionButton variant="danger" icon={<TrashIcon />} onClick={() => deleteStaff(detailStaff.id, detailStaff.name)}>
+                            Delete account
+                          </ActionButton>
+                        )}
+                      </div>
                     )}
                     {detailStaff.role === 'OWNER' && user?.role === 'OWNER' && (
                       <>
@@ -564,12 +568,10 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                           </p>
                         )}
                         {canEditDates && (
-                          <div className="space-x-2">
-                            <button onClick={() => startEditStaffDates(detailStaff)}
-                              className="text-xs text-gray-600 hover:underline">Edit dates</button>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <ActionButton icon={<CalendarIcon />} onClick={() => startEditStaffDates(detailStaff)}>Edit dates</ActionButton>
                             {detailStaff.leftDate && (
-                              <button onClick={() => clearLeftDate(detailStaff)}
-                                className="text-xs text-brand hover:underline">Clear left date</button>
+                              <ActionButton variant="primary" icon={<CheckIcon />} onClick={() => clearLeftDate(detailStaff)}>Clear left date</ActionButton>
                             )}
                           </div>
                         )}
@@ -703,10 +705,10 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                       {detailStaffBranches.length === 0 && <li className="text-gray-400">No branches assigned.</li>}
                     </ul>
                     {user?.role === 'OWNER' && (
-                      <button onClick={() => { setEditingStaffBranches(true); setStaffBranchEditIds(detailStaffBranches.map((b) => b.id)) }}
-                        className="mt-3 text-xs text-gray-600 hover:underline">
+                      <ActionButton className="mt-3" icon={<MapPinIcon />}
+                        onClick={() => { setEditingStaffBranches(true); setStaffBranchEditIds(detailStaffBranches.map((b) => b.id)) }}>
                         Edit branches
-                      </button>
+                      </ActionButton>
                     )}
                   </>
                 )}

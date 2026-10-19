@@ -7,11 +7,11 @@ import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
 import ConfirmDialog from '../ConfirmDialog'
 import { TableSkeleton } from '../Skeleton'
 import { useConfirm } from '../../hooks/useConfirm'
-import Spinner from '../Spinner'
 import RoleChangeOtpDialog, { type RoleChangeOtpTarget } from '../RoleChangeOtpDialog'
 import Avatar from '../Avatar'
 import RowActionsMenu from '../RowActionsMenu'
-import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon } from '../icons/ActionIcons'
+import ActionButton from '../ActionButton'
+import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, PencilIcon, TrashIcon, BanIcon, CheckIcon, CalendarIcon, PauseIcon, PlayIcon, CoinIcon, MapPinIcon } from '../icons/ActionIcons'
 import ProductPurchaseHistoryTab from '../ProductPurchaseHistoryTab'
 import PersonalDetailsFields from '../PersonalDetailsFields'
 import IdProofField from '../IdProofField'
@@ -607,14 +607,14 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                     <p><span className="text-gray-500">Last visit:</span> {
                       lastCheckins[detailMember.id] ? new Date(lastCheckins[detailMember.id]).toLocaleString() : 'Never'
                     }</p>
-                    <button onClick={() => startEditMemberInfo(detailMember)}
-                      className="text-xs text-gray-600 hover:underline">Edit info</button>
-                    {user?.role === 'OWNER' && (
-                      <button onClick={() => deleteMember(detailMember.id, detailMember.name)}
-                        className="ml-3 text-xs text-red-600 hover:underline">
-                        Delete account
-                      </button>
-                    )}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <ActionButton icon={<PencilIcon />} onClick={() => startEditMemberInfo(detailMember)}>Edit info</ActionButton>
+                      {user?.role === 'OWNER' && (
+                        <ActionButton variant="danger" icon={<TrashIcon />} onClick={() => deleteMember(detailMember.id, detailMember.name)}>
+                          Delete account
+                        </ActionButton>
+                      )}
+                    </div>
                     {user?.role === 'OWNER' && (
                       <>
                         <hr />
@@ -667,13 +667,13 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                 </label>
 
                 <div className="mt-3 overflow-x-auto">
-                  <table className="w-full min-w-[560px] table-fixed text-left text-sm">
+                  <table className="w-full min-w-[720px] table-fixed text-left text-sm">
                     <colgroup>
-                      <col className="w-[18%]" />
-                      <col className="w-[18%]" />
-                      <col className="w-[18%]" />
-                      <col className="w-[19%]" />
-                      <col className="w-[27%]" />
+                      <col className="w-[16%]" />
+                      <col className="w-[15%]" />
+                      <col className="w-[15%]" />
+                      <col className="w-[15%]" />
+                      <col className="w-[39%]" />
                     </colgroup>
                     <thead>
                       <tr className="border-b border-gray-200 text-gray-500">
@@ -719,19 +719,19 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                                   )}
                                 </td>
                                 <td className="py-2 align-top">
-                                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                  <div className="flex flex-wrap gap-1.5">
                                     {effective === 'ACTIVE' && (
-                                      <button onClick={() => pauseMembership(m.id)} className="text-xs text-amber-600 hover:underline">Pause</button>
+                                      <ActionButton variant="warning" icon={<PauseIcon />} onClick={() => pauseMembership(m.id)}>Pause</ActionButton>
                                     )}
                                     {effective === 'PAUSED' && (
-                                      <button onClick={() => resumeMembership(m.id)} className="text-xs text-green-700 hover:underline">Resume</button>
+                                      <ActionButton variant="success" icon={<PlayIcon />} onClick={() => resumeMembership(m.id)}>Resume</ActionButton>
                                     )}
                                     {(effective === 'ACTIVE' || effective === 'PAUSED' || effective === 'SCHEDULED') && (
-                                      <button onClick={() => cancelMembership(m.id)} className="text-xs text-red-600 hover:underline">Cancel</button>
+                                      <ActionButton variant="danger" icon={<BanIcon />} onClick={() => cancelMembership(m.id)}>Cancel</ActionButton>
                                     )}
-                                    <button onClick={() => startEdit(m)} className="text-xs text-gray-600 hover:underline">Edit dates</button>
+                                    <ActionButton icon={<CalendarIcon />} onClick={() => startEdit(m)}>Edit dates</ActionButton>
                                     {m.paymentStatus === 'PARTIAL' && (
-                                      <button onClick={() => openPayDialog(m)} className="text-xs text-green-700 hover:underline">Record payment</button>
+                                      <ActionButton variant="success" icon={<CoinIcon />} onClick={() => openPayDialog(m)}>Record payment</ActionButton>
                                     )}
                                   </div>
                                 </td>
@@ -879,10 +879,10 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                       {detailMemberBranches.length === 0 && <li className="text-gray-400">No branches assigned.</li>}
                     </ul>
                     {user?.role === 'OWNER' && (
-                      <button onClick={() => { setEditingMemberBranches(true); setMemberBranchEditIds(detailMemberBranches.map((b) => b.id)) }}
-                        className="mt-3 text-xs text-gray-600 hover:underline">
+                      <ActionButton className="mt-3" icon={<MapPinIcon />}
+                        onClick={() => { setEditingMemberBranches(true); setMemberBranchEditIds(detailMemberBranches.map((b) => b.id)) }}>
                         Edit branches
-                      </button>
+                      </ActionButton>
                     )}
                   </>
                 )}
