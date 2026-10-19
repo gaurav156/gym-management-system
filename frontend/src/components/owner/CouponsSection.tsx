@@ -7,6 +7,7 @@ import type { Coupon, DiscountType } from '../../types'
 import RowActionsMenu from '../RowActionsMenu'
 import { PencilIcon, BanIcon, CheckIcon, TrashIcon } from '../icons/ActionIcons'
 import { toast, getErrorMessage } from '../../store/toastStore'
+import EditModal from '../EditModal'
 
 interface CouponFormState {
   code: string
@@ -39,6 +40,40 @@ function toFormState(c: Coupon): CouponFormState {
     maxRedemptions: c.maxRedemptions != null ? String(c.maxRedemptions) : '',
     appliesTo: c.appliesTo
   }
+}
+
+function DiscountFields({ f, onChange }: { f: CouponFormState; onChange: (next: CouponFormState) => void }) {
+  return (
+    <>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <select value={f.discountType}
+          onChange={(e) => onChange({ ...f, discountType: e.target.value as DiscountType, maxDiscountAmount: e.target.value === 'FIXED' ? '' : f.maxDiscountAmount })}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm">
+          <option value="PERCENTAGE">Percentage off</option>
+          <option value="FIXED">Fixed amount off</option>
+        </select>
+        <input type="number" min={0} step="0.01" required
+          placeholder={f.discountType === 'PERCENTAGE' ? 'e.g. 10 (%)' : 'e.g. 200 (₹)'}
+          value={f.discountValue}
+          onChange={(e) => onChange({ ...f, discountValue: e.target.value })}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm" />
+      </div>
+      {f.discountType === 'PERCENTAGE' && (
+        <div>
+          <label className="text-xs text-gray-500">Max amount off (optional - caps the discount, e.g. ₹500)</label>
+          <input type="number" min={0} step="0.01" placeholder="No cap" value={f.maxDiscountAmount}
+            onChange={(e) => onChange({ ...f, maxDiscountAmount: e.target.value })}
+            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+        </div>
+      )}
+      <select value={f.appliesTo} onChange={(e) => onChange({ ...f, appliesTo: e.target.value as any })}
+        className="rounded-md border border-gray-300 px-3 py-2 text-sm">
+        <option value="PRODUCT">Store products only</option>
+        <option value="MEMBERSHIP">Memberships only</option>
+        <option value="BOTH">Both</option>
+      </select>
+    </>
+  )
 }
 
 export default function CouponsSection() {
@@ -155,40 +190,6 @@ export default function CouponsSection() {
     })
   }
 
-  function DiscountFields({ f, onChange }: { f: CouponFormState; onChange: (next: CouponFormState) => void }) {
-    return (
-      <>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <select value={f.discountType}
-            onChange={(e) => onChange({ ...f, discountType: e.target.value as DiscountType, maxDiscountAmount: e.target.value === 'FIXED' ? '' : f.maxDiscountAmount })}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm">
-            <option value="PERCENTAGE">Percentage off</option>
-            <option value="FIXED">Fixed amount off</option>
-          </select>
-          <input type="number" min={0} step="0.01" required
-            placeholder={f.discountType === 'PERCENTAGE' ? 'e.g. 10 (%)' : 'e.g. 200 (₹)'}
-            value={f.discountValue}
-            onChange={(e) => onChange({ ...f, discountValue: e.target.value })}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm" />
-        </div>
-        {f.discountType === 'PERCENTAGE' && (
-          <div>
-            <label className="text-xs text-gray-500">Max amount off (optional - caps the discount, e.g. ₹500)</label>
-            <input type="number" min={0} step="0.01" placeholder="No cap" value={f.maxDiscountAmount}
-              onChange={(e) => onChange({ ...f, maxDiscountAmount: e.target.value })}
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
-          </div>
-        )}
-        <select value={f.appliesTo} onChange={(e) => onChange({ ...f, appliesTo: e.target.value as any })}
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm">
-          <option value="PRODUCT">Store products only</option>
-          <option value="MEMBERSHIP">Memberships only</option>
-          <option value="BOTH">Both</option>
-        </select>
-      </>
-    )
-  }
-
   return (
     <div className="rounded-lg border border-gray-200 p-6">
       <div className="flex items-center justify-between">
@@ -265,85 +266,76 @@ export default function CouponsSection() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {!loading && coupons.map((c) => {
-              const isEditing = editingId === c.id
-              return isEditing ? (
-                <tr key={c.id}>
-                  <td colSpan={6} className="py-3">
-                    <div className="space-y-3 rounded-md border border-gray-200 p-3">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <input value={editForm.code} onChange={(e) => setEditForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
-                          placeholder="Code" className="rounded-md border border-gray-300 px-2 py-1.5 text-sm uppercase" />
-                        <input value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
-                          placeholder="Description" className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
-                      </div>
-                      <DiscountFields f={editForm} onChange={setEditForm} />
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <input type="datetime-local" value={editForm.startsAt}
-                          onChange={(e) => setEditForm((f) => ({ ...f, startsAt: e.target.value }))}
-                          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
-                        <input type="datetime-local" value={editForm.endsAt}
-                          onChange={(e) => setEditForm((f) => ({ ...f, endsAt: e.target.value }))}
-                          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <input type="number" min={1} placeholder="Max redemptions (optional)" value={editForm.maxRedemptions}
-                          onChange={(e) => setEditForm((f) => ({ ...f, maxRedemptions: e.target.value }))}
-                          className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm sm:max-w-[14rem]" />
-                        <label className="flex items-center gap-1.5 text-xs text-gray-600">
-                          <input type="checkbox" checked={editForm.firstTimeBuyersOnly}
-                            onChange={(e) => setEditForm((f) => ({ ...f, firstTimeBuyersOnly: e.target.checked }))} />
-                          First-time buyers only
-                        </label>
-                      </div>
-                      <div className="space-x-2">
-                        <button onClick={() => saveEdit(c.id)} disabled={savingEdit}
-                          className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
-                          {savingEdit && <Spinner className="h-3 w-3" />}
-                          {savingEdit ? 'Saving...' : 'Save'}
-                        </button>
-                        <button onClick={() => setEditingId(null)} disabled={savingEdit}
-                          className="text-xs text-gray-500 hover:underline disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                <tr key={c.id}>
-                  <td className="py-2 pr-4 font-medium">
-                    {c.code}
-                    {c.firstTimeBuyersOnly && <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">New members</span>}
-                  </td>
-                  <td className="py-2 pr-4">
-                    {c.discountType === 'PERCENTAGE' ? `${c.discountValue}%` : `₹${c.discountValue}`}
-                    {c.discountType === 'PERCENTAGE' && c.maxDiscountAmount != null && (
-                      <span className="ml-1 text-xs text-gray-400">(up to ₹{c.maxDiscountAmount})</span>
-                    )}
-                  </td>
-                  <td className="py-2 pr-4 text-xs text-gray-500">
-                    {c.startsAt ? new Date(c.startsAt).toLocaleString() : 'Any time'} –{' '}
-                    {c.endsAt ? new Date(c.endsAt).toLocaleString() : 'No end'}
-                  </td>
-                  <td className="py-2 pr-4 text-gray-500">{c.timesRedeemed}{c.maxRedemptions ? ` / ${c.maxRedemptions}` : ''}</td>
-                  <td className="py-2 pr-4">
-                    <span className={c.currentlyValid ? 'text-green-700' : 'text-gray-400'}>
-                      {c.currentlyValid ? 'Valid' : c.active ? 'Not in window' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="py-2">
-                    <RowActionsMenu actions={[
-                      { label: 'Edit', icon: <PencilIcon />, onClick: () => startEdit(c) },
-                      { label: c.active ? 'Deactivate' : 'Reactivate', icon: c.active ? <BanIcon /> : <CheckIcon />, onClick: () => toggleActive(c), danger: c.active },
-                      { label: 'Delete', icon: <TrashIcon />, onClick: () => deleteCoupon(c), danger: true },
-                    ]} />
-                  </td>
-                </tr>
-              )
-            })}
+            {!loading && coupons.map((c) => (
+              <tr key={c.id}>
+                <td className="py-2 pr-4 font-medium">
+                  {c.code}
+                  {c.firstTimeBuyersOnly && <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">New members</span>}
+                </td>
+                <td className="py-2 pr-4">
+                  {c.discountType === 'PERCENTAGE' ? `${c.discountValue}%` : `₹${c.discountValue}`}
+                  {c.discountType === 'PERCENTAGE' && c.maxDiscountAmount != null && (
+                    <span className="ml-1 text-xs text-gray-400">(up to ₹{c.maxDiscountAmount})</span>
+                  )}
+                </td>
+                <td className="py-2 pr-4 text-xs text-gray-500">
+                  {c.startsAt ? new Date(c.startsAt).toLocaleString() : 'Any time'} –{' '}
+                  {c.endsAt ? new Date(c.endsAt).toLocaleString() : 'No end'}
+                </td>
+                <td className="py-2 pr-4 text-gray-500">{c.timesRedeemed}{c.maxRedemptions ? ` / ${c.maxRedemptions}` : ''}</td>
+                <td className="py-2 pr-4">
+                  <span className={c.currentlyValid ? 'text-green-700' : 'text-gray-400'}>
+                    {c.currentlyValid ? 'Valid' : c.active ? 'Not in window' : 'Inactive'}
+                  </span>
+                </td>
+                <td className="py-2">
+                  <RowActionsMenu actions={[
+                    { label: 'Edit', icon: <PencilIcon />, onClick: () => startEdit(c) },
+                    { label: c.active ? 'Deactivate' : 'Reactivate', icon: c.active ? <BanIcon /> : <CheckIcon />, onClick: () => toggleActive(c), danger: c.active },
+                    { label: 'Delete', icon: <TrashIcon />, onClick: () => deleteCoupon(c), danger: true },
+                  ]} />
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
         {!loading && coupons.length === 0 && <p className="py-4 text-sm text-gray-400">No coupons yet - add one above.</p>}
       </div>
+
+      {editingId && (
+        <EditModal title="Edit coupon" saving={savingEdit}
+          onSave={() => saveEdit(editingId)} onClose={() => setEditingId(null)}>
+          <div className="space-y-3">
+            <input value={editForm.code} onChange={(e) => setEditForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+              placeholder="Code" className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm uppercase" />
+            <input value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder="Description" className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            <DiscountFields f={editForm} onChange={setEditForm} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs text-gray-500">Valid from</label>
+                <input type="datetime-local" value={editForm.startsAt}
+                  onChange={(e) => setEditForm((f) => ({ ...f, startsAt: e.target.value }))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Valid until</label>
+                <input type="datetime-local" value={editForm.endsAt}
+                  onChange={(e) => setEditForm((f) => ({ ...f, endsAt: e.target.value }))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <input type="number" min={1} placeholder="Max redemptions (optional)" value={editForm.maxRedemptions}
+              onChange={(e) => setEditForm((f) => ({ ...f, maxRedemptions: e.target.value }))}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            <label className="flex items-center gap-1.5 text-xs text-gray-600">
+              <input type="checkbox" checked={editForm.firstTimeBuyersOnly}
+                onChange={(e) => setEditForm((f) => ({ ...f, firstTimeBuyersOnly: e.target.checked }))} />
+              First-time buyers only
+            </label>
+          </div>
+        </EditModal>
+      )}
       <ConfirmDialog {...dialogProps} />
     </div>
   )

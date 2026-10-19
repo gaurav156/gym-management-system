@@ -15,6 +15,7 @@ import BroadcastsSection from '../components/owner/BroadcastsSection'
 import BackupSection from '../components/owner/BackupSection'
 import { toast, getErrorMessage } from '../store/toastStore'
 import PasswordInput from '../components/PasswordInput'
+import EditActions from '../components/EditActions'
 
 type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
 type Tab = 'FINANCE' | 'BRANCHES' | 'PLANS' | 'PRODUCTS' | 'BROADCASTS' | 'BACKUP'
@@ -339,13 +340,7 @@ export default function OwnerDashboard() {
                             placeholder="Phone"
                             className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
                           <div className="space-x-2">
-                            <button onClick={() => saveEditBranch(b.id)} disabled={savingBranchEdit}
-                              className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
-                              {savingBranchEdit && <Spinner className="h-3 w-3" />}
-                              {savingBranchEdit ? 'Saving...' : 'Save'}
-                            </button>
-                            <button onClick={cancelEditBranch} disabled={savingBranchEdit}
-                              className="text-xs text-gray-500 hover:underline disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
+                            <EditActions size="sm" onSave={() => saveEditBranch(b.id)} onCancel={cancelEditBranch} saving={savingBranchEdit} />  
                           </div>
                         </div>
                       ) : (

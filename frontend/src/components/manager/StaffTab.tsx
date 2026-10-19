@@ -14,6 +14,7 @@ import IdProofField from '../IdProofField'
 import { genderLabel, formatDobWithAge } from '../../utils/person'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { toast, getErrorMessage } from '../../store/toastStore'
+import EditActions from '../EditActions'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -167,9 +168,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     setStaffEditIdProof(null)
   }
 
-  // Endpoint depends on role - Manager edits go through /api/managers/{id} (Owner-only
-  // on the backend), Trainer edits keep using /api/trainers/{id} (Owner or Manager).
+  // Endpoint deends on role - Manager edits go through /api/managers/{id} (Owner-only
   async function saveStaffInfo(s: StaffSummary) {
+  // on the backend), Trainer edits keep using /api/trainers/{id} (Owner or Manager).
     const endpoint = s.role === 'MANAGER' ? `/api/managers/${s.id}` : `/api/trainers/${s.id}`
     setSavingStaffInfo(true)
     try {
@@ -493,13 +494,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                         pendingKey={staffEditIdProof} canChange onUploaded={setStaffEditIdProof} onError={toast.error} />
                     )}
                     <div className="space-x-2">
-                      <button onClick={() => saveStaffInfo(detailStaff)} disabled={savingStaffInfo}
-                        className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
-                        {savingStaffInfo && <Spinner className="h-3 w-3" />}
-                        {savingStaffInfo ? 'Saving...' : 'Save'}
-                      </button>
-                      <button onClick={() => setEditingStaffInfo(false)} disabled={savingStaffInfo}
-                        className="text-xs text-gray-500 hover:underline disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
+                      <EditActions size="sm" onSave={() => saveStaffInfo(detailStaff)} onCancel={() => setEditingStaffInfo(false)} saving={savingStaffInfo} />
                     </div>
                   </div>
                 ) : (
@@ -556,13 +551,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                             className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
                         </div>
                         <div className="space-x-2">
-                          <button onClick={() => saveStaffDates(detailStaff)} disabled={savingStaffDates}
-                            className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
-                            {savingStaffDates && <Spinner className="h-3 w-3" />}
-                            {savingStaffDates ? 'Saving...' : 'Save'}
-                          </button>
-                          <button onClick={() => setEditingStaffDates(false)} disabled={savingStaffDates}
-                            className="text-xs text-gray-500 hover:underline disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
+                          <EditActions size="sm" onSave={() => saveStaffDates(detailStaff)} onCancel={() => setEditingStaffDates(false)} saving={savingStaffDates} />
                         </div>
                       </div>
                     ) : (
@@ -704,13 +693,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                       ))}
                     </div>
                     <div className="space-x-2">
-                      <button onClick={() => saveStaffBranches(detailStaff.id)} disabled={savingStaffBranches}
-                        className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
-                        {savingStaffBranches && <Spinner className="h-3 w-3" />}
-                        {savingStaffBranches ? 'Saving...' : 'Save'}
-                      </button>
-                      <button onClick={() => setEditingStaffBranches(false)} disabled={savingStaffBranches}
-                        className="text-xs text-gray-500 hover:underline disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
+                      <EditActions size="sm" onSave={() => saveStaffBranches(detailStaff.id)} onCancel={() => setEditingStaffBranches(false)} saving={savingStaffBranches} />  
                     </div>
                   </div>
                 ) : (

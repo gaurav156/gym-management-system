@@ -188,7 +188,7 @@ export default function LandingPage() {
             <p className="mt-1 text-xs text-gray-500">Certified trainers</p>
           </div>
           <div>
-            <p className="font-display text-3xl font-semibold text-gray-900">1,000+</p>
+            <p className="font-display text-3xl font-semibold text-gray-900">10,000+</p>
             <p className="mt-1 text-xs text-gray-500">Members trained</p>
           </div>
         </div>

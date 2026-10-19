@@ -18,6 +18,7 @@ import IdProofField from '../IdProofField'
 import { genderLabel, formatDobWithAge } from '../../utils/person'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { toast, getErrorMessage } from '../../store/toastStore'
+import EditActions from '../EditActions'
 
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -587,14 +588,9 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                     <IdProofField compact personId={detailMember.id} uploaded={detailMember.idProofUploaded}
                       pendingKey={memberEditIdProof} canChange onUploaded={setMemberEditIdProof} onError={toast.error} />
                     <div className="space-x-2">
-                      <button onClick={() => saveMemberInfo(detailMember.id)} disabled={savingMemberInfo}
-                        className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
-                        {savingMemberInfo && <Spinner className="h-3 w-3" />}
-                        {savingMemberInfo ? 'Saving...' : 'Save'}
-                      </button>
-                      <button onClick={() => setEditingMemberInfo(false)}
-                        className="text-xs text-gray-500 hover:underline">Cancel</button>
+                      <EditActions size="sm" onSave={() => saveMemberInfo(detailMember.id)} onCancel={() => setEditingMemberInfo(false)} saving={savingMemberInfo} />
                     </div>
+
                   </div>
                 ) : (
                   <>
@@ -673,11 +669,11 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full min-w-[560px] table-fixed text-left text-sm">
                     <colgroup>
-                      <col className="w-[22%]" />
-                      <col className="w-[20%]" />
-                      <col className="w-[20%]" />
-                      <col className="w-[16%]" />
-                      <col className="w-[22%]" />
+                      <col className="w-[18%]" />
+                      <col className="w-[18%]" />
+                      <col className="w-[18%]" />
+                      <col className="w-[19%]" />
+                      <col className="w-[27%]" />
                     </colgroup>
                     <thead>
                       <tr className="border-b border-gray-200 text-gray-500">
@@ -706,54 +702,38 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                                     className="w-full min-w-0 rounded-md border border-gray-300 px-2 py-1 text-xs" />
                                 </td>
                                 <td className="truncate py-2 pr-4 text-xs text-gray-400">Updates on save</td>
-                                <td className="py-2 space-x-2 whitespace-nowrap">
-                                  <button onClick={() => saveEdit(m.id)} disabled={savingEdit} className="text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
-                                    {savingEdit ? 'Saving...' : 'Save'}
-                                  </button>
-                                  <button onClick={cancelEdit} className="text-xs text-gray-500 hover:underline">
-                                    Cancel
-                                  </button>
+                                <td className="py-2">
+                                  <EditActions size="sm" onSave={() => saveEdit(m.id)} onCancel={cancelEdit} saving={savingEdit} />
                                 </td>
                               </>
                             ) : (
                               <>
                                 <td className="truncate py-2 pr-4 text-gray-500">{m.startDate}</td>
                                 <td className="truncate py-2 pr-4 text-gray-500">{m.endDate}</td>
-                                <td className="truncate py-2 pr-4">
-                                  <span className={statusColorClass(effective)}>{statusLabel(effective)}</span>
-                                </td>
-                                <td className="truncate py-2 pr-4">
+                                <td className="py-2 pr-4 align-top">
                                   <span className={statusColorClass(effective)}>{statusLabel(effective)}</span>
                                   {m.paymentStatus === 'PARTIAL' && (
-                                    <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                                    <span className="mt-1 block w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
                                       Partially paid - ₹{m.balanceDue} due{m.balanceDueDate ? ` by ${m.balanceDueDate}` : ''}
                                     </span>
                                   )}
                                 </td>
-                                <td className="py-2 space-x-2 whitespace-nowrap">
-                                  {effective === 'ACTIVE' && (
-                                    <button onClick={() => pauseMembership(m.id)} className="text-xs text-amber-600 hover:underline">
-                                      Pause
-                                    </button>
-                                  )}
-                                  {effective === 'PAUSED' && (
-                                    <button onClick={() => resumeMembership(m.id)} className="text-xs text-green-700 hover:underline">
-                                      Resume
-                                    </button>
-                                  )}
-                                  {(effective === 'ACTIVE' || effective === 'PAUSED' || effective === 'SCHEDULED') && (
-                                    <button onClick={() => cancelMembership(m.id)} className="text-xs text-red-600 hover:underline">
-                                      Cancel
-                                    </button>
-                                  )}
-                                  <button onClick={() => startEdit(m)} className="text-xs text-gray-600 hover:underline">
-                                    Edit dates
-                                  </button>
-                                  {m.paymentStatus === 'PARTIAL' && (
-                                    <button onClick={() => openPayDialog(m)} className="text-xs text-green-700 hover:underline">
-                                      Record payment
-                                    </button>
-                                  )}
+                                <td className="py-2 align-top">
+                                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                    {effective === 'ACTIVE' && (
+                                      <button onClick={() => pauseMembership(m.id)} className="text-xs text-amber-600 hover:underline">Pause</button>
+                                    )}
+                                    {effective === 'PAUSED' && (
+                                      <button onClick={() => resumeMembership(m.id)} className="text-xs text-green-700 hover:underline">Resume</button>
+                                    )}
+                                    {(effective === 'ACTIVE' || effective === 'PAUSED' || effective === 'SCHEDULED') && (
+                                      <button onClick={() => cancelMembership(m.id)} className="text-xs text-red-600 hover:underline">Cancel</button>
+                                    )}
+                                    <button onClick={() => startEdit(m)} className="text-xs text-gray-600 hover:underline">Edit dates</button>
+                                    {m.paymentStatus === 'PARTIAL' && (
+                                      <button onClick={() => openPayDialog(m)} className="text-xs text-green-700 hover:underline">Record payment</button>
+                                    )}
+                                  </div>
                                 </td>
                               </>
                             )}
@@ -888,14 +868,9 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                       ))}
                     </div>
                     <div className="space-x-2">
-                      <button onClick={() => saveMemberBranches(detailMember.id)} disabled={savingMemberBranches}
-                        className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
-                        {savingMemberBranches && <Spinner className="h-3 w-3" />}
-                        {savingMemberBranches ? 'Saving...' : 'Save'}
-                      </button>
-                      <button onClick={() => setEditingMemberBranches(false)} disabled={savingMemberBranches}
-                        className="text-xs text-gray-500 hover:underline disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
+                      <EditActions size="sm" onSave={() => saveMemberBranches(detailMember.id)} onCancel={() => setEditingMemberBranches(false)} saving={savingMemberBranches} />
                     </div>
+
                   </div>
                 ) : (
                   <>

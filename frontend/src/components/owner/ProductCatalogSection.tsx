@@ -11,6 +11,7 @@ import type { Product, ProductCategory, Branch, PageResponse } from '../../types
 import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PencilIcon, BanIcon, CheckIcon, TrashIcon } from '../icons/ActionIcons'
 import { toast, getErrorMessage } from '../../store/toastStore'
+import EditModal from '../EditModal'
 
 const PAGE_SIZE = 10
 
@@ -18,6 +19,28 @@ interface BranchStockInput { branchId: string; stockQuantity: string }
 interface Props { branches: Branch[] }
 
 const emptyForm = { name: '', description: '', price: '', discountPrice: '', discountStartsAt: '', discountEndsAt: '' }
+
+function StockTable({ branches, stocks, onChange }: {
+  branches: Branch[]; stocks: BranchStockInput[]; onChange: (v: BranchStockInput[]) => void
+}) {
+  return (
+    <div className="rounded-md border border-gray-300 p-2 text-sm">
+      <p className="mb-1 text-xs text-gray-500">Stock per branch</p>
+      {branches.map((b) => {
+        const row = stocks.find((s) => s.branchId === b.id) ?? { branchId: b.id, stockQuantity: '' }
+        return (
+          <div key={b.id} className="flex items-center justify-between gap-2 py-1">
+            <span className="min-w-0 flex-1 truncate">{b.name}</span>
+            <input type="number" min={0} placeholder="0" value={row.stockQuantity}
+              onChange={(e) => onChange(stocks.map((s) => s.branchId === b.id ? { ...s, stockQuantity: e.target.value } : s))}
+              className="w-20 flex-shrink-0 rounded-md border border-gray-300 px-2 py-1 text-xs" />
+          </div>
+        )
+      })}
+      {branches.length === 0 && <p className="text-xs text-gray-400">Add a branch first.</p>}
+    </div>
+  )
+}
 
 export default function ProductCatalogSection({ branches }: Props) {
   const [products, setProducts] = useState<Product[]>([])
@@ -199,26 +222,6 @@ export default function ProductCatalogSection({ branches }: Props) {
     set(list.includes(id) ? list.filter((x) => x !== id) : [...list, id])
   }
 
-  function StockTable({ stocks, onChange }: { stocks: BranchStockInput[]; onChange: (v: BranchStockInput[]) => void }) {
-    return (
-      <div className="rounded-md border border-gray-300 p-2 text-sm">
-        <p className="mb-1 text-xs text-gray-500">Stock per branch</p>
-        {branches.map((b) => {
-          const row = stocks.find((s) => s.branchId === b.id) ?? { branchId: b.id, stockQuantity: '' }
-          return (
-            <div key={b.id} className="flex items-center justify-between gap-2 py-1">
-              <span className="min-w-0 flex-1 truncate">{b.name}</span>
-              <input type="number" min={0} placeholder="0" value={row.stockQuantity}
-                onChange={(e) => onChange(stocks.map((s) => s.branchId === b.id ? { ...s, stockQuantity: e.target.value } : s))}
-                className="w-20 flex-shrink-0 rounded-md border border-gray-300 px-2 py-1 text-xs" />
-            </div>
-          )
-        })}
-        {branches.length === 0 && <p className="text-xs text-gray-400">Add a branch first.</p>}
-      </div>
-    )
-  }
-
   return (
     <div className="rounded-lg border border-gray-200 p-6">
       <div className="flex items-center justify-between">
@@ -262,7 +265,7 @@ export default function ProductCatalogSection({ branches }: Props) {
             </div>
           </div>
 
-          <StockTable stocks={formStocks} onChange={setFormStocks} />
+          <StockTable branches={branches} stocks={formStocks} onChange={setFormStocks} />
 
           <div>
             <p className="mb-1 text-xs text-gray-500">Categories</p>
@@ -330,106 +333,40 @@ export default function ProductCatalogSection({ branches }: Props) {
             {loading ? (
               <TableSkeleton rows={5} columns={5} />
             ) : products.map((p) => {
-              const isEditing = editingId === p.id
               const totalStock = p.branchStocks.reduce((sum, s) => sum + s.stockQuantity, 0)
               return (
                 <tr key={p.id}>
-                  {isEditing ? (
-                    <td colSpan={5} className="py-3">
-                      <div className="space-y-3 rounded-md border border-gray-200 p-3">
-                        <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                          placeholder="Name" className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
-                        <DescriptionEditor value={editForm.description} onChange={(v) => setEditForm((f) => ({ ...f, description: v }))} rows={3} />
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <input type="number" min={0} step="0.01" value={editForm.price}
-                            onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))}
-                            placeholder="Price" className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
-                          <input type="number" min={0} step="0.01" value={editForm.discountPrice}
-                            onChange={(e) => setEditForm((f) => ({ ...f, discountPrice: e.target.value }))}
-                            placeholder="Discount price" className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <input type="datetime-local" value={editForm.discountStartsAt}
-                            onChange={(e) => setEditForm((f) => ({ ...f, discountStartsAt: e.target.value }))}
-                            className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
-                          <input type="datetime-local" value={editForm.discountEndsAt}
-                            onChange={(e) => setEditForm((f) => ({ ...f, discountEndsAt: e.target.value }))}
-                            className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" />
-                        </div>
-                        <StockTable stocks={editStocks} onChange={setEditStocks} />
-                        <div>
-                          <p className="mb-1 text-xs text-gray-500">Categories</p>
-                          <div className="flex flex-wrap gap-2">
-                            {categories.map((c) => (
-                              <label key={c.id} className={`cursor-pointer rounded-full border px-3 py-1 text-xs ${
-                                editCategoryIds.includes(c.id) ? 'border-brand bg-brand/10 text-brand' : 'border-gray-300 text-gray-600'
-                              }`}>
-                                <input type="checkbox" className="hidden" checked={editCategoryIds.includes(c.id)}
-                                  onChange={() => toggleCategory(editCategoryIds, setEditCategoryIds, c.id)} />
-                                {c.name}
-                              </label>
-                            ))}
+                    <td className="py-2 pr-4">
+                      <div className="flex items-center gap-2">
+                        {p.imageUrls[0] && (
+                          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded bg-gray-50">
+                            <img src={p.imageUrls[0]} alt="" className="max-h-full max-w-full object-contain" />
                           </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {editImages.map((url, i) => (
-                            <div key={url} className="relative h-14 w-14">
-                              <div className="flex h-full w-full items-center justify-center overflow-hidden rounded border border-gray-200 bg-gray-50">
-                                <img src={url} alt="" className="max-h-full max-w-full object-contain" />
-                              </div>
-                              <button type="button" onClick={() => setEditImages((imgs) => imgs.filter((_, idx) => idx !== i))}
-                                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white shadow">✕</button>
-                            </div>
-                          ))}
-                          <PhotoUploadButton onLoaded={(url) => setEditImages((imgs) => [...imgs, url])}
-                            label="Add image" size="sm" purpose="PRODUCT" />
-                        </div>
-                        <div className="space-x-2">
-                          <button onClick={() => saveEdit(p.id)} disabled={savingEdit}
-                            className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-60">
-                            {savingEdit && <Spinner className="h-3 w-3" />}
-                            {savingEdit ? 'Saving...' : 'Save'}
-                          </button>
-                          <button onClick={() => setEditingId(null)} disabled={savingEdit}
-                            className="text-xs text-gray-500 hover:underline disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
-                        </div>
+                        )}
+                        <span className={p.active ? '' : 'text-gray-400'}>{p.name}</span>
+                        {p.imageUrls.length > 1 && <span className="text-[10px] text-gray-400">+{p.imageUrls.length - 1}</span>}
                       </div>
                     </td>
-                  ) : (
-                    <>
-                      <td className="py-2 pr-4">
-                        <div className="flex items-center gap-2">
-                          {p.imageUrls[0] && (
-                            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded bg-gray-50">
-                              <img src={p.imageUrls[0]} alt="" className="max-h-full max-w-full object-contain" />
-                            </div>
-                          )}
-                          <span className={p.active ? '' : 'text-gray-400'}>{p.name}</span>
-                          {p.imageUrls.length > 1 && <span className="text-[10px] text-gray-400">+{p.imageUrls.length - 1}</span>}
-                        </div>
-                      </td>
-                      <td className="py-2 pr-4">
-                        {p.discountActive ? (
-                          <span><span className="text-gray-400 line-through">₹{p.price}</span>{' '}
-                            <span className="font-medium text-green-700">₹{p.discountPrice}</span></span>
-                        ) : <span>₹{p.price}</span>}
-                      </td>
-                      <td className="py-2 pr-4" title={p.branchStocks.map((s) => `${s.branchName}: ${s.stockQuantity}`).join(', ')}>
-                        {totalStock}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <span className={p.active ? 'text-green-700' : 'text-gray-400'}>{p.active ? 'Active' : 'Inactive'}</span>
-                      </td>
-                      <td className="py-2">
-                      <RowActionsMenu actions={[
-                        { label: 'View', icon: <EyeIcon />, onClick: () => setViewingProduct(p) },
-                        { label: 'Edit', icon: <PencilIcon />, onClick: () => startEdit(p) },
-                        { label: p.active ? 'Deactivate' : 'Reactivate', icon: p.active ? <BanIcon /> : <CheckIcon />, onClick: () => toggleActive(p), danger: p.active },
-                        { label: 'Delete', icon: <TrashIcon />, onClick: () => deleteProduct(p), danger: true },
-                      ]} />
+                    <td className="py-2 pr-4">
+                      {p.discountActive ? (
+                        <span><span className="text-gray-400 line-through">₹{p.price}</span>{' '}
+                          <span className="font-medium text-green-700">₹{p.discountPrice}</span></span>
+                      ) : <span>₹{p.price}</span>}
                     </td>
-                    </>
-                  )}
+                    <td className="py-2 pr-4" title={p.branchStocks.map((s) => `${s.branchName}: ${s.stockQuantity}`).join(', ')}>
+                      {totalStock}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <span className={p.active ? 'text-green-700' : 'text-gray-400'}>{p.active ? 'Active' : 'Inactive'}</span>
+                    </td>
+                    <td className="py-2">
+                    <RowActionsMenu actions={[
+                      { label: 'View', icon: <EyeIcon />, onClick: () => setViewingProduct(p) },
+                      { label: 'Edit', icon: <PencilIcon />, onClick: () => startEdit(p) },
+                      { label: p.active ? 'Deactivate' : 'Reactivate', icon: p.active ? <BanIcon /> : <CheckIcon />, onClick: () => toggleActive(p), danger: p.active },
+                      { label: 'Delete', icon: <TrashIcon />, onClick: () => deleteProduct(p), danger: true },
+                    ]} />
+                  </td>
                 </tr>
               )
             })}
@@ -447,6 +384,70 @@ export default function ProductCatalogSection({ branches }: Props) {
               className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
           </div>
         </div>
+      )}
+
+      {editingId && (
+        <EditModal title="Edit product" wide saving={savingEdit}
+          onSave={() => saveEdit(editingId)} onClose={() => setEditingId(null)}>
+          <div className="space-y-3">
+            <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="Name" className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            <DescriptionEditor value={editForm.description} onChange={(v) => setEditForm((f) => ({ ...f, description: v }))} rows={4} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input type="number" min={0} step="0.01" value={editForm.price}
+                onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))}
+                placeholder="Price" className="rounded-md border border-gray-300 px-3 py-2 text-sm" />
+              <input type="number" min={0} step="0.01" value={editForm.discountPrice}
+                onChange={(e) => setEditForm((f) => ({ ...f, discountPrice: e.target.value }))}
+                placeholder="Discount price" className="rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs text-gray-500">Discount starts</label>
+                <input type="datetime-local" value={editForm.discountStartsAt}
+                  onChange={(e) => setEditForm((f) => ({ ...f, discountStartsAt: e.target.value }))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Discount ends</label>
+                <input type="datetime-local" value={editForm.discountEndsAt}
+                  onChange={(e) => setEditForm((f) => ({ ...f, discountEndsAt: e.target.value }))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <StockTable branches={branches} stocks={editStocks} onChange={setEditStocks} />
+            <div>
+              <p className="mb-1 text-xs text-gray-500">Categories</p>
+              <div className="flex flex-wrap gap-2">
+                {categories.map((c) => (
+                  <label key={c.id} className={`cursor-pointer rounded-full border px-3 py-1 text-xs ${
+                    editCategoryIds.includes(c.id) ? 'border-brand bg-brand/10 text-brand' : 'border-gray-300 text-gray-600'
+                  }`}>
+                    <input type="checkbox" className="hidden" checked={editCategoryIds.includes(c.id)}
+                      onChange={() => toggleCategory(editCategoryIds, setEditCategoryIds, c.id)} />
+                    {c.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Images</label>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                {editImages.map((url, i) => (
+                  <div key={url} className="relative h-14 w-14">
+                    <div className="flex h-full w-full items-center justify-center overflow-hidden rounded border border-gray-200 bg-gray-50">
+                      <img src={url} alt="" className="max-h-full max-w-full object-contain" />
+                    </div>
+                    <button type="button" onClick={() => setEditImages((imgs) => imgs.filter((_, idx) => idx !== i))}
+                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white shadow">✕</button>
+                  </div>
+                ))}
+                <PhotoUploadButton onLoaded={(url) => setEditImages((imgs) => [...imgs, url])}
+                  label="Add image" size="sm" purpose="PRODUCT" />
+              </div>
+            </div>
+          </div>
+        </EditModal>
       )}
 
       {viewingProduct && (
