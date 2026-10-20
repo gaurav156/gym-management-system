@@ -527,367 +527,374 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
 
       {detailMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-lg bg-white p-6 lg:max-w-4xl">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar src={detailMember.photo} name={detailMember.name} className="h-12 w-12" textClassName="text-lg" />
-                <div>
-                  <h3 className="text-lg font-medium">{detailMember.name}</h3>
-                  <p className="text-xs text-gray-500">{detailMember.email} · PIN {detailMember.checkinPin ?? '—'}</p>
+          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl lg:max-w-4xl">
+
+            {/* Fixed part: photo, name, email, PIN, close button and tabs */}
+            <div className="flex-shrink-0 px-6 pt-6">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <Avatar src={detailMember.photo} name={detailMember.name} className="h-12 w-12" textClassName="text-lg" />
+                  <div className="min-w-0">
+                    <h3 className="break-words text-lg font-medium">{detailMember.name}</h3>
+                    <p className="break-words text-xs text-gray-500">{detailMember.email} · PIN {detailMember.checkinPin ?? '—'}</p>
+                  </div>
+                </div>
+                <button onClick={() => { setDetailMemberId(null); cancelEdit() }}
+                  className="flex-shrink-0 text-gray-400 hover:text-gray-600" aria-label="Close">✕</button>
+              </div>
+
+              <div className="mt-4 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
+                <div className="flex min-w-max gap-1">
+                  {(['INFO', 'MEMBERSHIPS', 'PAYMENTS', 'STORE', 'ATTENDANCE', 'BRANCHES'] as const).map((tab) => (
+                    <button key={tab} onClick={() => setModalTab(tab)}
+                      className={`-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm ${
+                        modalTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
+                      }`}>
+                      {tab === 'INFO' ? 'Info' : tab === 'MEMBERSHIPS' ? 'Membership plans' : tab === 'PAYMENTS' ? 'Payment history'
+                        : tab === 'STORE' ? 'Product purchases' : tab === 'ATTENDANCE' ? 'Attendance' : 'Branches'}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <button onClick={() => { setDetailMemberId(null); cancelEdit() }}
-                className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
 
-            <div className="mt-4 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
-              <div className="flex min-w-max gap-1">
-                {(['INFO', 'MEMBERSHIPS', 'PAYMENTS', 'STORE', 'ATTENDANCE', 'BRANCHES'] as const).map((tab) => (
-                  <button key={tab} onClick={() => setModalTab(tab)}
-                    className={`-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm ${
-                      modalTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}>
-                    {tab === 'INFO' ? 'Info' : tab === 'MEMBERSHIPS' ? 'Membership plans' : tab === 'PAYMENTS' ? 'Payment history'
-                      : tab === 'STORE' ? 'Product purchases' : tab === 'ATTENDANCE' ? 'Attendance' : 'Branches'}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Scrollable part: everything that depends on the selected tab */}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6">
+              {modalTab === 'INFO' && (
+                <div className="mt-4 space-y-2 text-sm">
+                  {editingMemberInfo ? (
+                    <div className="space-y-3 rounded-md border border-gray-200 p-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar src={memberEditPhoto} name={memberEditName} className="h-14 w-14" textClassName="text-lg" />
+                        <div className="flex flex-col items-start gap-1.5">
+                          <PhotoUploadButton onLoaded={setMemberEditPhoto} label="Change photo" size="sm" />
+                          {memberEditPhoto && (
+                            <button type="button" onClick={() => setMemberEditPhoto(null)}
+                              className="text-xs text-red-600 hover:underline">Remove photo</button>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500">Name</label>
+                        <input value={memberEditName} onChange={(e) => setMemberEditName(e.target.value)}
+                          className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500">Phone</label>
+                        <input value={memberEditPhone} onChange={(e) => setMemberEditPhone(e.target.value)}
+                          className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500">Address</label>
+                        <textarea value={memberEditAddress} onChange={(e) => setMemberEditAddress(e.target.value)} rows={2}
+                          className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                      </div>
+                      <PersonalDetailsFields compact gender={memberEditGender} dateOfBirth={memberEditDob}
+                        onGenderChange={setMemberEditGender} onDateOfBirthChange={setMemberEditDob} />
+                      <IdProofField compact personId={detailMember.id} uploaded={detailMember.idProofUploaded}
+                        pendingKey={memberEditIdProof} canChange onUploaded={setMemberEditIdProof} onError={toast.error} />
+                      <div className="space-x-2">
+                        <EditActions size="sm" onSave={() => saveMemberInfo(detailMember.id)} onCancel={() => setEditingMemberInfo(false)} saving={savingMemberInfo} />
+                      </div>
 
-            {modalTab === 'INFO' && (
-              <div className="mt-4 space-y-2 text-sm">
-                {editingMemberInfo ? (
-                  <div className="space-y-3 rounded-md border border-gray-200 p-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar src={memberEditPhoto} name={memberEditName} className="h-14 w-14" textClassName="text-lg" />
-                      <div className="flex flex-col items-start gap-1.5">
-                        <PhotoUploadButton onLoaded={setMemberEditPhoto} label="Change photo" size="sm" />
-                        {memberEditPhoto && (
-                          <button type="button" onClick={() => setMemberEditPhoto(null)}
-                            className="text-xs text-red-600 hover:underline">Remove photo</button>
+                    </div>
+                  ) : (
+                    <>
+                      <p><span className="text-gray-500">Name:</span> {detailMember.name}</p>
+                      <p><span className="text-gray-500">Email:</span> {detailMember.email}</p>
+                      <p><span className="text-gray-500">Phone:</span> {detailMember.phone ?? '—'}</p>
+                      <p><span className="text-gray-500">Address:</span> {detailMember.address ?? '—'}</p>
+                      <p><span className="text-gray-500">Gender:</span> {genderLabel(detailMember.gender)}</p>
+                      <p><span className="text-gray-500">Date of birth:</span> {formatDobWithAge(detailMember.dateOfBirth)}</p>
+                      <IdProofField compact personId={detailMember.id} uploaded={detailMember.idProofUploaded}
+                        pendingKey={null} canChange={false} onUploaded={() => {}} onError={toast.error} />
+                      <p><span className="text-gray-500">Check-in PIN:</span> {detailMember.checkinPin ?? '—'}</p>
+                      <p><span className="text-gray-500">Enrollment date:</span> {detailMember.enrollmentDate ?? 'Not enrolled yet'}</p>
+                      <p><span className="text-gray-500">Last visit:</span> {
+                        lastCheckins[detailMember.id] ? new Date(lastCheckins[detailMember.id]).toLocaleString() : 'Never'
+                      }</p>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <ActionButton icon={<PencilIcon />} onClick={() => startEditMemberInfo(detailMember)}>Edit info</ActionButton>
+                        {user?.role === 'OWNER' && (
+                          <ActionButton variant="danger" icon={<TrashIcon />} onClick={() => deleteMember(detailMember.id, detailMember.name)}>
+                            Delete account
+                          </ActionButton>
                         )}
                       </div>
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500">Name</label>
-                      <input value={memberEditName} onChange={(e) => setMemberEditName(e.target.value)}
-                        className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500">Phone</label>
-                      <input value={memberEditPhone} onChange={(e) => setMemberEditPhone(e.target.value)}
-                        className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500">Address</label>
-                      <textarea value={memberEditAddress} onChange={(e) => setMemberEditAddress(e.target.value)} rows={2}
-                        className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
-                    </div>
-                    <PersonalDetailsFields compact gender={memberEditGender} dateOfBirth={memberEditDob}
-                      onGenderChange={setMemberEditGender} onDateOfBirthChange={setMemberEditDob} />
-                    <IdProofField compact personId={detailMember.id} uploaded={detailMember.idProofUploaded}
-                      pendingKey={memberEditIdProof} canChange onUploaded={setMemberEditIdProof} onError={toast.error} />
-                    <div className="space-x-2">
-                      <EditActions size="sm" onSave={() => saveMemberInfo(detailMember.id)} onCancel={() => setEditingMemberInfo(false)} saving={savingMemberInfo} />
-                    </div>
-
-                  </div>
-                ) : (
-                  <>
-                    <p><span className="text-gray-500">Name:</span> {detailMember.name}</p>
-                    <p><span className="text-gray-500">Email:</span> {detailMember.email}</p>
-                    <p><span className="text-gray-500">Phone:</span> {detailMember.phone ?? '—'}</p>
-                    <p><span className="text-gray-500">Address:</span> {detailMember.address ?? '—'}</p>
-                    <p><span className="text-gray-500">Gender:</span> {genderLabel(detailMember.gender)}</p>
-                    <p><span className="text-gray-500">Date of birth:</span> {formatDobWithAge(detailMember.dateOfBirth)}</p>
-                    <IdProofField compact personId={detailMember.id} uploaded={detailMember.idProofUploaded}
-                      pendingKey={null} canChange={false} onUploaded={() => {}} onError={toast.error} />
-                    <p><span className="text-gray-500">Check-in PIN:</span> {detailMember.checkinPin ?? '—'}</p>
-                    <p><span className="text-gray-500">Enrollment date:</span> {detailMember.enrollmentDate ?? 'Not enrolled yet'}</p>
-                    <p><span className="text-gray-500">Last visit:</span> {
-                      lastCheckins[detailMember.id] ? new Date(lastCheckins[detailMember.id]).toLocaleString() : 'Never'
-                    }</p>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      <ActionButton icon={<PencilIcon />} onClick={() => startEditMemberInfo(detailMember)}>Edit info</ActionButton>
                       {user?.role === 'OWNER' && (
-                        <ActionButton variant="danger" icon={<TrashIcon />} onClick={() => deleteMember(detailMember.id, detailMember.name)}>
-                          Delete account
+                        <>
+                          <hr />
+                          <div className="rounded-md border border-gray-200 p-3">
+                            <p className="text-xs font-medium text-gray-700">Change role</p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              Promotes this Member to staff or Owner. Today becomes their joining date as
+                              Trainer/Manager; their membership history stays intact either way.
+                            </p>
+                            <div className="mt-2 flex items-center gap-2">
+                              <select value={selectedNewRole} onChange={(e) => setSelectedNewRole(e.target.value)}
+                                className="rounded-md border border-gray-300 px-2 py-1.5 text-sm">
+                                <option value="">Select new role...</option>
+                                <option value="TRAINER">Trainer</option>
+                                <option value="MANAGER">Manager</option>
+                                <option value="OWNER">Owner</option>
+                              </select>
+                              <button onClick={() => changeMemberRole(detailMember)} disabled={!selectedNewRole || changingRole}
+                                className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-60">
+                                {changingRole ? 'Changing...' : 'Change role'}
+                              </button>
+                            </div>
+                          </div>
+
+                          {roleHistory.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-xs font-medium text-gray-700">Past roles</p>
+                              <ul className="mt-1 space-y-1 text-xs text-gray-500">
+                                {roleHistory.map((h, i) => (
+                                  <li key={i}>
+                                    {h.previousRole} → {h.newRole} by {h.changedByName} on{' '}
+                                    {new Date(h.changedAt).toLocaleDateString()}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </>
+                      )}  
+                    </>
+                  )}
+                </div>
+              )}
+
+              {modalTab === 'MEMBERSHIPS' && (
+                <>
+                  <label className="mt-4 flex items-center gap-1.5 text-xs text-gray-500">
+                    <input type="checkbox" checked={modalShowExpired} onChange={(e) => setModalShowExpired(e.target.checked)} />
+                    Show expired / cancelled
+                  </label>
+
+                  <div className="mt-3 overflow-x-auto">
+                    <table className="w-full min-w-[720px] table-fixed text-left text-sm">
+                      <colgroup>
+                        <col className="w-[16%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[39%]" />
+                      </colgroup>
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-500">
+                          <th className="pb-2 pr-4">Plan</th>
+                          <th className="pb-2 pr-4">Start</th>
+                          <th className="pb-2 pr-4">End</th>
+                          <th className="pb-2 pr-4">Status</th>
+                          <th className="pb-2">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {pagedDetailMemberships.map((m) => {
+                          const effective = getEffectiveStatus(m)
+                          const isEditing = editingId === m.id
+                          return (
+                            <tr key={m.id}>
+                              <td className="truncate py-2 pr-4">{m.planName}</td>
+                              {isEditing ? (
+                                <>
+                                  <td className="py-2 pr-4">
+                                    <input type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)}
+                                      className="w-full min-w-0 rounded-md border border-gray-300 px-2 py-1 text-xs" />
+                                  </td>
+                                  <td className="py-2 pr-4">
+                                    <input type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)}
+                                      className="w-full min-w-0 rounded-md border border-gray-300 px-2 py-1 text-xs" />
+                                  </td>
+                                  <td className="truncate py-2 pr-4 text-xs text-gray-400">Updates on save</td>
+                                  <td className="py-2">
+                                    <EditActions size="sm" onSave={() => saveEdit(m.id)} onCancel={cancelEdit} saving={savingEdit} />
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="truncate py-2 pr-4 text-gray-500">{m.startDate}</td>
+                                  <td className="truncate py-2 pr-4 text-gray-500">{m.endDate}</td>
+                                  <td className="py-2 pr-4 align-top">
+                                    <span className={statusColorClass(effective)}>{statusLabel(effective)}</span>
+                                    {m.paymentStatus === 'PARTIAL' && (
+                                      <span className="mt-1 block w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                                        Partially paid - ₹{m.balanceDue} due{m.balanceDueDate ? ` by ${m.balanceDueDate}` : ''}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-2 align-top">
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {effective === 'ACTIVE' && (
+                                        <ActionButton variant="warning" icon={<PauseIcon />} onClick={() => pauseMembership(m.id)}>Pause</ActionButton>
+                                      )}
+                                      {effective === 'PAUSED' && (
+                                        <ActionButton variant="success" icon={<PlayIcon />} onClick={() => resumeMembership(m.id)}>Resume</ActionButton>
+                                      )}
+                                      {(effective === 'ACTIVE' || effective === 'PAUSED' || effective === 'SCHEDULED') && (
+                                        <ActionButton variant="danger" icon={<BanIcon />} onClick={() => cancelMembership(m.id)}>Cancel</ActionButton>
+                                      )}
+                                      <ActionButton icon={<CalendarIcon />} onClick={() => startEdit(m)}>Edit dates</ActionButton>
+                                      {m.paymentStatus === 'PARTIAL' && (
+                                        <ActionButton variant="success" icon={<CoinIcon />} onClick={() => openPayDialog(m)}>Record payment</ActionButton>
+                                      )}
+                                    </div>
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {detailMemberships.length === 0 && <p className="py-4 text-sm text-gray-400">No memberships to show.</p>}
+                  {detailMemberships.length > 0 && (
+                    <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                      <span>Page {modalPage} of {modalTotalPages} ({detailMemberships.length} total)</span>
+                      <div className="space-x-2">
+                        <button disabled={modalPage === 1} onClick={() => setModalPage((p) => p - 1)}
+                          className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                        <button disabled={modalPage === modalTotalPages} onClick={() => setModalPage((p) => p + 1)}
+                          className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {modalTab === 'PAYMENTS' && (
+                <div className="mt-4">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-500">
+                          <th className="pb-2 pr-4">Date</th>
+                          <th className="pb-2 pr-4">Plan</th>
+                          <th className="pb-2 pr-4">Amount</th>
+                          <th className="pb-2 pr-4">Mode</th>
+                          <th className="pb-2 pr-4">Recorded by</th>
+                          <th className="pb-2">Invoice</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {detailPayments.map((p) => (
+                          <tr key={p.id}>
+                            <td className="py-2 pr-4 text-gray-500">{new Date(p.createdAt).toLocaleString()}</td>
+                            <td className="py-2 pr-4">{p.planName ?? '—'}</td>
+                            <td className="py-2 pr-4">₹{p.amount}</td>
+                            <td className="py-2 pr-4">{p.mode}</td>
+                            <td className="py-2 pr-4">{p.recordedByName}</td>
+                            <td className="py-2">
+                              <RowActionsMenu actions={[
+                                { label: 'View', icon: <EyeIcon />, onClick: () => handleInvoiceAction(p.id, 'view') },
+                                { label: 'Print', icon: <PrinterIcon />, onClick: () => handleInvoiceAction(p.id, 'print') },
+                                { label: 'Download', icon: <DownloadIcon />, onClick: () => handleInvoiceAction(p.id, 'download') },
+                                { label: 'Send Email', icon: <MailIcon />, onClick: () => handlePaymentSendAction(p.id, 'email')},
+                                { label: 'Send WhatsApp', icon: <WhatsAppIcon />, onClick: () => handlePaymentSendAction(p.id, 'whatsapp') },
+                              ]} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {detailPayments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
+                  {detailPaymentsTotalElements > 0 && (
+                    <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                      <span>Page {detailPaymentsPage + 1} of {detailPaymentsTotalPages} ({detailPaymentsTotalElements} total)</span>
+                      <div className="space-x-2">
+                        <button disabled={detailPaymentsPage === 0} onClick={() => loadDetailPayments(detailMember!.id, detailPaymentsPage - 1)}
+                          className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                        <button disabled={detailPaymentsPage + 1 >= detailPaymentsTotalPages} onClick={() => loadDetailPayments(detailMember!.id, detailPaymentsPage + 1)}
+                          className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {modalTab === 'STORE' && detailMember && (
+                <ProductPurchaseHistoryTab personId={detailMember.id} />
+              )}
+
+              {modalTab === 'ATTENDANCE' && (
+                <div className="mt-4">
+                  <div className="overflow-x-auto">
+                    <p className="mb-2 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-500">
+                          <th className="pb-2 pr-4">Check-in</th>
+                          <th className="pb-2 pr-4">Check-out</th>
+                          <th className="pb-2 pr-4">Method</th>
+                          <th className="pb-2">Branch</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {detailAttendance.map((a) => (
+                          <tr key={a.id}>
+                            <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleString()}</td>
+                            <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '—'}</td>
+                            <td className="py-2 pr-4">{a.method}</td>
+                            <td className="py-2 text-gray-500">{a.branchName}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {detailAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
+                  {detailAttendanceTotalElements > 0 && (
+                    <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                      <span>Page {detailAttendancePage + 1} of {detailAttendanceTotalPages} ({detailAttendanceTotalElements} total)</span>
+                      <div className="space-x-2">
+                        <button disabled={detailAttendancePage === 0} onClick={() => loadDetailAttendance(detailMemberId!, detailAttendancePage - 1)}
+                          className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                        <button disabled={detailAttendancePage + 1 >= detailAttendanceTotalPages} onClick={() => loadDetailAttendance(detailMemberId!, detailAttendancePage + 1)}
+                          className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {modalTab === 'BRANCHES' && (
+                <div className="mt-4 text-sm">
+                  {editingMemberBranches ? (
+                    <div className="space-y-3">
+                      <div className="rounded-md border border-gray-300 p-2">
+                        {allBranches.map((b) => (
+                          <label key={b.id} className="flex items-center gap-2 py-1">
+                            <input type="checkbox" checked={memberBranchEditIds.includes(b.id)}
+                              onChange={() => setMemberBranchEditIds((ids) =>
+                                ids.includes(b.id) ? ids.filter((x) => x !== b.id) : [...ids, b.id])} />
+                            {b.name}
+                          </label>
+                        ))}
+                      </div>
+                      <div className="space-x-2">
+                        <EditActions size="sm" onSave={() => saveMemberBranches(detailMember.id)} onCancel={() => setEditingMemberBranches(false)} saving={savingMemberBranches} />
+                      </div>
+
+                    </div>
+                  ) : (
+                    <>
+                      <ul className="space-y-1">
+                        {detailMemberBranches.map((b) => <li key={b.id}>{b.name}</li>)}
+                        {detailMemberBranches.length === 0 && <li className="text-gray-400">No branches assigned.</li>}
+                      </ul>
+                      {user?.role === 'OWNER' && (
+                        <ActionButton className="mt-3" icon={<MapPinIcon />}
+                          onClick={() => { setEditingMemberBranches(true); setMemberBranchEditIds(detailMemberBranches.map((b) => b.id)) }}>
+                          Edit branches
                         </ActionButton>
                       )}
-                    </div>
-                    {user?.role === 'OWNER' && (
-                      <>
-                        <hr />
-                        <div className="rounded-md border border-gray-200 p-3">
-                          <p className="text-xs font-medium text-gray-700">Change role</p>
-                          <p className="mt-1 text-xs text-gray-500">
-                            Promotes this Member to staff or Owner. Today becomes their joining date as
-                            Trainer/Manager; their membership history stays intact either way.
-                          </p>
-                          <div className="mt-2 flex items-center gap-2">
-                            <select value={selectedNewRole} onChange={(e) => setSelectedNewRole(e.target.value)}
-                              className="rounded-md border border-gray-300 px-2 py-1.5 text-sm">
-                              <option value="">Select new role...</option>
-                              <option value="TRAINER">Trainer</option>
-                              <option value="MANAGER">Manager</option>
-                              <option value="OWNER">Owner</option>
-                            </select>
-                            <button onClick={() => changeMemberRole(detailMember)} disabled={!selectedNewRole || changingRole}
-                              className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-60">
-                              {changingRole ? 'Changing...' : 'Change role'}
-                            </button>
-                          </div>
-                        </div>
-
-                        {roleHistory.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-xs font-medium text-gray-700">Past roles</p>
-                            <ul className="mt-1 space-y-1 text-xs text-gray-500">
-                              {roleHistory.map((h, i) => (
-                                <li key={i}>
-                                  {h.previousRole} → {h.newRole} by {h.changedByName} on{' '}
-                                  {new Date(h.changedAt).toLocaleDateString()}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </>
-                    )}  
-                  </>
-                )}
-              </div>
-            )}
-
-            {modalTab === 'MEMBERSHIPS' && (
-              <>
-                <label className="mt-4 flex items-center gap-1.5 text-xs text-gray-500">
-                  <input type="checkbox" checked={modalShowExpired} onChange={(e) => setModalShowExpired(e.target.checked)} />
-                  Show expired / cancelled
-                </label>
-
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full min-w-[720px] table-fixed text-left text-sm">
-                    <colgroup>
-                      <col className="w-[16%]" />
-                      <col className="w-[15%]" />
-                      <col className="w-[15%]" />
-                      <col className="w-[15%]" />
-                      <col className="w-[39%]" />
-                    </colgroup>
-                    <thead>
-                      <tr className="border-b border-gray-200 text-gray-500">
-                        <th className="pb-2 pr-4">Plan</th>
-                        <th className="pb-2 pr-4">Start</th>
-                        <th className="pb-2 pr-4">End</th>
-                        <th className="pb-2 pr-4">Status</th>
-                        <th className="pb-2">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {pagedDetailMemberships.map((m) => {
-                        const effective = getEffectiveStatus(m)
-                        const isEditing = editingId === m.id
-                        return (
-                          <tr key={m.id}>
-                            <td className="truncate py-2 pr-4">{m.planName}</td>
-                            {isEditing ? (
-                              <>
-                                <td className="py-2 pr-4">
-                                  <input type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)}
-                                    className="w-full min-w-0 rounded-md border border-gray-300 px-2 py-1 text-xs" />
-                                </td>
-                                <td className="py-2 pr-4">
-                                  <input type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)}
-                                    className="w-full min-w-0 rounded-md border border-gray-300 px-2 py-1 text-xs" />
-                                </td>
-                                <td className="truncate py-2 pr-4 text-xs text-gray-400">Updates on save</td>
-                                <td className="py-2">
-                                  <EditActions size="sm" onSave={() => saveEdit(m.id)} onCancel={cancelEdit} saving={savingEdit} />
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td className="truncate py-2 pr-4 text-gray-500">{m.startDate}</td>
-                                <td className="truncate py-2 pr-4 text-gray-500">{m.endDate}</td>
-                                <td className="py-2 pr-4 align-top">
-                                  <span className={statusColorClass(effective)}>{statusLabel(effective)}</span>
-                                  {m.paymentStatus === 'PARTIAL' && (
-                                    <span className="mt-1 block w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                                      Partially paid - ₹{m.balanceDue} due{m.balanceDueDate ? ` by ${m.balanceDueDate}` : ''}
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-2 align-top">
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {effective === 'ACTIVE' && (
-                                      <ActionButton variant="warning" icon={<PauseIcon />} onClick={() => pauseMembership(m.id)}>Pause</ActionButton>
-                                    )}
-                                    {effective === 'PAUSED' && (
-                                      <ActionButton variant="success" icon={<PlayIcon />} onClick={() => resumeMembership(m.id)}>Resume</ActionButton>
-                                    )}
-                                    {(effective === 'ACTIVE' || effective === 'PAUSED' || effective === 'SCHEDULED') && (
-                                      <ActionButton variant="danger" icon={<BanIcon />} onClick={() => cancelMembership(m.id)}>Cancel</ActionButton>
-                                    )}
-                                    <ActionButton icon={<CalendarIcon />} onClick={() => startEdit(m)}>Edit dates</ActionButton>
-                                    {m.paymentStatus === 'PARTIAL' && (
-                                      <ActionButton variant="success" icon={<CoinIcon />} onClick={() => openPayDialog(m)}>Record payment</ActionButton>
-                                    )}
-                                  </div>
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                    </>
+                  )}
                 </div>
-                {detailMemberships.length === 0 && <p className="py-4 text-sm text-gray-400">No memberships to show.</p>}
-                {detailMemberships.length > 0 && (
-                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                    <span>Page {modalPage} of {modalTotalPages} ({detailMemberships.length} total)</span>
-                    <div className="space-x-2">
-                      <button disabled={modalPage === 1} onClick={() => setModalPage((p) => p - 1)}
-                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                      <button disabled={modalPage === modalTotalPages} onClick={() => setModalPage((p) => p + 1)}
-                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {modalTab === 'PAYMENTS' && (
-              <div className="mt-4">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-gray-500">
-                        <th className="pb-2 pr-4">Date</th>
-                        <th className="pb-2 pr-4">Plan</th>
-                        <th className="pb-2 pr-4">Amount</th>
-                        <th className="pb-2 pr-4">Mode</th>
-                        <th className="pb-2 pr-4">Recorded by</th>
-                        <th className="pb-2">Invoice</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {detailPayments.map((p) => (
-                        <tr key={p.id}>
-                          <td className="py-2 pr-4 text-gray-500">{new Date(p.createdAt).toLocaleString()}</td>
-                          <td className="py-2 pr-4">{p.planName ?? '—'}</td>
-                          <td className="py-2 pr-4">₹{p.amount}</td>
-                          <td className="py-2 pr-4">{p.mode}</td>
-                          <td className="py-2 pr-4">{p.recordedByName}</td>
-                          <td className="py-2">
-                            <RowActionsMenu actions={[
-                              { label: 'View', icon: <EyeIcon />, onClick: () => handleInvoiceAction(p.id, 'view') },
-                              { label: 'Print', icon: <PrinterIcon />, onClick: () => handleInvoiceAction(p.id, 'print') },
-                              { label: 'Download', icon: <DownloadIcon />, onClick: () => handleInvoiceAction(p.id, 'download') },
-                              { label: 'Send Email', icon: <MailIcon />, onClick: () => handlePaymentSendAction(p.id, 'email')},
-                              { label: 'Send WhatsApp', icon: <WhatsAppIcon />, onClick: () => handlePaymentSendAction(p.id, 'whatsapp') },
-                            ]} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {detailPayments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
-                {detailPaymentsTotalElements > 0 && (
-                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                    <span>Page {detailPaymentsPage + 1} of {detailPaymentsTotalPages} ({detailPaymentsTotalElements} total)</span>
-                    <div className="space-x-2">
-                      <button disabled={detailPaymentsPage === 0} onClick={() => loadDetailPayments(detailMember!.id, detailPaymentsPage - 1)}
-                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                      <button disabled={detailPaymentsPage + 1 >= detailPaymentsTotalPages} onClick={() => loadDetailPayments(detailMember!.id, detailPaymentsPage + 1)}
-                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {modalTab === 'STORE' && detailMember && (
-              <ProductPurchaseHistoryTab personId={detailMember.id} />
-            )}
-
-            {modalTab === 'ATTENDANCE' && (
-              <div className="mt-4">
-                <div className="overflow-x-auto">
-                  <p className="mb-2 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-gray-500">
-                        <th className="pb-2 pr-4">Check-in</th>
-                        <th className="pb-2 pr-4">Check-out</th>
-                        <th className="pb-2 pr-4">Method</th>
-                        <th className="pb-2">Branch</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {detailAttendance.map((a) => (
-                        <tr key={a.id}>
-                          <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleString()}</td>
-                          <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '—'}</td>
-                          <td className="py-2 pr-4">{a.method}</td>
-                          <td className="py-2 text-gray-500">{a.branchName}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {detailAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
-                {detailAttendanceTotalElements > 0 && (
-                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                    <span>Page {detailAttendancePage + 1} of {detailAttendanceTotalPages} ({detailAttendanceTotalElements} total)</span>
-                    <div className="space-x-2">
-                      <button disabled={detailAttendancePage === 0} onClick={() => loadDetailAttendance(detailMemberId!, detailAttendancePage - 1)}
-                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                      <button disabled={detailAttendancePage + 1 >= detailAttendanceTotalPages} onClick={() => loadDetailAttendance(detailMemberId!, detailAttendancePage + 1)}
-                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {modalTab === 'BRANCHES' && (
-              <div className="mt-4 text-sm">
-                {editingMemberBranches ? (
-                  <div className="space-y-3">
-                    <div className="rounded-md border border-gray-300 p-2">
-                      {allBranches.map((b) => (
-                        <label key={b.id} className="flex items-center gap-2 py-1">
-                          <input type="checkbox" checked={memberBranchEditIds.includes(b.id)}
-                            onChange={() => setMemberBranchEditIds((ids) =>
-                              ids.includes(b.id) ? ids.filter((x) => x !== b.id) : [...ids, b.id])} />
-                          {b.name}
-                        </label>
-                      ))}
-                    </div>
-                    <div className="space-x-2">
-                      <EditActions size="sm" onSave={() => saveMemberBranches(detailMember.id)} onCancel={() => setEditingMemberBranches(false)} saving={savingMemberBranches} />
-                    </div>
-
-                  </div>
-                ) : (
-                  <>
-                    <ul className="space-y-1">
-                      {detailMemberBranches.map((b) => <li key={b.id}>{b.name}</li>)}
-                      {detailMemberBranches.length === 0 && <li className="text-gray-400">No branches assigned.</li>}
-                    </ul>
-                    {user?.role === 'OWNER' && (
-                      <ActionButton className="mt-3" icon={<MapPinIcon />}
-                        onClick={() => { setEditingMemberBranches(true); setMemberBranchEditIds(detailMemberBranches.map((b) => b.id)) }}>
-                        Edit branches
-                      </ActionButton>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}

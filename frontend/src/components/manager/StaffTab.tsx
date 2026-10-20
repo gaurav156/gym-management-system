@@ -332,6 +332,8 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
 
   const roleOptions = detailStaff ? CHANGEABLE_ROLES.filter((r) => r !== detailStaff.role) : []
 
+  const isEditingStaff = editingStaffInfo || editingStaffDates
+
   useScrollLock(!!detailStaff)
   
   return (
@@ -430,294 +432,298 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
 
       {detailStaff && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-lg bg-white p-6 lg:max-w-4xl">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar src={detailStaff.photo} name={detailStaff.name} className="h-12 w-12" textClassName="text-lg" />
-                <div>
-                  <h3 className="text-lg font-medium">{detailStaff.name}</h3>
-                  <p className="text-xs text-gray-500">
-                    {roleLabel(detailStaff.role)} · {detailStaff.email} · PIN {detailStaff.checkinPin ?? '—'}
-                    {detailStaff.leftDate && (detailStaff.role === 'TRAINER' || detailStaff.role === 'MANAGER') && (
-                      <span className="ml-1 text-amber-600">· Left {detailStaff.leftDate}</span>
-                    )}
-                  </p>
+          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl lg:max-w-4xl">
+
+            <div className="flex-shrink-0 px-6 pt-6">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <Avatar src={detailStaff.photo} name={detailStaff.name} className="h-12 w-12" textClassName="text-lg" />
+                  <div className="min-w-0">
+                    <h3 className="break-words text-lg font-medium">{detailStaff.name}</h3>
+                    <p className="break-words text-xs text-gray-500">
+                      {roleLabel(detailStaff.role)} · {detailStaff.email} · PIN {detailStaff.checkinPin ?? '—'}
+                      {detailStaff.leftDate && (detailStaff.role === 'TRAINER' || detailStaff.role === 'MANAGER') && (
+                        <span className="ml-1 text-amber-600">· Left {detailStaff.leftDate}</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setDetailStaffId(null)}
+                  className="flex-shrink-0 text-gray-400 hover:text-gray-600" aria-label="Close">✕</button>
+              </div>
+
+              <div className="mt-4 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
+                <div className="flex min-w-max gap-1">
+                  {(['INFO', 'ATTENDANCE', 'BRANCHES', 'STORE'] as const).map((tab) => (
+                    <button key={tab} onClick={() => setStaffModalTab(tab)}
+                      className={`-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm ${
+                        staffModalTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
+                      }`}>
+                      {tab === 'INFO' ? 'Info' : tab === 'ATTENDANCE' ? 'Attendance' : tab === 'BRANCHES' ? 'Branches' : 'Product purchases'}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <button onClick={() => setDetailStaffId(null)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
 
-            <div className="mt-4 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
-              <div className="flex min-w-max gap-1">
-                {(['INFO', 'ATTENDANCE', 'BRANCHES', 'STORE'] as const).map((tab) => (
-                  <button key={tab} onClick={() => setStaffModalTab(tab)}
-                    className={`-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm ${
-                      staffModalTab === tab ? 'border-brand text-brand font-medium' : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}>
-                    {tab === 'INFO' ? 'Info' : tab === 'ATTENDANCE' ? 'Attendance' : tab === 'BRANCHES' ? 'Branches' : 'Product purchases'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {staffModalTab === 'INFO' && (
-              <div className="mt-4 space-y-2 text-sm">
-                {editingStaffInfo ? (
-                  <div className="space-y-3 rounded-md border border-gray-200 p-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar src={staffEditPhoto} name={staffEditName} className="h-14 w-14" textClassName="text-lg" />
-                      <div className="flex flex-col items-start gap-1.5">
-                        <PhotoUploadButton onLoaded={setStaffEditPhoto} label="Change photo" size="sm" />
-                        {staffEditPhoto && (
-                          <button type="button" onClick={() => setStaffEditPhoto(null)}
-                            className="text-xs text-red-600 hover:underline">Remove photo</button>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500">Name</label>
-                      <input value={staffEditName} onChange={(e) => setStaffEditName(e.target.value)}
-                        className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500">Phone</label>
-                      <input value={staffEditPhone} onChange={(e) => setStaffEditPhone(e.target.value)}
-                        className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500">Address</label>
-                      <textarea value={staffEditAddress} onChange={(e) => setStaffEditAddress(e.target.value)} rows={2}
-                        className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
-                    </div>
-                    <PersonalDetailsFields compact gender={staffEditGender} dateOfBirth={staffEditDob}
-                      onGenderChange={setStaffEditGender} onDateOfBirthChange={setStaffEditDob} />
-                    {canViewIdProof && (  
-                      <IdProofField compact personId={detailStaff.id} uploaded={detailStaff.idProofUploaded}
-                        pendingKey={staffEditIdProof} canChange onUploaded={setStaffEditIdProof} onError={toast.error} />
-                    )}
-                    <div className="space-x-2">
-                      <EditActions size="sm" onSave={() => saveStaffInfo(detailStaff)} onCancel={() => setEditingStaffInfo(false)} saving={savingStaffInfo} />
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <p><span className="text-gray-500">Role:</span> {roleLabel(detailStaff.role)}</p>
-                    <p><span className="text-gray-500">Name:</span> {detailStaff.name}</p>
-                    <p><span className="text-gray-500">Email:</span> {detailStaff.email}</p>
-                    <p><span className="text-gray-500">Phone:</span> {detailStaff.phone ?? '—'}</p>
-                    <p><span className="text-gray-500">Address:</span> {detailStaff.address ?? '—'}</p>
-                    <p><span className="text-gray-500">Gender:</span> {genderLabel(detailStaff.gender)}</p>
-                    <p><span className="text-gray-500">Date of birth:</span> {formatDobWithAge(detailStaff.dateOfBirth)}</p>
-                    {canViewIdProof && (
-                      <IdProofField compact personId={detailStaff.id} uploaded={detailStaff.idProofUploaded}
-                        pendingKey={null} canChange={false} onUploaded={() => {}} onError={toast.error} />
-                    )}
-                    <p><span className="text-gray-500">Check-in PIN:</span> {detailStaff.checkinPin ?? '—'}</p>
-                    <p><span className="text-gray-500">Last visit:</span> {
-                      lastCheckins[detailStaff.id] ? new Date(lastCheckins[detailStaff.id]).toLocaleString() : 'Never'
-                    }</p>
-                    {(canEditInfo || canDelete) && (
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {canEditInfo && (
-                          <ActionButton icon={<PencilIcon />} onClick={() => startEditStaffInfo(detailStaff)}>Edit info</ActionButton>
-                        )}
-                        {canDelete && (
-                          <ActionButton variant="danger" icon={<TrashIcon />} onClick={() => deleteStaff(detailStaff.id, detailStaff.name)}>
-                            Delete account
-                          </ActionButton>
-                        )}
-                      </div>
-                    )}
-                    {detailStaff.role === 'OWNER' && user?.role === 'OWNER' && (
-                      <>
-                        <p className="text-xs text-gray-400">Owner info is edited from the Profile page.</p>
-                        <p className="text-xs text-gray-400">
-                          To delete an Owner account, first change their role (below), then delete it.
-                        </p>
-                      </>
-                    )}
-                  </>
-                )}
-
-                {(detailStaff.role === 'TRAINER' || detailStaff.role === 'MANAGER') && (
-                  <>
-                    <hr />
-                    {editingStaffDates ? (
-                      <div className="space-y-3 rounded-md border border-gray-200 p-3">
-                        <div>
-                          <label className="text-xs text-gray-500">Joining date</label>
-                          <input type="date" value={joiningDateInput} onChange={(e) => setJoiningDateInput(e.target.value)}
-                            className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-500">Left date (leave blank if still active)</label>
-                          <input type="date" value={leftDateInput} onChange={(e) => setLeftDateInput(e.target.value)}
-                            className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
-                        </div>
-                        <div className="space-x-2">
-                          <EditActions size="sm" onSave={() => saveStaffDates(detailStaff)} onCancel={() => setEditingStaffDates(false)} saving={savingStaffDates} />
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6">
+              {staffModalTab === 'INFO' && (
+                <div className="mt-4 space-y-2 text-sm">
+                  {editingStaffInfo ? (
+                    <div className="space-y-3 rounded-md border border-gray-200 p-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar src={staffEditPhoto} name={staffEditName} className="h-14 w-14" textClassName="text-lg" />
+                        <div className="flex flex-col items-start gap-1.5">
+                          <PhotoUploadButton onLoaded={setStaffEditPhoto} label="Change photo" size="sm" />
+                          {staffEditPhoto && (
+                            <button type="button" onClick={() => setStaffEditPhoto(null)}
+                              className="text-xs text-red-600 hover:underline">Remove photo</button>
+                          )}
                         </div>
                       </div>
-                    ) : (
-                      <>
-                        <p><span className="text-gray-500">Joining date:</span> {detailStaff.joiningDate ?? '—'}</p>
-                        <p><span className="text-gray-500">Left date:</span> {detailStaff.leftDate ?? '—'}</p>
-                        {detailStaff.leftDate && (
-                          <p className="text-xs text-amber-600">
-                            While a left date is set, this person can't check in or log into their dashboard.
-                          </p>
-                        )}
-                        {canEditDates && (
-                          <div className="flex flex-wrap gap-2 pt-1">
-                            <ActionButton icon={<CalendarIcon />} onClick={() => startEditStaffDates(detailStaff)}>Edit dates</ActionButton>
-                            {detailStaff.leftDate && (
-                              <ActionButton variant="primary" icon={<CheckIcon />} onClick={() => clearLeftDate(detailStaff)}>Clear left date</ActionButton>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-
-                {canChangeRole && (
-                  <>
-                    <hr />
-                    <div className="rounded-md border border-gray-200 p-3">
-                      <p className="text-xs font-medium text-gray-700">Change role</p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        {detailStaff.role === 'OWNER'
-                          ? "Demoting an Owner needs a code emailed to the primary Owner's address (OWNER_EMAIL), " +
-                            'and at least one other active Owner must exist. Once demoted you can delete the account.'
-                          : 'Moving this person off staff (e.g. to Member) automatically sets today as their ' +
-                            'left date. Moving someone onto staff sets today as their joining date.'}
-                      </p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <select value={selectedNewRole} onChange={(e) => setSelectedNewRole(e.target.value)}
-                          className="rounded-md border border-gray-300 px-2 py-1.5 text-sm">
-                          <option value="">Select new role...</option>
-                          {roleOptions.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
-                        </select>
-                        <button onClick={() => changeRole(detailStaff)} disabled={!selectedNewRole || changingRole}
-                          className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-60">
-                          {changingRole ? 'Changing...' : 'Change role'}
-                        </button>
+                      <div>
+                        <label className="text-xs text-gray-500">Name</label>
+                        <input value={staffEditName} onChange={(e) => setStaffEditName(e.target.value)}
+                          className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
                       </div>
-                      {detailStaff.role === 'OWNER' && selectedNewRole && (
-                        <div className="mt-3 rounded-md border border-gray-300 p-2 text-sm">
-                          <p className="mb-1 text-xs text-gray-500">
-                            Owners have access everywhere - pick the branch(es) they should belong to after demotion.
-                          </p>
-                          {allBranches.map((b) => (
-                            <label key={b.id} className="flex items-center gap-2 py-1">
-                              <input type="checkbox" checked={demotionBranchIds.includes(b.id)}
-                                onChange={() => setDemotionBranchIds((ids) =>
-                                  ids.includes(b.id) ? ids.filter((x) => x !== b.id) : [...ids, b.id])} />
-                              {b.name}
-                            </label>
-                          ))}
+                      <div>
+                        <label className="text-xs text-gray-500">Phone</label>
+                        <input value={staffEditPhone} onChange={(e) => setStaffEditPhone(e.target.value)}
+                          className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500">Address</label>
+                        <textarea value={staffEditAddress} onChange={(e) => setStaffEditAddress(e.target.value)} rows={2}
+                          className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                      </div>
+                      <PersonalDetailsFields compact gender={staffEditGender} dateOfBirth={staffEditDob}
+                        onGenderChange={setStaffEditGender} onDateOfBirthChange={setStaffEditDob} />
+                      {canViewIdProof && (  
+                        <IdProofField compact personId={detailStaff.id} uploaded={detailStaff.idProofUploaded}
+                          pendingKey={staffEditIdProof} canChange onUploaded={setStaffEditIdProof} onError={toast.error} />
+                      )}
+                      <div className="space-x-2">
+                        <EditActions size="sm" onSave={() => saveStaffInfo(detailStaff)} onCancel={() => setEditingStaffInfo(false)} saving={savingStaffInfo} />
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p><span className="text-gray-500">Role:</span> {roleLabel(detailStaff.role)}</p>
+                      <p><span className="text-gray-500">Name:</span> {detailStaff.name}</p>
+                      <p><span className="text-gray-500">Email:</span> {detailStaff.email}</p>
+                      <p><span className="text-gray-500">Phone:</span> {detailStaff.phone ?? '—'}</p>
+                      <p><span className="text-gray-500">Address:</span> {detailStaff.address ?? '—'}</p>
+                      <p><span className="text-gray-500">Gender:</span> {genderLabel(detailStaff.gender)}</p>
+                      <p><span className="text-gray-500">Date of birth:</span> {formatDobWithAge(detailStaff.dateOfBirth)}</p>
+                      {canViewIdProof && (
+                        <IdProofField compact personId={detailStaff.id} uploaded={detailStaff.idProofUploaded}
+                          pendingKey={null} canChange={false} onUploaded={() => {}} onError={toast.error} />
+                      )}
+                      <p><span className="text-gray-500">Check-in PIN:</span> {detailStaff.checkinPin ?? '—'}</p>
+                      <p><span className="text-gray-500">Last visit:</span> {
+                        lastCheckins[detailStaff.id] ? new Date(lastCheckins[detailStaff.id]).toLocaleString() : 'Never'
+                      }</p>
+                      {(canEditInfo || canDelete) && (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {canEditInfo && (
+                            <ActionButton icon={<PencilIcon />} disabled={editingStaffDates} onClick={() => startEditStaffInfo(detailStaff)}>Edit info</ActionButton>
+                          )}
+                          {canDelete && (
+                            <ActionButton variant="danger" icon={<TrashIcon />} disabled={editingStaffDates} onClick={() => deleteStaff(detailStaff.id, detailStaff.name)}>Delete account</ActionButton>
+                          )}
                         </div>
                       )}
-                    </div>
+                      {detailStaff.role === 'OWNER' && user?.role === 'OWNER' && (
+                        <>
+                          <p className="text-xs text-gray-400">Owner info is edited from the Profile page.</p>
+                          <p className="text-xs text-gray-400">
+                            To delete an Owner account, first change their role (below), then delete it.
+                          </p>
+                        </>
+                      )}
+                    </>
+                  )}
 
-                    {roleHistory.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs font-medium text-gray-700">Past roles</p>
-                        <ul className="mt-1 space-y-1 text-xs text-gray-500">
-                          {roleHistory.map((h, i) => (
-                            <li key={i}>
-                              {roleLabel(h.previousRole)} → {roleLabel(h.newRole)} by {h.changedByName} on{' '}
-                              {new Date(h.changedAt).toLocaleDateString()}
-                            </li>
-                          ))}
-                        </ul>
+                  {(detailStaff.role === 'TRAINER' || detailStaff.role === 'MANAGER') && (
+                    <>
+                      <hr />
+                      {editingStaffDates ? (
+                        <div className="space-y-3 rounded-md border border-gray-200 p-3">
+                          <div>
+                            <label className="text-xs text-gray-500">Joining date</label>
+                            <input type="date" value={joiningDateInput} onChange={(e) => setJoiningDateInput(e.target.value)}
+                              className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-500">Left date (leave blank if still active)</label>
+                            <input type="date" value={leftDateInput} onChange={(e) => setLeftDateInput(e.target.value)}
+                              className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+                          </div>
+                          <div className="space-x-2">
+                            <EditActions size="sm" onSave={() => saveStaffDates(detailStaff)} onCancel={() => setEditingStaffDates(false)} saving={savingStaffDates} />
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p><span className="text-gray-500">Joining date:</span> {detailStaff.joiningDate ?? '—'}</p>
+                          <p><span className="text-gray-500">Left date:</span> {detailStaff.leftDate ?? '—'}</p>
+                          {detailStaff.leftDate && (
+                            <p className="text-xs text-amber-600">
+                              While a left date is set, this person can't check in or log into their dashboard.
+                            </p>
+                          )}
+                          {canEditDates && !editingStaffInfo && (
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              <ActionButton icon={<CalendarIcon />} onClick={() => startEditStaffDates(detailStaff)}>Edit dates</ActionButton>
+                              {detailStaff.leftDate && (
+                                <ActionButton variant="primary" icon={<CheckIcon />} onClick={() => clearLeftDate(detailStaff)}>Clear left date</ActionButton>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {canChangeRole && !isEditingStaff && (
+                    <>
+                      <hr />
+                      <div className="rounded-md border border-gray-200 p-3">
+                        <p className="text-xs font-medium text-gray-700">Change role</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {detailStaff.role === 'OWNER'
+                            ? "Demoting an Owner needs a code emailed to the primary Owner's address (OWNER_EMAIL), " +
+                              'and at least one other active Owner must exist. Once demoted you can delete the account.'
+                            : 'Moving this person off staff (e.g. to Member) automatically sets today as their ' +
+                              'left date. Moving someone onto staff sets today as their joining date.'}
+                        </p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <select value={selectedNewRole} onChange={(e) => setSelectedNewRole(e.target.value)}
+                            className="rounded-md border border-gray-300 px-2 py-1.5 text-sm">
+                            <option value="">Select new role...</option>
+                            {roleOptions.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                          </select>
+                          <button onClick={() => changeRole(detailStaff)} disabled={!selectedNewRole || changingRole}
+                            className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-60">
+                            {changingRole ? 'Changing...' : 'Change role'}
+                          </button>
+                        </div>
+                        {detailStaff.role === 'OWNER' && selectedNewRole && (
+                          <div className="mt-3 rounded-md border border-gray-300 p-2 text-sm">
+                            <p className="mb-1 text-xs text-gray-500">
+                              Owners have access everywhere - pick the branch(es) they should belong to after demotion.
+                            </p>
+                            {allBranches.map((b) => (
+                              <label key={b.id} className="flex items-center gap-2 py-1">
+                                <input type="checkbox" checked={demotionBranchIds.includes(b.id)}
+                                  onChange={() => setDemotionBranchIds((ids) =>
+                                    ids.includes(b.id) ? ids.filter((x) => x !== b.id) : [...ids, b.id])} />
+                                {b.name}
+                              </label>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
 
-            {staffModalTab === 'ATTENDANCE' && (
-              <div className="mt-4">
-                <p className="mb-2 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-gray-500">
-                        <th className="pb-2 pr-4">Check-in</th>
-                        <th className="pb-2 pr-4">Check-out</th>
-                        <th className="pb-2 pr-4">Method</th>
-                        <th className="pb-2">Branch</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {detailStaffAttendance.map((a) => (
-                        <tr key={a.id}>
-                          <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleString()}</td>
-                          <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '—'}</td>
-                          <td className="py-2 pr-4">{a.method}</td>
-                          <td className="py-2 text-gray-500">{a.branchName}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      {roleHistory.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-xs font-medium text-gray-700">Past roles</p>
+                          <ul className="mt-1 space-y-1 text-xs text-gray-500">
+                            {roleHistory.map((h, i) => (
+                              <li key={i}>
+                                {roleLabel(h.previousRole)} → {roleLabel(h.newRole)} by {h.changedByName} on{' '}
+                                {new Date(h.changedAt).toLocaleDateString()}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
-                {detailStaffAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
-                {staffModalTotalElements > 0 && (
-                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                    <span>Page {staffModalPage + 1} of {staffModalTotalPages} ({staffModalTotalElements} total)</span>
-                    <div className="space-x-2">
-                      <button disabled={staffModalPage === 0} onClick={() => loadDetailStaffAttendance(detailStaff!.id, staffModalPage - 1)}
-                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                      <button disabled={staffModalPage + 1 >= staffModalTotalPages} onClick={() => loadDetailStaffAttendance(detailStaff!.id, staffModalPage + 1)}
-                        className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+              )}
 
-            {staffModalTab === 'BRANCHES' && (
-              <div className="mt-4 text-sm">
-                {detailStaff.role === 'OWNER' ? (
-                  <p className="text-gray-500">Owner has implicit access to every branch.</p>
-                ) : editingStaffBranches ? (
-                  <div className="space-y-3">
-                    <div className="rounded-md border border-gray-300 p-2">
-                      {allBranches.map((b) => (
-                        <label key={b.id} className="flex items-center gap-2 py-1">
-                          <input type="checkbox" checked={staffBranchEditIds.includes(b.id)}
-                            onChange={() => setStaffBranchEditIds((ids) =>
-                              ids.includes(b.id) ? ids.filter((x) => x !== b.id) : [...ids, b.id])} />
-                          {b.name}
-                        </label>
-                      ))}
-                    </div>
-                    <div className="space-x-2">
-                      <EditActions size="sm" onSave={() => saveStaffBranches(detailStaff.id)} onCancel={() => setEditingStaffBranches(false)} saving={savingStaffBranches} />  
-                    </div>
+              {staffModalTab === 'ATTENDANCE' && (
+                <div className="mt-4">
+                  <p className="mb-2 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-500">
+                          <th className="pb-2 pr-4">Check-in</th>
+                          <th className="pb-2 pr-4">Check-out</th>
+                          <th className="pb-2 pr-4">Method</th>
+                          <th className="pb-2">Branch</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {detailStaffAttendance.map((a) => (
+                          <tr key={a.id}>
+                            <td className="py-2 pr-4 text-gray-500">{new Date(a.checkInTime).toLocaleString()}</td>
+                            <td className="py-2 pr-4 text-gray-500">{a.checkOutTime ? new Date(a.checkOutTime).toLocaleString() : '—'}</td>
+                            <td className="py-2 pr-4">{a.method}</td>
+                            <td className="py-2 text-gray-500">{a.branchName}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                ) : (
-                  <>
-                    <ul className="space-y-1">
-                      {detailStaffBranches.map((b) => <li key={b.id}>{b.name}</li>)}
-                      {detailStaffBranches.length === 0 && <li className="text-gray-400">No branches assigned.</li>}
-                    </ul>
-                    {user?.role === 'OWNER' && (
-                      <ActionButton className="mt-3" icon={<MapPinIcon />}
-                        onClick={() => { setEditingStaffBranches(true); setStaffBranchEditIds(detailStaffBranches.map((b) => b.id)) }}>
-                        Edit branches
-                      </ActionButton>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
+                  {detailStaffAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
+                  {staffModalTotalElements > 0 && (
+                    <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                      <span>Page {staffModalPage + 1} of {staffModalTotalPages} ({staffModalTotalElements} total)</span>
+                      <div className="space-x-2">
+                        <button disabled={staffModalPage === 0} onClick={() => loadDetailStaffAttendance(detailStaff!.id, staffModalPage - 1)}
+                          className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
+                        <button disabled={staffModalPage + 1 >= staffModalTotalPages} onClick={() => loadDetailStaffAttendance(detailStaff!.id, staffModalPage + 1)}
+                          className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
-            {staffModalTab === 'STORE' && detailStaff && (
-              <ProductPurchaseHistoryTab personId={detailStaff.id} />
-            )}
+              {staffModalTab === 'BRANCHES' && (
+                <div className="mt-4 text-sm">
+                  {detailStaff.role === 'OWNER' ? (
+                    <p className="text-gray-500">Owner has implicit access to every branch.</p>
+                  ) : editingStaffBranches ? (
+                    <div className="space-y-3">
+                      <div className="rounded-md border border-gray-300 p-2">
+                        {allBranches.map((b) => (
+                          <label key={b.id} className="flex items-center gap-2 py-1">
+                            <input type="checkbox" checked={staffBranchEditIds.includes(b.id)}
+                              onChange={() => setStaffBranchEditIds((ids) =>
+                                ids.includes(b.id) ? ids.filter((x) => x !== b.id) : [...ids, b.id])} />
+                            {b.name}
+                          </label>
+                        ))}
+                      </div>
+                      <div className="space-x-2">
+                        <EditActions size="sm" onSave={() => saveStaffBranches(detailStaff.id)} onCancel={() => setEditingStaffBranches(false)} saving={savingStaffBranches} />  
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <ul className="space-y-1">
+                        {detailStaffBranches.map((b) => <li key={b.id}>{b.name}</li>)}
+                        {detailStaffBranches.length === 0 && <li className="text-gray-400">No branches assigned.</li>}
+                      </ul>
+                      {user?.role === 'OWNER' && (
+                        <ActionButton className="mt-3" icon={<MapPinIcon />}
+                          onClick={() => { setEditingStaffBranches(true); setStaffBranchEditIds(detailStaffBranches.map((b) => b.id)) }}>
+                          Edit branches
+                        </ActionButton>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {staffModalTab === 'STORE' && detailStaff && (
+                <ProductPurchaseHistoryTab personId={detailStaff.id} />
+              )}
+            </div>
           </div>
         </div>
       )}
