@@ -14,14 +14,16 @@ import Avatar from '../components/Avatar'
 import MemberStoreTab from '../components/member/MemberStoreTab'
 import MarketingPreferenceSection from '../components/MarketingPreferenceSection'
 import { toast, getErrorMessage } from '../store/toastStore'
+import { usePersistedTab } from '../hooks/usePersistedTab'
 
 const PAGE_SIZE = 5
 
 type Tab = 'PROFILE' | 'ATTENDANCE' | 'STORE'
+const TAB_KEYS: Tab[] = ['PROFILE', 'ATTENDANCE', 'STORE']
 
 export default function StaffProfilePage() {
     const user = useAuthStore((s) => s.user)
-    const [activeTab, setActiveTab] = useState<Tab>('PROFILE')
+    const [activeTab, setActiveTab] = usePersistedTab<Tab>('staff-profile', TAB_KEYS, 'PROFILE')
 
     const [profile, setProfile] = useState<Profile | null>(null)
     const [profileLoading, setProfileLoading] = useState(true)

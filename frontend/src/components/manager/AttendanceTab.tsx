@@ -7,6 +7,7 @@ import Spinner from '../Spinner'
 import { TableSkeleton } from '../Skeleton'
 import type { HourlyCount, TodayAttendanceEntry } from '../../types'
 import { toast, getErrorMessage } from '../../store/toastStore'
+import { usePersistedTab } from '../../hooks/usePersistedTab'
 
 const PAGE_SIZE = 10
 const SCAN_RETRY_COOLDOWN_MS = 2000
@@ -21,7 +22,7 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
   const [summary, setSummary] = useState<HourlyCount[]>([])
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendanceEntry[]>([])
   const [todayAttendanceLoading, setTodayAttendanceLoading] = useState(true)
-  const [attendanceTab, setAttendanceTab] = useState<'MEMBERS' | 'STAFF'>('MEMBERS')
+  const [attendanceTab, setAttendanceTab] = usePersistedTab<'MEMBERS' | 'STAFF'>('attendance-sub', ['MEMBERS', 'STAFF'], 'MEMBERS')
   const [todayAttendancePage, setTodayAttendancePage] = useState(1)
   const [checkingIn, setCheckingIn] = useState(false)
 

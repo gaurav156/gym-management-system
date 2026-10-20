@@ -9,8 +9,11 @@ import StaffTab from '../components/manager/StaffTab'
 import StoreTab from '../components/manager/StoreTab'
 import type { Branch, LastCheckinEntry } from '../types'
 import { toast, getErrorMessage } from '../store/toastStore'
+import { usePersistedTab } from '../hooks/usePersistedTab'
 
 type Tab = 'ATTENDANCE' | 'PAYMENTS' | 'STORE' | 'EXPENSES' | 'MEMBERS' | 'STAFF'
+const TAB_KEYS: Tab[] = ['ATTENDANCE', 'PAYMENTS', 'STORE', 'EXPENSES', 'MEMBERS', 'STAFF']
+
 
 export default function ManagerDashboard() {
   const user = useAuthStore((s) => s.user)
@@ -18,7 +21,7 @@ export default function ManagerDashboard() {
   const [selectedBranch, setSelectedBranch] = useState('')
   const [allBranches, setAllBranches] = useState<Branch[]>([])
   const [lastCheckins, setLastCheckins] = useState<Record<string, string>>({})
-  const [activeTab, setActiveTab] = useState<Tab>('ATTENDANCE')
+  const [activeTab, setActiveTab] = usePersistedTab<Tab>('manager', TAB_KEYS, 'ATTENDANCE')
 
   useEffect(() => {
     if (!user) return

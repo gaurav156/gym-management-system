@@ -18,6 +18,7 @@ import PasswordInput from '../components/PasswordInput'
 import EditActions from '../components/EditActions'
 import ActionButton from '../components/ActionButton'
 import { PencilIcon, TrashIcon, PlayIcon, PauseIcon } from '../components/icons/ActionIcons'
+import { usePersistedTab } from '../hooks/usePersistedTab'
 
 type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
 type Tab = 'FINANCE' | 'BRANCHES' | 'PLANS' | 'PRODUCTS' | 'BROADCASTS' | 'BACKUP'
@@ -30,6 +31,8 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'BROADCASTS', label: 'Broadcasts' },
   { key: 'BACKUP', label: 'Backup & Export' },
 ]
+
+const TAB_KEYS = TABS.map((t) => t.key) 
 
 const ACCOUNT_ROLES: { value: AccountRole; label: string }[] = [
   { value: 'MEMBER', label: 'Member' },
@@ -60,7 +63,7 @@ function BranchCheckboxes({ branches, selected, onChange }: {
 }
 
 export default function OwnerDashboard() {
-  const [activeTab, setActiveTab] = useState<Tab>('FINANCE')
+  const [activeTab, setActiveTab] = usePersistedTab<Tab>('owner', TAB_KEYS, 'FINANCE')
 
   const [branches, setBranches] = useState<Branch[]>([])
   const [branchesLoading, setBranchesLoading] = useState(true)

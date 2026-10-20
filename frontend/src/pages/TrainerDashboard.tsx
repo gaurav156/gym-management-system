@@ -6,14 +6,16 @@ import HourlyCrowdChart from '../components/HourlyCrowdChart'
 import MemberStoreTab from '../components/member/MemberStoreTab'
 import type { Branch, AttendanceLogEntry, HourlyCount, PageResponse } from '../types'
 import { toast, getErrorMessage } from '../store/toastStore'
+import { usePersistedTab } from '../hooks/usePersistedTab'
 
 const PAGE_SIZE = 5
 
 type Tab = 'OVERVIEW' | 'STORE'
+const TAB_KEYS: Tab[] = ['OVERVIEW', 'STORE']
 
 export default function TrainerDashboard() {
   const user = useAuthStore((s) => s.user)
-  const [activeTab, setActiveTab] = useState<Tab>('OVERVIEW')
+  const [activeTab, setActiveTab] = usePersistedTab<Tab>('trainer', TAB_KEYS, 'OVERVIEW')
 
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranch, setSelectedBranch] = useState('')

@@ -10,13 +10,15 @@ import { viewInvoice, printInvoice, downloadInvoice } from '../utils/invoice'
 import type { InvoiceResponse } from '../types'
 import MemberStoreTab from '../components/member/MemberStoreTab'
 import { toast, getErrorMessage } from '../store/toastStore'
+import { usePersistedTab } from '../hooks/usePersistedTab'
 
 const PAGE_SIZE = 5
+type Tab = 'OVERVIEW' | 'STORE'
+const TAB_KEYS: Tab[] = ['OVERVIEW', 'STORE']
 
 export default function MemberDashboard() {
   const user = useAuthStore((s) => s.user)
-  type Tab = 'OVERVIEW' | 'STORE'
-  const [activeTab, setActiveTab] = useState<Tab>('OVERVIEW')
+  const [activeTab, setActiveTab] = usePersistedTab<Tab>('member', TAB_KEYS, 'OVERVIEW')
 
   const [memberships, setMemberships] = useState<Membership[]>([])
   const [membershipLoading, setMembershipLoading] = useState(true)
