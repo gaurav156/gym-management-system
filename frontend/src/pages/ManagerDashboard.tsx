@@ -9,11 +9,15 @@ import StaffTab from '../components/manager/StaffTab'
 import StoreTab from '../components/manager/StoreTab'
 import type { Branch, LastCheckinEntry } from '../types'
 import { toast, getErrorMessage } from '../store/toastStore'
-import { usePersistedTab } from '../hooks/usePersistedTab'
+import { usePersistedTab, TAB_STORAGE_PREFIX } from '../hooks/usePersistedTab'
 
 type Tab = 'ATTENDANCE' | 'PAYMENTS' | 'STORE' | 'EXPENSES' | 'MEMBERS' | 'STAFF'
 const TAB_KEYS: Tab[] = ['ATTENDANCE', 'PAYMENTS', 'STORE', 'EXPENSES', 'MEMBERS', 'STAFF']
+const BRANCH_STORAGE_KEY = TAB_STORAGE_PREFIX + 'manager-branch'
 
+function readSavedBranch(): string | null {
+  try { return sessionStorage.getItem(BRANCH_STORAGE_KEY) } catch { return null }
+}
 
 export default function ManagerDashboard() {
   const user = useAuthStore((s) => s.user)
@@ -22,6 +26,11 @@ export default function ManagerDashboard() {
   const [allBranches, setAllBranches] = useState<Branch[]>([])
   const [lastCheckins, setLastCheckins] = useState<Record<string, string>>({})
   const [activeTab, setActiveTab] = usePersistedTab<Tab>('manager', TAB_KEYS, 'ATTENDANCE')
+
+  function selectBranch(id: string) {
+    setSelectedBranch(id)
+    try { sessionStorage.setItem(BRANCH_STORAGE_KEY, id) } catch { /* ignore */ }
+  }
 
   useEffect(() => {
     if (!user) return
@@ -34,7 +43,11 @@ export default function ManagerDashboard() {
     request
       .then((res) => {
         setBranches(res.data)
-        if (res.data.length > 0) setSelectedBranch((res.data.find((b) => b.active) ?? res.data[0]).id)
+        if (res.data.length > 0) {
+          const saved = readSavedBranch()
+          const restored = res.data.find((b) => b.id === saved)
+          setSelectedBranch((restored ?? res.data.find((b) => b.active) ?? res.data[0]).id)
+        }
       })
       .catch((err) => {
         toast.error(getErrorMessage(err, 'Failed to load branches - check the backend logs.'))
@@ -80,7 +93,7 @@ export default function ManagerDashboard() {
       </h1>
 
       {branches.length > 1 && (
-        <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}
+        <select value={selectedBranch} onChange={(e) => selectBranch(e.target.value)}
           className="mt-4 rounded-md border border-gray-300 px-3 py-2 text-sm">
           {branches.map((b) => <option key={b.id} value={b.id}>{b.name}{b.active ? '' : ' (inactive)'}</option>)}
         </select>
