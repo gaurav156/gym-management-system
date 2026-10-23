@@ -28,6 +28,7 @@ export interface Branch {
   name: string
   address: string
   phone: string | null
+  mapUrl?: string | null
   active: boolean
   deletable?: boolean | null
 }

@@ -71,6 +71,8 @@ export default function OwnerDashboard() {
   const [branchName, setBranchName] = useState('')
   const [branchAddress, setBranchAddress] = useState('')
   const [branchPhone, setBranchPhone] = useState('')
+  const [branchMapUrl, setBranchMapUrl] = useState('')
+  const [editBranchMapUrl, setEditBranchMapUrl] = useState('')
 
   const [editingBranchId, setEditingBranchId] = useState<string | null>(null)
   const [editBranchName, setEditBranchName] = useState('')
@@ -148,8 +150,8 @@ export default function OwnerDashboard() {
     e.preventDefault()
     setCreatingBranch(true)
     try {
-      await api.post('/api/branches', { name: branchName, address: branchAddress, phone: branchPhone || null })
-      setBranchName(''); setBranchAddress(''); setBranchPhone('')
+      await api.post('/api/branches', { name: branchName, address: branchAddress, phone: branchPhone || null, mapUrl: branchMapUrl || null })
+      setBranchName(''); setBranchAddress(''); setBranchPhone(''); setBranchMapUrl('')
       toast.success('Branch added.')
       loadBranches()
     } catch (err) {
@@ -164,6 +166,7 @@ export default function OwnerDashboard() {
     setEditBranchName(b.name)
     setEditBranchAddress(b.address)
     setEditBranchPhone(b.phone ?? '')
+    setEditBranchMapUrl(b.mapUrl ?? '')
   }
 
   function cancelEditBranch() {
@@ -176,7 +179,8 @@ export default function OwnerDashboard() {
       await api.put(`/api/branches/${id}`, {
         name: editBranchName,
         address: editBranchAddress,
-        phone: editBranchPhone || null,
+        phone: editBranchPhone,
+        mapUrl: editBranchMapUrl,
       })
       toast.success('Branch updated.')
       setEditingBranchId(null)
@@ -282,6 +286,13 @@ export default function OwnerDashboard() {
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
                   <input placeholder="Phone" value={branchPhone} onChange={(e) => setBranchPhone(e.target.value)}
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                  <div>
+                    <input placeholder="Google Maps link (optional)" value={branchMapUrl} onChange={(e) => setBranchMapUrl(e.target.value)}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                    <p className="mt-1 text-[11px] text-gray-400">
+                      Google Maps → Share → copy the link. For the most exact pin on the website's embedded map, use Share → Embed a map and paste that code. Leave blank to search by name and address.
+                    </p>
+                  </div>
                   <button disabled={creatingBranch}
                     className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
                     {creatingBranch && <Spinner className="h-4 w-4" />}
@@ -344,6 +355,9 @@ export default function OwnerDashboard() {
                           <input value={editBranchPhone} onChange={(e) => setEditBranchPhone(e.target.value)}
                             placeholder="Phone"
                             className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
+                          <input value={editBranchMapUrl} onChange={(e) => setEditBranchMapUrl(e.target.value)}
+                            placeholder="Google Maps link (blank = use address search)"
+                            className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm" />
                           <div className="space-x-2">
                             <EditActions size="sm" onSave={() => saveEditBranch(b.id)} onCancel={cancelEditBranch} saving={savingBranchEdit} />  
                           </div>
@@ -357,6 +371,7 @@ export default function OwnerDashboard() {
                             </p>
                             <p className="text-xs text-gray-500">{b.address}</p>
                             <p className="text-xs text-gray-400">{b.phone || 'No phone on file'}</p>
+                            {b.mapUrl && <a href={b.mapUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-brand hover:underline">Map link set</a>}
                             {b.deletable === false && (
                               <p className="text-[10px] text-gray-400">Has recorded activity - can be deactivated but not deleted.</p>
                             )}

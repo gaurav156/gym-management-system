@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import Footer from '../components/Footer'
 import { InstagramIcon, FacebookIcon } from '../components/SocialIcons'
 import type { Branch } from '../types'
+import { resolveBranchMap } from '../utils/maps'
 
 const GYM_NAME = import.meta.env.VITE_GYM_NAME || 'FitZone Gym'
 const GYM_LOGO_URL = import.meta.env.VITE_GYM_LOGO_URL || '/logo.svg'
@@ -123,14 +124,7 @@ export default function LandingPage() {
   }, [])
 
   const selectedBranch = branches.find((b) => b.id === selectedBranchId) ?? branches[0] ?? null
-  // Include the gym's own brand name, not just the branch name - "Andheri Branch, 123
-  // MG Road" alone is often ambiguous enough that Google resolves it to the wrong place
-  // entirely; prefixing the brand name is what actually disambiguates the search.
-  const mapQuery = selectedBranch
-    ? `${GYM_NAME} ${selectedBranch.name}, ${selectedBranch.address ?? ''}`
-    : GYM_NAME
-  const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`
-  const mapEmbedSrc = `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`
+  const { embedSrc: mapEmbedSrc, directionsUrl } = resolveBranchMap(selectedBranch, GYM_NAME)
 
   return (
     <div>

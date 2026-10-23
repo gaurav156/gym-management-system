@@ -13,6 +13,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class BranchService {
@@ -25,6 +27,14 @@ public class BranchService {
     private final ProductOrderRepository productOrderRepository;
     private final ExpenseRepository expenseRepository;
     private final AttendanceRepository attendanceRepository;
+
+    private static final Pattern MAP_URL = Pattern.compile(
+            "^https://((www|maps)\\.)?google\\.[a-z.]{2,6}/maps\\S*$"
+                    + "|^https://maps\\.app\\.goo\\.gl/\\S+$"
+                    + "|^https://goo\\.gl/maps/\\S+$",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern IFRAME_SRC = Pattern.compile("src\\s*=\\s*\"([^\"]+)\"", Pattern.CASE_INSENSITIVE);
+
 
     public BranchService(BranchRepository branchRepository,
                          BranchAssignmentRepository branchAssignmentRepository,
@@ -45,7 +55,8 @@ public class BranchService {
     }
 
     public BranchResponse create(CreateBranchRequest req) {
-        Branch branch = Branch.builder().name(req.name()).address(req.address()).phone(req.phone()).build();
+        Branch branch = Branch.builder().name(req.name()).address(req.address()).phone(req.phone())
+                .mapUrl(cleanMapUrl(req.mapUrl())).build();
         branch = branchRepository.save(branch);
         return toResponse(branch, true);
     }
@@ -60,6 +71,7 @@ public class BranchService {
         if (req.name() != null && !req.name().isBlank()) branch.setName(req.name());
         if (req.address() != null) branch.setAddress(req.address().isBlank() ? null : req.address());
         if (req.phone() != null) branch.setPhone(req.phone().isBlank() ? null : req.phone());
+        if (req.mapUrl() != null) branch.setMapUrl(cleanMapUrl(req.mapUrl()));
 
         branch = branchRepository.save(branch);
         return toResponse(branch, true);
@@ -182,7 +194,25 @@ public class BranchService {
     }
 
     private BranchResponse toResponse(Branch b, boolean withDeletable) {
-        return new BranchResponse(b.getId(), b.getName(), b.getAddress(), b.getPhone(), b.isActive(),
+        return new BranchResponse(b.getId(), b.getName(), b.getAddress(), b.getPhone(), b.getMapUrl(), b.isActive(),
                 withDeletable ? deleteBlockedReason(b.getId()) == null : null);
+    }
+
+    // Blank -> null (clears it). Also accepts Google's whole "Embed a map" <iframe ...> snippet
+    // and pulls out its src. Only Google Maps hosts over https are allowed, since this value
+    // ends up in an <a href> and an <iframe src> on the public landing page.
+    private String cleanMapUrl(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String v = raw.trim();
+        if (v.toLowerCase().contains("<iframe")) {
+            Matcher m = IFRAME_SRC.matcher(v);
+            if (!m.find()) throw new IllegalArgumentException("Couldn't find a map link in that embed code");
+            v = m.group(1).trim();
+        }
+        if (v.length() > 2000 || !MAP_URL.matcher(v).matches()) {
+            throw new IllegalArgumentException(
+                    "Enter a valid Google Maps link (https://maps.app.goo.gl/... or https://www.google.com/maps/...)");
+        }
+        return v;
     }
 }

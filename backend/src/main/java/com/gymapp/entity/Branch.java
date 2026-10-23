@@ -30,6 +30,11 @@ public class Branch {
 
     private String phone;
 
+    // Owner-supplied Google Maps link (validated in BranchService). Null = fall back to
+    // an address search on the landing page.
+    @Column(name = "map_url", columnDefinition = "TEXT")
+    private String mapUrl;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
 

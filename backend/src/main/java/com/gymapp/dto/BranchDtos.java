@@ -12,7 +12,8 @@ public class BranchDtos {
     public record CreateBranchRequest(
             @NotBlank String name,
             String address,
-            String phone
+            String phone,
+            String mapUrl
     ) {}
 
     // deletable is only computed for the Owner's list (null elsewhere) so the UI can show
@@ -22,6 +23,7 @@ public class BranchDtos {
             String name,
             String address,
             String phone,
+            String mapUrl,
             boolean active,
             Boolean deletable
     ) {}
@@ -32,7 +34,9 @@ public class BranchDtos {
     public record UpdateBranchRequest(
             String name,
             String address,
-            String phone
+            String phone,
+            // null = leave as is, blank = clear
+            String mapUrl
     ) {}
 
     // Replaces the old single from/to transfer - sets a person's branch assignments to
