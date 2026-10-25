@@ -5,14 +5,15 @@ import { useAuthStore } from '../store/authStore'
 import Spinner from '../components/Spinner'
 import Turnstile from '../components/Turnstile'
 import PersonalDetailsFields from '../components/PersonalDetailsFields'
-import type { AuthUser, Branch, Gender } from '../types'
+import type { AuthUser, Gender } from '../types'
 import { toast, getErrorMessage } from '../store/toastStore'
 import PasswordInput from '../components/PasswordInput'
+import { usePublicBranches, NO_BRANCHES } from '../api/queries'
 
 const RESEND_COOLDOWN_SECONDS = 60
 
 export default function RegisterPage() {
-  const [branches, setBranches] = useState<Branch[]>([])
+  const { data: branches = NO_BRANCHES } = usePublicBranches()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -36,10 +37,6 @@ export default function RegisterPage() {
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const [marketing, setMarketing] = useState(true)
-
-  useEffect(() => {
-    api.get<Branch[]>('/api/public/branches').then((res) => setBranches(res.data)).catch(() => {})
-  }, [])
 
   useEffect(() => {
     return () => { if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current) }

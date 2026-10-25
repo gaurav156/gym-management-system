@@ -1,24 +1,20 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useState } from 'react'
 import { api } from '../../api/client'
 import Spinner from '../Spinner'
 import ConfirmDialog from '../ConfirmDialog'
 import { useConfirm } from '../../hooks/useConfirm'
 import type { ProductCategory } from '../../types'
 import { toast, getErrorMessage } from '../../store/toastStore'
+import { queryClient } from '../../api/queryClient'
+import { qk, useProductCategories } from '../../api/queries'
 
 export default function ProductCategoriesSection() {
-  const [categories, setCategories] = useState<ProductCategory[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: categories = [], isLoading: loading } = useProductCategories()
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const { confirm, dialogProps } = useConfirm()
 
-  function load() {
-    setLoading(true)
-    api.get<ProductCategory[]>('/api/product-categories').then((res) => setCategories(res.data)).finally(() => setLoading(false))
-  }
-
-  useEffect(() => { load() }, [])
+  function load() { queryClient.invalidateQueries({ queryKey: qk.categories }) }
 
   async function createCategory(e: FormEvent) {
     e.preventDefault()
@@ -29,6 +25,7 @@ export default function ProductCategoriesSection() {
       toast.success('Category added.')
       setName('')
       load()
+      queryClient.invalidateQueries({ queryKey: qk.categories })
     } catch (err: any) {
       toast.error(getErrorMessage(err, 'Failed to create category'))
     } finally {
@@ -46,6 +43,7 @@ export default function ProductCategoriesSection() {
         await api.delete(`/api/product-categories/${c.id}`)
         toast.success('Category deleted.')
         load()
+        queryClient.invalidateQueries({ queryKey: qk.categories })
       },
     })
   }

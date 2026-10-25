@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -50,6 +51,9 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     // whose grace period has passed, regardless of member.
     List<Membership> findByStatusAndPaymentStatusAndBalanceDueDateBefore(
             MembershipStatus status, PaymentStatus paymentStatus, LocalDate cutoff);
+
+    @Query("SELECT m FROM Membership m WHERE m.member.id IN :ids")
+    List<Membership> findByMemberIdIn(@Param("ids") Collection<UUID> ids);
 
     // Used by CouponService's membership-coupon first-time-buyer check.
     boolean existsByMemberId(UUID memberId);

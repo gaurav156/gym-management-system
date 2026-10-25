@@ -187,6 +187,7 @@ export interface MemberSummary {
   gender: Gender | null
   dateOfBirth: string | null
   idProofUploaded: boolean
+  membershipStatus: 'ACTIVE' | 'SCHEDULED' | 'PAUSED' | 'NONE'
 }
 
 export interface HourlyCount {

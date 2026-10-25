@@ -7,11 +7,12 @@ import { viewProductInvoice, printProductInvoice, downloadProductInvoice } from 
 import { useConfirm } from '../../hooks/useConfirm'
 import Spinner from '../Spinner'
 import { TableSkeleton } from '../Skeleton'
-import type { Product, ProductOrder, ProductCategory, ProductOrderInvoice, MemberSummary, StaffSummary, PageResponse } from '../../types'
+import type { Product, ProductOrder, ProductOrderInvoice, MemberSummary, StaffSummary, PageResponse } from '../../types'
 import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, BanIcon } from '../icons/ActionIcons'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { toast, getErrorMessage } from '../../store/toastStore'
+import { useProductCategories } from '../../api/queries'
 
 const ORDER_PAGE_SIZE = 10
 const PRODUCT_PAGE_SIZE = 8
@@ -26,7 +27,7 @@ export default function StoreTab({ selectedBranch }: Props) {
   const [products, setProducts] = useState<Product[]>([])
   const [productSearch, setProductSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
-  const [categories, setCategories] = useState<ProductCategory[]>([])
+  const { data: categories = [] } = useProductCategories()
   const [productPage, setProductPage] = useState(0)
   const [productTotalPages, setProductTotalPages] = useState(1)
   const [cart, setCart] = useState<CartLine[]>([])
@@ -105,8 +106,6 @@ export default function StoreTab({ selectedBranch }: Props) {
         setOrderPage(res.data.page)
       }).finally(() => setOrdersLoading(false))
   }
-
-  useEffect(() => { api.get<ProductCategory[]>('/api/product-categories').then((res) => setCategories(res.data)) }, [])
 
   useEffect(() => {
     if (!selectedBranch) return

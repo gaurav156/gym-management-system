@@ -1,0 +1,1 @@
+CREATE INDEX idx_users_checkin_pin ON users(checkin_pin);

@@ -1,12 +1,13 @@
 import { FormEvent, useEffect, useState, useRef } from 'react'
 import { api } from '../../api/client'
-import type { Plan, Payment, MemberSummary, InvoiceResponse, PageResponse } from '../../types'
+import type { Payment, MemberSummary, InvoiceResponse, PageResponse } from '../../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
 import { TableSkeleton } from '../Skeleton'
 import Spinner from '../Spinner'
 import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon } from '../icons/ActionIcons'
 import { toast, getErrorMessage } from '../../store/toastStore'
+import { usePlans } from '../../api/queries'
 
 const PAGE_SIZE = 10
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
@@ -17,7 +18,7 @@ interface Props {
 }
 
 export default function PaymentsTab({ selectedBranch }: Props) {
-  const [plans, setPlans] = useState<Plan[]>([])
+  const { data: plans = [] } = usePlans()
   const [members, setMembers] = useState<MemberSummary[]>([])
   const [selectedMember, setSelectedMember] = useState<MemberSummary | null>(null)
 
@@ -59,10 +60,6 @@ export default function PaymentsTab({ selectedBranch }: Props) {
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [memberDropdownOpen, setMemberDropdownOpen] = useState(false)
   const memberDropdownRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    api.get<Plan[]>('/api/plans').then((res) => setPlans(res.data))
-  }, [])
 
   function loadMemberOptions(search: string) {
     if (!selectedBranch) return

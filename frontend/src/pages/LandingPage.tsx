@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../api/client'
 import Footer from '../components/Footer'
 import { InstagramIcon, FacebookIcon } from '../components/SocialIcons'
-import type { Branch } from '../types'
 import { resolveBranchMap } from '../utils/maps'
+import { usePublicBranches, NO_BRANCHES } from '../api/queries'
 
 const GYM_NAME = import.meta.env.VITE_GYM_NAME || 'FitZone Gym'
 const GYM_LOGO_URL = import.meta.env.VITE_GYM_LOGO_URL || '/logo.svg'
@@ -111,17 +110,12 @@ const VALUES = [
 ]
 
 export default function LandingPage() {
-  const [branches, setBranches] = useState<Branch[]>([])
+  const { data: branches = NO_BRANCHES } = usePublicBranches()
   const [selectedBranchId, setSelectedBranchId] = useState('')
 
   useEffect(() => {
-    api.get<Branch[]>('/api/public/branches')
-      .then((res) => {
-        setBranches(res.data)
-        if (res.data.length > 0) setSelectedBranchId(res.data[0].id)
-      })
-      .catch(() => { /* landing page still works fine with the branch list empty */ })
-  }, [])
+    if (!selectedBranchId && branches.length > 0) setSelectedBranchId(branches[0].id)
+  }, [branches, selectedBranchId])
 
   const selectedBranch = branches.find((b) => b.id === selectedBranchId) ?? branches[0] ?? null
   const { embedSrc: mapEmbedSrc, directionsUrl } = resolveBranchMap(selectedBranch, GYM_NAME)

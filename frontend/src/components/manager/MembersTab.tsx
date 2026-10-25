@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { api } from '../../api/client'
 import { getEffectiveStatus, statusColorClass, statusLabel, type EffectiveStatus } from '../../utils/membership'
 import PhotoUploadButton from '../PhotoUploadButton'
@@ -34,7 +34,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [members, setMembers] = useState<MemberSummary[]>([])
   const [memberTotalPages, setMemberTotalPages] = useState(1)
   const [memberTotalElements, setMemberTotalElements] = useState(0)
-  const [memberships, setMemberships] = useState<MembershipAdmin[]>([]) // still the full branch list - status is computed from this
 
   const [memberSearchInput, setMemberSearchInput] = useState('') // what's in the box
   const [memberSearch, setMemberSearch] = useState('')           // what was last sent to the server
@@ -108,10 +107,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     }).finally(() => setMembersLoading(false))
   }
 
-  function loadMemberships() {
-    if (!selectedBranch) return
-    api.get<MembershipAdmin[]>(`/api/memberships/branch/${selectedBranch}`).then((res) => setMemberships(res.data))
-  }
 
   useEffect(() => {
     isFirstSearchRun.current = true
@@ -120,7 +115,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     setMemberStatusFilter('ALL')
     setMemberSort('NAME')
     loadMembers(0, '', 'ALL', 'NAME')
-    loadMemberships()
   }, [selectedBranch])
 
   useEffect(() => {
@@ -199,9 +193,10 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   // fetch - the modal derives from its own fetch (not the branch list), so an action
   // taken inside it needs its own explicit refresh too.
   function refreshMembershipViews() {
-    loadMemberships()
+    loadMembers(memberPage, memberSearch, memberStatusFilter, memberSort)
     if (detailMemberId) {
-      api.get<MembershipAdmin[]>(`/api/memberships/member/${detailMemberId}`).then((res) => setDetailMembershipsFetched(res.data))
+      api.get<MembershipAdmin[]>(`/api/memberships/member/${detailMemberId}`)
+        .then((res) => setDetailMembershipsFetched(res.data))
     }
   }
 
@@ -352,7 +347,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
         toast.success('Account deleted.')
         setDetailMemberId(null)
         loadMembers(0, memberSearch, memberStatusFilter, memberSort)
-        loadMemberships()
       },
     })
   }
@@ -383,7 +377,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
           toast.success('Role changed.')
           setDetailMemberId(null)
           loadMembers(0, memberSearch, memberStatusFilter, memberSort)
-          loadMemberships()
         } finally {
           setChangingRole(false)
         }
@@ -410,24 +403,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     }
   }
 
-  type MemberRow = { member: MemberSummary; status: EffectiveStatus | 'NONE' }
-
-  const memberRows: MemberRow[] = members.map((mem): MemberRow => {
-    const relevant = memberships.filter((ms) => ms.memberId === mem.id).map((ms) => getEffectiveStatus(ms))
-    const status: EffectiveStatus | 'NONE' =
-      relevant.includes('ACTIVE') ? 'ACTIVE' :
-      relevant.includes('SCHEDULED') ? 'SCHEDULED' :
-      relevant.includes('PAUSED') ? 'PAUSED' : 'NONE'
-    return { member: mem, status }
-  })
-
-  // // Status filter and sort apply within the currently loaded page only, since the roster
-  // // itself is now paginated server-side - see the note rendered under the filters below.
-  // const visibleMemberRows = memberRows
-  //   .filter(({ status }) => memberStatusFilter === 'ALL' || status === memberStatusFilter)
-  //   .sort((a, b) => memberSort === 'NAME'
-  //     ? a.member.name.localeCompare(b.member.name)
-  //     : a.status.localeCompare(b.status))
+  const memberRows = members.map((member) => ({ member, status: member.membershipStatus }))
 
   const detailMember = members.find((m) => m.id === detailMemberId) ?? null
   const detailMemberships = detailMembershipsFetched
@@ -907,7 +883,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
           setPromotionTarget(null)
           setDetailMemberId(null)
           loadMembers(0, memberSearch, memberStatusFilter, memberSort)
-          loadMemberships()
         }}
       />
       {payTarget && (

@@ -1,3 +1,5 @@
+import { localDateISO } from './date'
+
 // A membership's displayed status is derived from today's date, not just its stored
 // `status` field - a row can be status="ACTIVE" in the database while still being in the
 // future (not started yet) or in the past (lapsed). Only PAUSED and CANCELLED are true
@@ -16,7 +18,7 @@ export function getEffectiveStatus(m: MembershipDates): EffectiveStatus {
   if (m.status === 'CANCELLED') return 'CANCELLED'
   if (m.status === 'PAUSED') return 'PAUSED'
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localDateISO()
   if (m.endDate < today) return 'EXPIRED'
   if (m.startDate > today) return 'SCHEDULED'
   return 'ACTIVE'

@@ -7,9 +7,9 @@ import ExpensesTab from '../components/manager/ExpensesTab'
 import MembersTab from '../components/manager/MembersTab'
 import StaffTab from '../components/manager/StaffTab'
 import StoreTab from '../components/manager/StoreTab'
-import type { Branch, LastCheckinEntry } from '../types'
-import { toast, getErrorMessage } from '../store/toastStore'
+import type { LastCheckinEntry } from '../types'
 import { usePersistedTab, TAB_STORAGE_PREFIX } from '../hooks/usePersistedTab'
+import { useAccessibleBranches } from '../api/queries'
 
 type Tab = 'ATTENDANCE' | 'PAYMENTS' | 'STORE' | 'EXPENSES' | 'MEMBERS' | 'STAFF'
 const TAB_KEYS: Tab[] = ['ATTENDANCE', 'PAYMENTS', 'STORE', 'EXPENSES', 'MEMBERS', 'STAFF']
@@ -21,9 +21,9 @@ function readSavedBranch(): string | null {
 
 export default function ManagerDashboard() {
   const user = useAuthStore((s) => s.user)
-  const [branches, setBranches] = useState<Branch[]>([])
+  const { branches } = useAccessibleBranches(user?.role, user?.userId)
   const [selectedBranch, setSelectedBranch] = useState('')
-  const [allBranches, setAllBranches] = useState<Branch[]>([])
+  const allBranches = user?.role === 'OWNER' ? branches : []
   const [lastCheckins, setLastCheckins] = useState<Record<string, string>>({})
   const [activeTab, setActiveTab] = usePersistedTab<Tab>('manager', TAB_KEYS, 'ATTENDANCE')
 
@@ -33,36 +33,11 @@ export default function ManagerDashboard() {
   }
 
   useEffect(() => {
-    if (!user) return
-    // Owner has implicit access to every branch (no branch_assignments row of their own);
-    // a Manager only sees branches they're actually assigned to.
-    const request = user.role === 'OWNER'
-      ? api.get<Branch[]>('/api/branches')
-      : api.get<Branch[]>('/api/branches/mine', { params: { userId: user.userId } })
-
-    request
-      .then((res) => {
-        setBranches(res.data)
-        if (res.data.length > 0) {
-          const saved = readSavedBranch()
-          const restored = res.data.find((b) => b.id === saved)
-          setSelectedBranch((restored ?? res.data.find((b) => b.active) ?? res.data[0]).id)
-        }
-      })
-      .catch((err) => {
-        toast.error(getErrorMessage(err, 'Failed to load branches - check the backend logs.'))
-      })
-  }, [user])
-
-  // Owner needs the full branch list to offer as checkboxes when editing someone's
-  // assignments - a Manager only ever has their own assigned branches in `branches`.
-  useEffect(() => {
-    if (user?.role === 'OWNER') {
-      setAllBranches(branches)
-    } else {
-      api.get<Branch[]>('/api/branches').then((res) => setAllBranches(res.data)).catch(() => {})
-    }
-  }, [user, branches])
+    if (selectedBranch || branches.length === 0) return
+    const saved = readSavedBranch()
+    const restored = branches.find((b) => b.id === saved)
+    setSelectedBranch((restored ?? branches.find((b) => b.active) ?? branches[0]).id)
+  }, [branches, selectedBranch])
 
   function loadLastCheckins() {
     if (!selectedBranch) return

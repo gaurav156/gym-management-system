@@ -19,6 +19,8 @@ import EditActions from '../components/EditActions'
 import ActionButton from '../components/ActionButton'
 import { PencilIcon, TrashIcon, PlayIcon, PauseIcon } from '../components/icons/ActionIcons'
 import { usePersistedTab } from '../hooks/usePersistedTab'
+import { queryClient } from '../api/queryClient'
+import { qk, useOwnerBranches, usePlans, NO_BRANCHES } from '../api/queries'
 
 type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
 type Tab = 'FINANCE' | 'BRANCHES' | 'PLANS' | 'PRODUCTS' | 'BROADCASTS' | 'BACKUP'
@@ -65,8 +67,7 @@ function BranchCheckboxes({ branches, selected, onChange }: {
 export default function OwnerDashboard() {
   const [activeTab, setActiveTab] = usePersistedTab<Tab>('owner', TAB_KEYS, 'FINANCE')
 
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [branchesLoading, setBranchesLoading] = useState(true)
+  const { data: branches = NO_BRANCHES, isLoading: branchesLoading } = useOwnerBranches()
   const [creatingBranch, setCreatingBranch] = useState(false)
   const [branchName, setBranchName] = useState('')
   const [branchAddress, setBranchAddress] = useState('')
@@ -90,8 +91,7 @@ export default function OwnerDashboard() {
   const [accountBranchIds, setAccountBranchIds] = useState<string[]>([])
   const [creatingAccount, setCreatingAccount] = useState(false)
 
-  const [plans, setPlans] = useState<Plan[]>([])
-  const [plansLoading, setPlansLoading] = useState(true)
+  const { data: plans = [], isLoading: plansLoading } = usePlans()
   const [planName, setPlanName] = useState('')
   const [planMonths, setPlanMonths] = useState(1)
   const [planPrice, setPlanPrice] = useState('')
@@ -139,10 +139,7 @@ export default function OwnerDashboard() {
     })
   }
 
-  function loadBranches() {
-    setBranchesLoading(true)
-    api.get<Branch[]>('/api/branches').then((res) => setBranches(res.data)).finally(() => setBranchesLoading(false))
-  }
+  function loadBranches() { queryClient.invalidateQueries({ queryKey: qk.branches }) }
 
   useEffect(() => { loadBranches() }, [])
 
@@ -220,12 +217,7 @@ export default function OwnerDashboard() {
     }
   }
 
-  function loadPlans() {
-    setPlansLoading(true)
-    api.get<Plan[]>('/api/plans').then((res) => setPlans(res.data)).finally(() => setPlansLoading(false))
-  }
-
-  useEffect(() => { loadPlans() }, [])
+  function loadPlans() { queryClient.invalidateQueries({ queryKey: qk.plans }) }
 
   async function createPlan(e: FormEvent) {
     e.preventDefault()

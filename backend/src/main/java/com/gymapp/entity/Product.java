@@ -7,6 +7,7 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import org.hibernate.annotations.BatchSize;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -58,6 +59,7 @@ public class Product {
     private boolean active = true;
 
     @ElementCollection
+    @BatchSize(size = 50)
     @CollectionTable(name = "product_images", joinColumns = @JoinColumn(name = "product_id"))
     @OrderColumn(name = "display_order")
     @Column(name = "image_key", nullable = false)
@@ -65,6 +67,7 @@ public class Product {
     private List<String> imageKeys = new ArrayList<>();
 
     @ManyToMany(fetch = FetchType.LAZY)
+    @BatchSize(size = 50)
     @JoinTable(name = "product_category_map",
             joinColumns = @JoinColumn(name = "product_id"),
             inverseJoinColumns = @JoinColumn(name = "category_id"))

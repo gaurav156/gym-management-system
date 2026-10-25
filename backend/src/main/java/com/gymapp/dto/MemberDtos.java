@@ -21,6 +21,7 @@ public class MemberDtos {
             LocalDate enrollmentDate,
             Gender gender,
             LocalDate dateOfBirth,
-            boolean idProofUploaded
+            boolean idProofUploaded,
+            String membershipStatus
     ) {}
 }

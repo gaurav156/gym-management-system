@@ -11,6 +11,7 @@ import type { InvoiceResponse } from '../types'
 import MemberStoreTab from '../components/member/MemberStoreTab'
 import { toast, getErrorMessage } from '../store/toastStore'
 import { usePersistedTab } from '../hooks/usePersistedTab'
+import { usePlans, useMyBranches, NO_BRANCHES } from '../api/queries'
 
 const PAGE_SIZE = 5
 type Tab = 'OVERVIEW' | 'STORE'
@@ -22,9 +23,8 @@ export default function MemberDashboard() {
 
   const [memberships, setMemberships] = useState<Membership[]>([])
   const [membershipLoading, setMembershipLoading] = useState(true)
-  const [plans, setPlans] = useState<Plan[]>([])
-  const [plansLoading, setPlansLoading] = useState(true)
-  const [branches, setBranches] = useState<Branch[]>([])
+  const { data: plans = [], isLoading: plansLoading } = usePlans()
+  const { data: branches = NO_BRANCHES } = useMyBranches(user?.userId)
   const [selectedBranch, setSelectedBranch] = useState('')
   const [summary, setSummary] = useState<HourlyCount[]>([])
 
@@ -99,22 +99,12 @@ export default function MemberDashboard() {
     function onFocus() { loadMembershipData() }
     window.addEventListener('focus', onFocus)
 
-    // Plans are chain-wide now, not tied to the member's branch(es) - a single call covers it.
-    setPlansLoading(true)
-    api.get<Plan[]>('/api/plans')
-      .then((res) => setPlans(res.data))
-      .catch((err) => toast.error(getErrorMessage(err, 'Failed to load plans')))
-      .finally(() => setPlansLoading(false))
-
-    api.get<Branch[]>('/api/branches/mine', { params: { userId: user.userId } })
-      .then((res) => {
-        setBranches(res.data)
-        if (res.data.length > 0) setSelectedBranch(res.data[0].id)
-      })
-      .catch((err) => toast.error(getErrorMessage(err, 'Failed to load your branches')))
-
     return () => window.removeEventListener('focus', onFocus)
   }, [user])
+
+  useEffect(() => {
+    if (!selectedBranch && branches.length > 0) setSelectedBranch(branches[0].id)
+  }, [branches, selectedBranch])
 
   useEffect(() => {
     if (!selectedBranch) return

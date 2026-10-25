@@ -3,9 +3,10 @@ import { api } from '../../api/client'
 import ProductDetailModal from '../ProductDetailModal'
 import ProductImage from '../ProductImage'
 import { viewProductInvoice, printProductInvoice, downloadProductInvoice } from '../../utils/productInvoice'
-import type { Product, ProductOrder, ProductCategory, Branch, ProductOrderInvoice, PageResponse } from '../../types'
+import type { Product, ProductOrder, ProductOrderInvoice, PageResponse } from '../../types'
 import { useAuthStore } from '../../store/authStore'
 import { toast, getErrorMessage } from '../../store/toastStore'
+import { useAccessibleBranches, useProductCategories } from '../../api/queries'
 
 const PRODUCT_PAGE_SIZE = 9
 const SHOW_ALL_SIZE = 500
@@ -13,11 +14,11 @@ const ORDER_PAGE_SIZE = 5
 
 export default function MemberStoreTab({ memberId }: { memberId: string }) {
   const user = useAuthStore((s) => s.user)
-  
-  const [branches, setBranches] = useState<Branch[]>([])
+
+  const { branches } = useAccessibleBranches(user?.role, memberId)
   const [selectedBranch, setSelectedBranch] = useState('')
 
-  const [categories, setCategories] = useState<ProductCategory[]>([])
+  const { data: categories = [] } = useProductCategories()
   const [categoryFilter, setCategoryFilter] = useState('')
 
   const [products, setProducts] = useState<Product[]>([])
@@ -36,21 +37,10 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
   const [orderTotalElements, setOrderTotalElements] = useState(0)
 
   useEffect(() => {
-    // Owner has implicit access to every branch (no branch_assignments row of their
-    // own - see BranchService) - /api/branches/mine would return [] for them, which is
-    // why the Owner's Store tab was stuck on the loading skeleton forever. Same
-    // role-aware fetch ManagerDashboard already uses.
-    const request = user?.role === 'OWNER'
-      ? api.get<Branch[]>('/api/branches')
-      : api.get<Branch[]>('/api/branches/mine', { params: { userId: memberId } })
+    if (!selectedBranch && branches.length > 0) setSelectedBranch(branches[0].id)
+  }, [branches, selectedBranch])
 
-    request.then((res) => {
-      setBranches(res.data)
-      if (res.data.length > 0) setSelectedBranch(res.data[0].id)
-    })
-    api.get<ProductCategory[]>('/api/product-categories').then((res) => setCategories(res.data))
-    loadOrders(0)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadOrders(0) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function loadProducts(page = 0, all = showAll) {
     if (!selectedBranch) return

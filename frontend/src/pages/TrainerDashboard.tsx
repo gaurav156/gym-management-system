@@ -4,9 +4,10 @@ import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import HourlyCrowdChart from '../components/HourlyCrowdChart'
 import MemberStoreTab from '../components/member/MemberStoreTab'
-import type { Branch, AttendanceLogEntry, HourlyCount, PageResponse } from '../types'
+import type { AttendanceLogEntry, HourlyCount, PageResponse } from '../types'
 import { toast, getErrorMessage } from '../store/toastStore'
 import { usePersistedTab } from '../hooks/usePersistedTab'
+import { useMyBranches, NO_BRANCHES } from '../api/queries'
 
 const PAGE_SIZE = 5
 
@@ -17,7 +18,7 @@ export default function TrainerDashboard() {
   const user = useAuthStore((s) => s.user)
   const [activeTab, setActiveTab] = usePersistedTab<Tab>('trainer', TAB_KEYS, 'OVERVIEW')
 
-  const [branches, setBranches] = useState<Branch[]>([])
+  const { data: branches = NO_BRANCHES } = useMyBranches(user?.userId)
   const [selectedBranch, setSelectedBranch] = useState('')
   const [summary, setSummary] = useState<HourlyCount[]>([])
 
@@ -49,15 +50,12 @@ export default function TrainerDashboard() {
     function onFocus() { loadAttendance(0) }
     window.addEventListener('focus', onFocus)
 
-    api.get<Branch[]>('/api/branches/mine', { params: { userId: user.userId } })
-      .then((res) => {
-        setBranches(res.data)
-        if (res.data.length > 0) setSelectedBranch(res.data[0].id)
-      })
-      .catch((err) => toast.error(getErrorMessage(err, 'Failed to load your branches')))
-
     return () => window.removeEventListener('focus', onFocus)
   }, [user])
+
+  useEffect(() => {
+    if (!selectedBranch && branches.length > 0) setSelectedBranch(branches[0].id)
+  }, [branches, selectedBranch])
 
   useEffect(() => {
     if (!selectedBranch) return

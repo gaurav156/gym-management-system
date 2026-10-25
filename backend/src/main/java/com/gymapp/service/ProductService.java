@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class ProductService {
@@ -142,13 +143,20 @@ public class ProductService {
         imageKeys.forEach(imageRefs::deleteAfterCommit);
     }
 
+    private Map<UUID, List<ProductBranchStock>> loadStocks(List<Product> products) {
+        if (products.isEmpty()) return Map.of();
+        return branchStockRepository.findByProductIdIn(products.stream().map(Product::getId).toList())
+                .stream().collect(Collectors.groupingBy(s -> s.getProduct().getId()));
+    }
+
     // branchId computes stockQuantity/outOfStock for that specific branch - Member and
     // front-desk browsing both always supply one, since they're picking up from a chosen
     // branch. categoryId is optional; null means "all categories".
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> listCatalog(String search, UUID categoryId, UUID branchId, Pageable pageable) {
         Page<Product> page = productRepository.findActiveCatalog(blankToNull(search), categoryId, pageable);
-        return PageResponse.from(page.map(p -> toResponse(p, branchId)));
+        var stocks = loadStocks(page.getContent());
+        return PageResponse.from(page.map(p -> toResponse(p, branchId, stocks.getOrDefault(p.getId(), List.of()))));
     }
 
     // Management list shows every branch's stock at once via branchStocks, not one
@@ -191,25 +199,27 @@ public class ProductService {
         return isDiscountActive(p) ? p.getDiscountPrice() : p.getPrice();
     }
 
-    private ProductResponse toResponse(Product p, UUID branchId) {
+    private ProductResponse toResponse(Product p, UUID branchId) {   // single-product callers
+        return toResponse(p, branchId, branchStockRepository.findByProductId(p.getId()));
+    }
+
+    private ProductResponse toResponse(Product p, UUID branchId, List<ProductBranchStock> stocks) {
         boolean discountActive = isDiscountActive(p);
         List<String> urls = p.getImageKeys().stream().map(imageRefs::toUrl).toList();
         List<CategoryRef> categories = p.getCategories().stream()
                 .map(c -> new CategoryRef(c.getId(), c.getName()))
                 .sorted(Comparator.comparing(CategoryRef::name))
                 .toList();
-        List<BranchStockResponse> branchStocks = branchStockRepository.findByProductId(p.getId()).stream()
+        List<BranchStockResponse> branchStocks = stocks.stream()
                 .map(bs -> new BranchStockResponse(bs.getBranch().getId(), bs.getBranch().getName(), bs.getStockQuantity()))
-                .sorted(Comparator.comparing(BranchStockResponse::branchName))
-                .toList();
+                .sorted(Comparator.comparing(BranchStockResponse::branchName)).toList();
 
         Integer stockQuantity = null;
         Boolean outOfStock = null;
         if (branchId != null) {
-            int qty = branchStockRepository.findByProductIdAndBranchId(p.getId(), branchId)
-                    .map(ProductBranchStock::getStockQuantity).orElse(0);
-            stockQuantity = qty;
-            outOfStock = qty <= 0;
+            int qty = stocks.stream().filter(s -> s.getBranch().getId().equals(branchId))
+                    .findFirst().map(ProductBranchStock::getStockQuantity).orElse(0);
+            stockQuantity = qty; outOfStock = qty <= 0;
         }
 
         return new ProductResponse(

@@ -68,13 +68,14 @@ public class AttendanceService {
             person = userRepository.findById(scannedId)
                     .orElseThrow(() -> new IllegalArgumentException("Invalid QR code"));
         } else if (req.method() == CheckinMethod.PIN) {
-            // In this simple version the kiosk supplies branchId + the 4-digit PIN;
-            // in a real deployment you'd look up by a scanned member ID + PIN, but this
-            // keeps the flow demoable without a card reader.
-            person = userRepository.findAll().stream()
-                    .filter(u -> req.pin() != null && req.pin().equals(u.getCheckinPin()))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Invalid PIN"));
+            List<User> matches = (req.pin() == null || req.pin().isBlank())
+                    ? List.of() : userRepository.findByCheckinPin(req.pin());
+            if (matches.isEmpty()) throw new IllegalArgumentException("Invalid PIN");
+            if (matches.size() > 1) {
+                throw new IllegalArgumentException(
+                        "This PIN is shared by more than one person - please use the QR code instead");
+            }
+            person = matches.get(0);
         } else {
             throw new IllegalArgumentException("Unsupported check-in method for this endpoint yet");
         }

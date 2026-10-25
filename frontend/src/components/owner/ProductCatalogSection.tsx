@@ -7,11 +7,12 @@ import Spinner from '../Spinner'
 import ConfirmDialog from '../ConfirmDialog'
 import { useConfirm } from '../../hooks/useConfirm'
 import { TableSkeleton } from '../Skeleton'
-import type { Product, ProductCategory, Branch, PageResponse } from '../../types'
+import type { Product, Branch, PageResponse } from '../../types'
 import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PencilIcon, BanIcon, CheckIcon, TrashIcon } from '../icons/ActionIcons'
 import { toast, getErrorMessage } from '../../store/toastStore'
 import EditModal from '../EditModal'
+import { useProductCategories } from '../../api/queries'
 
 const PAGE_SIZE = 10
 
@@ -50,7 +51,7 @@ export default function ProductCatalogSection({ branches }: Props) {
   const [page, setPage] = useState(0)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
-  const [categories, setCategories] = useState<ProductCategory[]>([])
+  const { data: categories = [], isLoading } = useProductCategories()
 
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState(emptyForm)
@@ -83,7 +84,6 @@ export default function ProductCatalogSection({ branches }: Props) {
   }
 
   useEffect(() => { loadProducts(0) }, [])
-  useEffect(() => { api.get<ProductCategory[]>('/api/product-categories').then((res) => setCategories(res.data)) }, [])
 
   useEffect(() => {
     const handle = setTimeout(() => loadProducts(0, search, categoryFilter), 300)

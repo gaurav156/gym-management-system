@@ -139,4 +139,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     List<User> findActiveMembersWithUsablePlan(@Param("role") Role role,
                                                @Param("status") MembershipStatus status,
                                                @Param("today") LocalDate today);
+
+    List<User> findByCheckinPin(String checkinPin);
 }
