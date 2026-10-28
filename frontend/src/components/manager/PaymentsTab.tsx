@@ -1,13 +1,14 @@
 import { FormEvent, useEffect, useState, useRef } from 'react'
 import { api } from '../../api/client'
-import type { Payment, MemberSummary, InvoiceResponse, PageResponse } from '../../types'
+import type { MemberSummary, InvoiceResponse, PageResponse } from '../../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
 import { TableSkeleton } from '../Skeleton'
 import Spinner from '../Spinner'
 import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon } from '../icons/ActionIcons'
 import { toast, getErrorMessage } from '../../store/toastStore'
-import { usePlans } from '../../api/queries'
+import { usePayments, usePlans, invalidateMembershipData } from '../../api/queries'
+import RefreshButton from '../RefreshButton'
 
 const PAGE_SIZE = 10
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
@@ -22,11 +23,12 @@ export default function PaymentsTab({ selectedBranch }: Props) {
   const [members, setMembers] = useState<MemberSummary[]>([])
   const [selectedMember, setSelectedMember] = useState<MemberSummary | null>(null)
 
-  const [payments, setPayments] = useState<Payment[]>([])
-  const [paymentsLoading, setPaymentsLoading] = useState(true)
   const [paymentPage, setPaymentPage] = useState(0) // 0-indexed to match Spring's Pageable
-  const [paymentTotalPages, setPaymentTotalPages] = useState(1)
-  const [paymentTotalElements, setPaymentTotalElements] = useState(0)
+  const paymentsQuery = usePayments(selectedBranch, paymentPage, PAGE_SIZE)
+  const payments = paymentsQuery.data?.content ?? []
+  const paymentTotalPages = paymentsQuery.data?.totalPages ?? 1
+  const paymentTotalElements = paymentsQuery.data?.totalElements ?? 0
+  const paymentsLoading = paymentsQuery.isLoading
 
   const [purchaseMemberId, setPurchaseMemberId] = useState('')
   const [purchasePlanId, setPurchasePlanId] = useState('')
@@ -70,8 +72,8 @@ export default function PaymentsTab({ selectedBranch }: Props) {
 
   useEffect(() => {
     if (!selectedBranch) return
+    setPaymentPage(0)
     loadMemberOptions('')
-    loadPayments(0)
   }, [selectedBranch])
 
   // Debounced server-side search while the dropdown is open, same pattern as
@@ -83,19 +85,6 @@ export default function PaymentsTab({ selectedBranch }: Props) {
     return () => clearTimeout(handle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memberSearchQuery, memberDropdownOpen])
-
-  function loadPayments(page = 0) {
-    if (!selectedBranch) return
-    setPaymentsLoading(true)
-    api.get<PageResponse<Payment>>(`/api/payments/branch/${selectedBranch}`, {
-      params: { page, size: PAGE_SIZE },
-    }).then((res) => {
-      setPayments(res.data.content)
-      setPaymentTotalPages(res.data.totalPages)
-      setPaymentTotalElements(res.data.totalElements)
-      setPaymentPage(res.data.page)
-    }).finally(() => setPaymentsLoading(false))
-  }
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -153,7 +142,8 @@ export default function PaymentsTab({ selectedBranch }: Props) {
       setPurchaseFullPayment(true); setPurchaseAmountPaid(''); setPurchaseBalanceDueDate('')
       setPurchaseCouponCode(''); setPurchaseCouponStatus(null)
       setSelectedMember(null)
-      loadPayments(0)
+      setPaymentPage(0)
+      invalidateMembershipData()
     } catch (err: any) {
       toast.error(getErrorMessage(err, 'Failed to record purchase'))
     } finally {
@@ -313,8 +303,13 @@ export default function PaymentsTab({ selectedBranch }: Props) {
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">Payment history</h2>
-        <p className="mt-1 text-xs text-gray-500">All cash collected at this branch, most recent first.</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-medium">Payment history</h2>
+            <p className="mt-1 text-xs text-gray-500">All cash collected at this branch, most recent first.</p>
+          </div>
+          <RefreshButton onClick={() => paymentsQuery.refetch()} spinning={paymentsQuery.isFetching} />
+        </div>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -358,9 +353,9 @@ export default function PaymentsTab({ selectedBranch }: Props) {
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
             <span>Page {paymentPage + 1} of {paymentTotalPages} ({paymentTotalElements} total)</span>
             <div className="space-x-2">
-              <button disabled={paymentPage === 0} onClick={() => loadPayments(paymentPage - 1)}
+              <button disabled={paymentPage === 0} onClick={() => setPaymentPage((p) => p - 1)} 
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-              <button disabled={paymentPage + 1 >= paymentTotalPages} onClick={() => loadPayments(paymentPage + 1)}
+              <button disabled={paymentPage + 1 >= paymentTotalPages} onClick={() => setPaymentPage((p) => p + 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
             </div>
           </div>

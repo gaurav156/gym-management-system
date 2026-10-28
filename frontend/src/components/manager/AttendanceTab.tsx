@@ -5,23 +5,21 @@ import QrScanner from '../QrScanner'
 import HourlyCrowdChart from '../HourlyCrowdChart'
 import Spinner from '../Spinner'
 import { TableSkeleton } from '../Skeleton'
-import type { HourlyCount, TodayAttendanceEntry } from '../../types'
 import { toast, getErrorMessage } from '../../store/toastStore'
 import { usePersistedTab } from '../../hooks/usePersistedTab'
+import { queryClient } from '../../api/queryClient'
+import { qk, useAttendanceSummary, useTodayAttendance } from '../../api/queries'
+import RefreshButton from '../RefreshButton'
 
 const PAGE_SIZE = 10
 const SCAN_RETRY_COOLDOWN_MS = 2000
 
 interface Props {
   selectedBranch: string
-  onCheckinSuccess: () => void
 }
 
-export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Props) {
+export default function AttendanceTab({ selectedBranch }: Props) {
   const [checkinPin, setCheckinPin] = useState('')
-  const [summary, setSummary] = useState<HourlyCount[]>([])
-  const [todayAttendance, setTodayAttendance] = useState<TodayAttendanceEntry[]>([])
-  const [todayAttendanceLoading, setTodayAttendanceLoading] = useState(true)
   const [attendanceTab, setAttendanceTab] = usePersistedTab<'MEMBERS' | 'STAFF'>('attendance-sub', ['MEMBERS', 'STAFF'], 'MEMBERS')
   const [todayAttendancePage, setTodayAttendancePage] = useState(1)
   const [checkingIn, setCheckingIn] = useState(false)
@@ -38,8 +36,13 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
   const [selectedDate, setSelectedDate] = useState(() => localDateISO())
   const isToday = selectedDate === localDateISO()
 
-  const summaryTicket = useRef(0)
-  const attendanceTicket = useRef(0)
+  const date = isToday ? undefined : selectedDate
+  const summaryQuery = useAttendanceSummary(selectedBranch, date, isToday)
+  const attendanceQuery = useTodayAttendance(selectedBranch, date, isToday)
+  const summary = summaryQuery.data ?? []
+  const todayAttendance = attendanceQuery.data ?? []
+  const todayAttendanceLoading = attendanceQuery.isLoading
+  function reloadAttendance() { queryClient.invalidateQueries({ queryKey: qk.attendance }) }
 
   function renderDatePicker() {
     return (
@@ -55,33 +58,10 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
           <button type="button" onClick={() => setSelectedDate(localDateISO())}
             className="text-xs text-brand hover:underline">Today</button>
         )}
+        <RefreshButton onClick={reloadAttendance} spinning={attendanceQuery.isFetching || summaryQuery.isFetching} />
       </div>
     )
   }
-
-  function loadSummary() {
-    if (!selectedBranch) return
-    const ticket = ++summaryTicket.current
-    api.get<HourlyCount[]>(`/api/attendance/summary/${selectedBranch}`, {
-      params: { date: isToday ? undefined : selectedDate },
-    }).then((res) => { if (ticket === summaryTicket.current) setSummary(res.data) })
-  }
-
-  function loadTodayAttendance() {
-    if (!selectedBranch) return
-    const ticket = ++attendanceTicket.current
-    setTodayAttendanceLoading(true)
-    api.get<TodayAttendanceEntry[]>(`/api/attendance/today/${selectedBranch}`, {
-      params: { date: isToday ? undefined : selectedDate },
-    })
-      .then((res) => { if (ticket === attendanceTicket.current) setTodayAttendance(res.data) })
-      .finally(() => { if (ticket === attendanceTicket.current) setTodayAttendanceLoading(false) })
-  }
-
-  useEffect(() => {
-    loadSummary()
-    loadTodayAttendance()
-  }, [selectedBranch, selectedDate])
 
   useEffect(() => {
     setTodayAttendancePage(1)
@@ -104,9 +84,7 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
       })
       toast.success(data.message)
       setCheckinPin('')
-      loadTodayAttendance()
-      loadSummary()
-      onCheckinSuccess()
+      reloadAttendance()
     } catch (err: any) {
       toast.error(getErrorMessage(err, 'Check-in failed'))
     } finally {
@@ -130,9 +108,7 @@ export default function AttendanceTab({ selectedBranch, onCheckinSuccess }: Prop
       toast.success(data.message); 
       setHasScanned(true);
       setScanActive(false)
-      loadTodayAttendance()
-      loadSummary()
-      onCheckinSuccess()
+      reloadAttendance()
     } catch (err: any) {
       toast.error(getErrorMessage(err, 'Check-in failed'))
       setTimeout(() => setScanLocked(false), SCAN_RETRY_COOLDOWN_MS)

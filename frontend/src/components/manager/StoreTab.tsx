@@ -12,7 +12,9 @@ import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, BanIcon } from '../icons/ActionIcons'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { toast, getErrorMessage } from '../../store/toastStore'
-import { useProductCategories } from '../../api/queries'
+import { useProductCategories, qk, useBranchOrders } from '../../api/queries'
+import { queryClient } from '../../api/queryClient'
+import RefreshButton from '../RefreshButton'
 
 const ORDER_PAGE_SIZE = 10
 const PRODUCT_PAGE_SIZE = 8
@@ -52,11 +54,12 @@ export default function StoreTab({ selectedBranch }: Props) {
 
   const [purchasing, setPurchasing] = useState(false)
 
-  const [orders, setOrders] = useState<ProductOrder[]>([])
-  const [ordersLoading, setOrdersLoading] = useState(true)
   const [orderPage, setOrderPage] = useState(0)
-  const [orderTotalPages, setOrderTotalPages] = useState(1)
-  const [orderTotalElements, setOrderTotalElements] = useState(0)
+  const ordersQuery = useBranchOrders(selectedBranch, orderPage, ORDER_PAGE_SIZE)
+  const orders = ordersQuery.data?.content ?? []
+  const orderTotalPages = ordersQuery.data?.totalPages ?? 1
+  const orderTotalElements = ordersQuery.data?.totalElements ?? 0
+  const ordersLoading = ordersQuery.isLoading
 
   const [cancelTarget, setCancelTarget] = useState<ProductOrder | null>(null)
   const [refundAmount, setRefundAmount] = useState('')
@@ -95,23 +98,16 @@ export default function StoreTab({ selectedBranch }: Props) {
     })
   }
 
-  function loadOrders(page = 0) {
-    if (!selectedBranch) return
-    setOrdersLoading(true)
-    api.get<PageResponse<ProductOrder>>(`/api/product-orders/branch/${selectedBranch}`, { params: { page, size: ORDER_PAGE_SIZE } })
-      .then((res) => {
-        setOrders(res.data.content)
-        setOrderTotalPages(res.data.totalPages)
-        setOrderTotalElements(res.data.totalElements)
-        setOrderPage(res.data.page)
-      }).finally(() => setOrdersLoading(false))
+  function loadOrders(page?: number) {
+    if (page !== undefined && page !== orderPage) setOrderPage(page)
+    queryClient.invalidateQueries({ queryKey: qk.productOrders })
   }
 
   useEffect(() => {
     if (!selectedBranch) return
     loadProducts(0)
     loadBuyerOptions('')
-    loadOrders(0)
+    setOrderPage(0)
   }, [selectedBranch]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -445,7 +441,10 @@ export default function StoreTab({ selectedBranch }: Props) {
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">Product order history</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-medium">Product order history</h2>
+          <RefreshButton onClick={() => ordersQuery.refetch()} spinning={ordersQuery.isFetching} />
+        </div>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -496,9 +495,9 @@ export default function StoreTab({ selectedBranch }: Props) {
             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
               <span>Page {orderPage + 1} of {orderTotalPages} ({orderTotalElements} total)</span>
               <div className="space-x-2">
-                <button disabled={orderPage === 0} onClick={() => loadOrders(orderPage - 1)}
+                <button disabled={orderPage === 0} onClick={() => setOrderPage((p) => p - 1)}
                   className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                <button disabled={orderPage + 1 >= orderTotalPages} onClick={() => loadOrders(orderPage + 1)}
+                <button disabled={orderPage + 1 >= orderTotalPages} onClick={() => setOrderPage((p) => p + 1)}
                   className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
               </div>
             </div>

@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react'
-import { api } from '../api/client'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '../store/authStore'
 import AttendanceTab from '../components/manager/AttendanceTab'
 import PaymentsTab from '../components/manager/PaymentsTab'
@@ -7,9 +6,8 @@ import ExpensesTab from '../components/manager/ExpensesTab'
 import MembersTab from '../components/manager/MembersTab'
 import StaffTab from '../components/manager/StaffTab'
 import StoreTab from '../components/manager/StoreTab'
-import type { LastCheckinEntry } from '../types'
 import { usePersistedTab, TAB_STORAGE_PREFIX } from '../hooks/usePersistedTab'
-import { useAccessibleBranches } from '../api/queries'
+import { useAccessibleBranches, useLastCheckins } from '../api/queries'
 
 type Tab = 'ATTENDANCE' | 'PAYMENTS' | 'STORE' | 'EXPENSES' | 'MEMBERS' | 'STAFF'
 const TAB_KEYS: Tab[] = ['ATTENDANCE', 'PAYMENTS', 'STORE', 'EXPENSES', 'MEMBERS', 'STAFF']
@@ -24,7 +22,12 @@ export default function ManagerDashboard() {
   const { branches } = useAccessibleBranches(user?.role, user?.userId)
   const [selectedBranch, setSelectedBranch] = useState('')
   const allBranches = user?.role === 'OWNER' ? branches : []
-  const [lastCheckins, setLastCheckins] = useState<Record<string, string>>({})
+  const { data: lastCheckinList } = useLastCheckins(selectedBranch)
+  const lastCheckins = useMemo(() => {
+    const map: Record<string, string> = {}
+    lastCheckinList?.forEach((e) => { map[e.personId] = e.lastCheckIn })
+    return map
+  }, [lastCheckinList])
   const [activeTab, setActiveTab] = usePersistedTab<Tab>('manager', TAB_KEYS, 'ATTENDANCE')
 
   function selectBranch(id: string) {
@@ -38,19 +41,6 @@ export default function ManagerDashboard() {
     const restored = branches.find((b) => b.id === saved)
     setSelectedBranch((restored ?? branches.find((b) => b.active) ?? branches[0]).id)
   }, [branches, selectedBranch])
-
-  function loadLastCheckins() {
-    if (!selectedBranch) return
-    api.get<LastCheckinEntry[]>(`/api/attendance/last-checkin/${selectedBranch}`).then((res) => {
-      const map: Record<string, string> = {}
-      res.data.forEach((e) => { map[e.personId] = e.lastCheckIn })
-      setLastCheckins(map)
-    })
-  }
-
-  useEffect(() => {
-    loadLastCheckins()
-  }, [selectedBranch])
 
   const TABS: { key: Tab; label: string }[] = [
     { key: 'ATTENDANCE', label: 'Attendance' },
@@ -89,7 +79,7 @@ export default function ManagerDashboard() {
 
       <div className="mt-6">
         {activeTab === 'ATTENDANCE' && (
-          <AttendanceTab selectedBranch={selectedBranch} onCheckinSuccess={loadLastCheckins} />
+          <AttendanceTab selectedBranch={selectedBranch} />
         )}
         {activeTab === 'PAYMENTS' && (
           <PaymentsTab selectedBranch={selectedBranch} />

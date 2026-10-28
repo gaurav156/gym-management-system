@@ -19,7 +19,10 @@ import { genderLabel, formatDobWithAge } from '../../utils/person'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { toast, getErrorMessage } from '../../store/toastStore'
 import EditActions from '../EditActions'
+import { useMembers, invalidatePeople, invalidateMembershipData } from '../../api/queries'
+import RefreshButton from '../RefreshButton'
 
+const NO_MEMBERS: MemberSummary[] = []
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
 
@@ -31,15 +34,21 @@ interface Props {
 }
 
 export default function MembersTab({ selectedBranch, allBranches, lastCheckins, user }: Props) {
-  const [members, setMembers] = useState<MemberSummary[]>([])
-  const [memberTotalPages, setMemberTotalPages] = useState(1)
-  const [memberTotalElements, setMemberTotalElements] = useState(0)
+
 
   const [memberSearchInput, setMemberSearchInput] = useState('') // what's in the box
   const [memberSearch, setMemberSearch] = useState('')           // what was last sent to the server
   const [memberStatusFilter, setMemberStatusFilter] = useState<'ALL' | EffectiveStatus | 'NONE'>('ALL')
   const [memberSort, setMemberSort] = useState<'NAME' | 'STATUS'>('NAME')
   const [memberPage, setMemberPage] = useState(0) // 0-indexed
+  const membersQuery = useMembers({
+    branchId: selectedBranch, search: memberSearch, status: memberStatusFilter,
+    sort: memberSort, page: memberPage, size: PAGE_SIZE,
+  })
+  const members = membersQuery.data?.content ?? NO_MEMBERS
+  const memberTotalPages = membersQuery.data?.totalPages ?? 1
+  const memberTotalElements = membersQuery.data?.totalElements ?? 0
+  const membersLoading = membersQuery.isLoading
 
   const [detailMemberId, setDetailMemberId] = useState<string | null>(null)
   const [modalTab, setModalTab] = useState<'INFO' | 'MEMBERSHIPS' | 'PAYMENTS' | 'STORE' | 'ATTENDANCE' | 'BRANCHES'>('INFO')
@@ -81,7 +90,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
 
   const [detailMembershipsFetched, setDetailMembershipsFetched] = useState<MembershipAdmin[]>([]) // unchanged, still full list
 
-  const [membersLoading, setMembersLoading] = useState(true)
   const { confirm, dialogProps } = useConfirm()
   const [savingMemberInfo, setSavingMemberInfo] = useState(false)
   const [savingMemberBranches, setSavingMemberBranches] = useState(false)
@@ -92,52 +100,27 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [payMode, setPayMode] = useState('CASH')
   const [paying, setPaying] = useState(false)
 
-  const isFirstSearchRun = useRef(true)
-
-  function loadMembers(page = 0, search = memberSearch, status = memberStatusFilter, sort = memberSort) {
-    if (!selectedBranch) return
-    setMembersLoading(true)
-    api.get<PageResponse<MemberSummary>>('/api/members', {
-      params: { branchId: selectedBranch, search: search || undefined, status, sort, page, size: PAGE_SIZE },
-    }).then((res) => {
-      setMembers(res.data.content)
-      setMemberTotalPages(res.data.totalPages)
-      setMemberTotalElements(res.data.totalElements)
-      setMemberPage(res.data.page)
-    }).finally(() => setMembersLoading(false))
+  // Mutations call this. It refreshes the lists and optionally jumps to a page.
+  function loadMembers(page?: number) {
+    if (page !== undefined && page !== memberPage) setMemberPage(page)
+    invalidatePeople()
   }
 
-
   useEffect(() => {
-    isFirstSearchRun.current = true
-    setMemberSearchInput('')
-    setMemberSearch('')
-    setMemberStatusFilter('ALL')
-    setMemberSort('NAME')
-    loadMembers(0, '', 'ALL', 'NAME')
+    setMemberSearchInput(''); setMemberSearch('')
+    setMemberStatusFilter('ALL'); setMemberSort('NAME'); setMemberPage(0)
   }, [selectedBranch])
 
   useEffect(() => {
-    if (isFirstSearchRun.current) {
-      isFirstSearchRun.current = false
-      return
-    }
-    const handle = setTimeout(() => {
-      setMemberSearch(memberSearchInput)
-      loadMembers(0, memberSearchInput, memberStatusFilter, memberSort)
-    }, 300)
+    const handle = setTimeout(() => { setMemberSearch(memberSearchInput); setMemberPage(0) }, 300)
     return () => clearTimeout(handle)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memberSearchInput])
 
   function handleStatusFilterChange(value: typeof memberStatusFilter) {
-    setMemberStatusFilter(value)
-    loadMembers(0, memberSearch, value, memberSort)
+    setMemberStatusFilter(value); setMemberPage(0)
   }
-
   function handleSortChange(value: typeof memberSort) {
-    setMemberSort(value)
-    loadMembers(0, memberSearch, memberStatusFilter, value)
+    setMemberSort(value); setMemberPage(0)
   }
 
   function loadDetailMemberBranches(memberId: string) {
@@ -193,7 +176,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   // fetch - the modal derives from its own fetch (not the branch list), so an action
   // taken inside it needs its own explicit refresh too.
   function refreshMembershipViews() {
-    loadMembers(memberPage, memberSearch, memberStatusFilter, memberSort)
+    invalidateMembershipData()
     if (detailMemberId) {
       api.get<MembershipAdmin[]>(`/api/memberships/member/${detailMemberId}`)
         .then((res) => setDetailMembershipsFetched(res.data))
@@ -328,7 +311,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       })
       toast.success('Member details updated.')
       setEditingMemberInfo(false)
-      loadMembers(memberPage, memberSearch, memberStatusFilter, memberSort)
+      loadMembers()
     } catch (err: any) {
       toast.error(getErrorMessage(err, 'Failed to update member info'))
     } finally {
@@ -346,7 +329,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
         await api.delete(`/api/owner/users/${memberId}`)
         toast.success('Account deleted.')
         setDetailMemberId(null)
-        loadMembers(0, memberSearch, memberStatusFilter, memberSort)
+        loadMembers(0)
       },
     })
   }
@@ -376,7 +359,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
           await api.put(`/api/owner/users/${member.id}/role`, { newRole: selectedNewRole })
           toast.success('Role changed.')
           setDetailMemberId(null)
-          loadMembers(0, memberSearch, memberStatusFilter, memberSort)
+          loadMembers(0)
         } finally {
           setChangingRole(false)
         }
@@ -420,8 +403,13 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   return (
     <div>
       <div className="rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">Members</h2>
-        <p className="mt-1 text-xs text-gray-500">Click a member to view all their plans and take action.</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-medium">Members</h2>
+            <p className="mt-1 text-xs text-gray-500">Click a member to view all their plans and take action.</p>
+          </div>
+          <RefreshButton onClick={() => membersQuery.refetch()} spinning={membersQuery.isFetching} />
+        </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
           <input placeholder="Search name or email..." value={memberSearchInput} onChange={(e) => setMemberSearchInput(e.target.value)}
@@ -492,9 +480,9 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
             <span>Page {memberPage + 1} of {memberTotalPages} ({memberTotalElements} total)</span>
             <div className="space-x-2">
-              <button disabled={memberPage === 0} onClick={() => loadMembers(memberPage - 1)}
+              <button disabled={memberPage === 0} onClick={() => setMemberPage((p) => p - 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-              <button disabled={memberPage + 1 >= memberTotalPages} onClick={() => loadMembers(memberPage + 1)}
+              <button disabled={memberPage + 1 >= memberTotalPages} onClick={() => setMemberPage((p) => p + 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
             </div>
           </div>
@@ -882,7 +870,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
         onDone={() => {
           setPromotionTarget(null)
           setDetailMemberId(null)
-          loadMembers(0, memberSearch, memberStatusFilter, memberSort)
+          loadMembers(0)
         }}
       />
       {payTarget && (

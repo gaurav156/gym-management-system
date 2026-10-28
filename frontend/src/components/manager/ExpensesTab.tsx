@@ -5,8 +5,11 @@ import Spinner from '../Spinner'
 import ConfirmDialog from '../ConfirmDialog'
 import { useConfirm } from '../../hooks/useConfirm'
 import { TableSkeleton } from '../Skeleton'
-import type { Expense, ExpenseCategory, PageResponse, AuthUser } from '../../types'
+import type { ExpenseCategory, AuthUser } from '../../types'
 import { toast, getErrorMessage } from '../../store/toastStore'
+import { qk, useExpenses } from '../../api/queries'
+import { queryClient } from '../../api/queryClient'
+import RefreshButton from '../RefreshButton'
 
 const PAGE_SIZE = 10
 
@@ -29,11 +32,12 @@ interface Props {
 }
 
 export default function ExpensesTab({ selectedBranch, user }: Props) {
-  const [expenses, setExpenses] = useState<Expense[]>([])
-  const [expensesLoading, setExpensesLoading] = useState(true)
   const [expensePage, setExpensePage] = useState(0)
-  const [expenseTotalPages, setExpenseTotalPages] = useState(1)
-  const [expenseTotalElements, setExpenseTotalElements] = useState(0)
+  const expensesQuery = useExpenses(selectedBranch, expensePage, PAGE_SIZE)
+  const expenses = expensesQuery.data?.content ?? []
+  const expenseTotalPages = expensesQuery.data?.totalPages ?? 1
+  const expenseTotalElements = expensesQuery.data?.totalElements ?? 0
+  const expensesLoading = expensesQuery.isLoading
 
   const [category, setCategory] = useState<ExpenseCategory>('OTHER')
   const [amount, setAmount] = useState('')
@@ -44,24 +48,12 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
 
   const { confirm, dialogProps } = useConfirm()
 
-  function loadExpenses(page = 0) {
-    if (!selectedBranch) return
-    setExpensesLoading(true)
-    api.get<PageResponse<Expense>>(`/api/expenses/branch/${selectedBranch}`, {
-      params: { page, size: PAGE_SIZE },
-    }).then((res) => {
-      setExpenses(res.data.content)
-      setExpenseTotalPages(res.data.totalPages)
-      setExpenseTotalElements(res.data.totalElements)
-      setExpensePage(res.data.page)
-    }).catch((err) => {
-      toast.error(getErrorMessage(err, 'Failed to load expenses'))
-    }).finally(() => setExpensesLoading(false))
+  function loadExpenses(page?: number) {
+    if (page !== undefined && page !== expensePage) setExpensePage(page)
+    queryClient.invalidateQueries({ queryKey: qk.expenses })
   }
 
-  useEffect(() => {
-    loadExpenses(0)
-  }, [selectedBranch])
+  useEffect(() => { setExpensePage(0) }, [selectedBranch])
 
   function resetForm() {
     setCategory('OTHER'); setAmount(''); setExpenseDate(new Date().toISOString().slice(0, 10))
@@ -171,8 +163,11 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">Expense history</h2>
-        <p className="mt-1 text-xs text-gray-500">Most recent expense date first.</p>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-medium">Expense history</h2>
+          <p className="mt-1 text-xs text-gray-500">Most recent expense date first.</p>
+          <RefreshButton onClick={() => expensesQuery.refetch()} spinning={expensesQuery.isFetching} />
+        </div>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -216,9 +211,9 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
             <span>Page {expensePage + 1} of {expenseTotalPages} ({expenseTotalElements} total)</span>
             <div className="space-x-2">
-              <button disabled={expensePage === 0} onClick={() => loadExpenses(expensePage - 1)}
+              <button disabled={expensePage === 0} onClick={() => setExpensePage((p) => p - 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-              <button disabled={expensePage + 1 >= expenseTotalPages} onClick={() => loadExpenses(expensePage + 1)}
+              <button disabled={expensePage + 1 >= expenseTotalPages} onClick={() => setExpensePage((p) => p + 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
             </div>
           </div>

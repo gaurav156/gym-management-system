@@ -11,7 +11,7 @@ import type { InvoiceResponse } from '../types'
 import MemberStoreTab from '../components/member/MemberStoreTab'
 import { toast, getErrorMessage } from '../store/toastStore'
 import { usePersistedTab } from '../hooks/usePersistedTab'
-import { usePlans, useMyBranches, NO_BRANCHES } from '../api/queries'
+import { usePlans, useMyBranches, NO_BRANCHES, useAttendanceSummary } from '../api/queries'
 
 const PAGE_SIZE = 5
 type Tab = 'OVERVIEW' | 'STORE'
@@ -26,7 +26,7 @@ export default function MemberDashboard() {
   const { data: plans = [], isLoading: plansLoading } = usePlans()
   const { data: branches = NO_BRANCHES } = useMyBranches(user?.userId)
   const [selectedBranch, setSelectedBranch] = useState('')
-  const [summary, setSummary] = useState<HourlyCount[]>([])
+  const { data: summary = [] } = useAttendanceSummary(selectedBranch)
 
   const [payments, setPayments] = useState<Payment[]>([])
   const [paymentsLoading, setPaymentsLoading] = useState(true)
@@ -105,11 +105,6 @@ export default function MemberDashboard() {
   useEffect(() => {
     if (!selectedBranch && branches.length > 0) setSelectedBranch(branches[0].id)
   }, [branches, selectedBranch])
-
-  useEffect(() => {
-    if (!selectedBranch) return
-    api.get<HourlyCount[]>(`/api/attendance/summary/${selectedBranch}`).then((res) => setSummary(res.data))
-  }, [selectedBranch])
 
   const activeMembership = memberships.find((m) => getEffectiveStatus(m) === 'ACTIVE')
   const pausedMembership = memberships.find((m) => getEffectiveStatus(m) === 'PAUSED')

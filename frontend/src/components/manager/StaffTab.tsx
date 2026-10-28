@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import PhotoUploadButton from '../PhotoUploadButton'
-import Spinner from '../Spinner'
 import type { Branch, StaffSummary, AttendanceLogEntry, AuthUser, RoleHistoryEntry, PageResponse, Gender } from '../../types'
 import ConfirmDialog from '../ConfirmDialog'
 import { TableSkeleton } from '../Skeleton'
@@ -17,7 +16,10 @@ import { toast, getErrorMessage } from '../../store/toastStore'
 import EditActions from '../EditActions'
 import ActionButton from '../ActionButton'
 import { PencilIcon, TrashIcon, CalendarIcon, CheckIcon, MapPinIcon } from '../icons/ActionIcons'
+import { useStaff, invalidatePeople } from '../../api/queries'
+import RefreshButton from '../RefreshButton'
 
+const NO_STAFF: StaffSummary[] = []
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
 
@@ -41,18 +43,22 @@ const ROLE_SORT_ORDER: Record<string, number> = { OWNER: 0, MANAGER: 1, TRAINER:
 const CHANGEABLE_ROLES = ['MEMBER', 'TRAINER', 'MANAGER', 'OWNER'] as const
 
 export default function StaffTab({ selectedBranch, allBranches, lastCheckins, user }: Props) {
-  const [staff, setStaff] = useState<StaffSummary[]>([])
-  const [staffLoading, setStaffLoading] = useState(true)
   const [savingStaffInfo, setSavingStaffInfo] = useState(false)
   const [savingStaffDates, setSavingStaffDates] = useState(false)
   const [savingStaffBranches, setSavingStaffBranches] = useState(false)
   const { confirm, dialogProps } = useConfirm()
-  const [staffTotalPages, setStaffTotalPages] = useState(1)
-  const [staffTotalElements, setStaffTotalElements] = useState(0)
   const [showLeftStaff, setShowLeftStaff] = useState(false)
   const [staffPage, setStaffPage] = useState(0) // 0-indexed
   const [staffRoleFilter, setStaffRoleFilter] = useState<'ALL' | 'OWNER' | 'MANAGER' | 'TRAINER'>('ALL')
   const [staffSort, setStaffSort] = useState<'NAME' | 'ROLE'>('NAME')
+  const staffQuery = useStaff({
+    branchId: selectedBranch, role: staffRoleFilter, includeLeft: showLeftStaff,
+    sort: staffSort, page: staffPage, size: PAGE_SIZE,
+  })
+  const staff = staffQuery.data?.content ?? NO_STAFF
+  const staffTotalPages = staffQuery.data?.totalPages ?? 1
+  const staffTotalElements = staffQuery.data?.totalElements ?? 0
+  const staffLoading = staffQuery.isLoading
 
   const [detailStaffId, setDetailStaffId] = useState<string | null>(null)
   const [staffModalTab, setStaffModalTab] = useState<'INFO' | 'ATTENDANCE' | 'BRANCHES' | 'STORE'>('INFO')
@@ -88,35 +94,18 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const [otpTarget, setOtpTarget] = useState<RoleChangeOtpTarget | null>(null)
   const [demotionBranchIds, setDemotionBranchIds] = useState<string[]>([])
 
-  function loadStaff(page = 0, roleFilter = staffRoleFilter, includeLeft = showLeftStaff, sort = staffSort) {
-    if (!selectedBranch) return
-    setStaffLoading(true)
-    api.get<PageResponse<StaffSummary>>('/api/staff', {
-      params: { branchId: selectedBranch, role: roleFilter, includeLeft, sort, page, size: PAGE_SIZE },
-    }).then((res) => {
-      setStaff(res.data.content)
-      setStaffTotalPages(res.data.totalPages)
-      setStaffTotalElements(res.data.totalElements)
-      setStaffPage(res.data.page)
-    }).finally(() => setStaffLoading(false))
+  function loadStaff(page?: number) {
+    if (page !== undefined && page !== staffPage) setStaffPage(page)
+    invalidatePeople()
   }
 
-  useEffect(() => { loadStaff(0) }, [selectedBranch])
+  useEffect(() => { setStaffPage(0) }, [selectedBranch])
 
-  function handleRoleFilterChange(value: typeof staffRoleFilter) {
-    setStaffRoleFilter(value)
-    loadStaff(0, value, showLeftStaff, staffSort)
-  }
+  function handleRoleFilterChange(value: typeof staffRoleFilter) { setStaffRoleFilter(value); setStaffPage(0) }
 
-  function handleShowLeftChange(value: boolean) {
-    setShowLeftStaff(value)
-    loadStaff(0, staffRoleFilter, value, staffSort)
-  }
+  function handleShowLeftChange(value: boolean) { setShowLeftStaff(value); setStaffPage(0) }
 
-  function handleSortChange(value: typeof staffSort) {
-    setStaffSort(value)
-    loadStaff(0, staffRoleFilter, showLeftStaff, value)
-  }
+  function handleSortChange(value: typeof staffSort) { setStaffSort(value); setStaffPage(0) }
 
   function loadDetailStaffAttendance(staffId: string, page = 0) {
     api.get<PageResponse<AttendanceLogEntry>>(`/api/attendance/history/${staffId}`, { params: { page, size: MODAL_PAGE_SIZE } })
@@ -341,15 +330,18 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       <div className="rounded-lg border border-gray-200 p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="font-medium">Staff</h2>
-          <label className="flex items-center gap-1.5 text-xs text-gray-500">
-            <input
-              type="checkbox"
-              checked={showLeftStaff}
-              onChange={(e) => handleShowLeftChange(e.target.checked)}
-              className="flex-shrink-0"
-            />
-            <span>Show all trainers/managers (including left)</span>
-          </label>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 text-xs text-gray-500">
+              <input
+                type="checkbox"
+                checked={showLeftStaff}
+                onChange={(e) => handleShowLeftChange(e.target.checked)}
+                className="flex-shrink-0"
+              />
+              <span>Show all trainers/managers (including left)</span>
+            </label>
+            <RefreshButton onClick={() => staffQuery.refetch()} spinning={staffQuery.isFetching} />
+          </div>
         </div>
         <p className="mt-1 text-xs text-gray-500">Owner, Managers, and Trainers for this branch - all can check in/out.</p>
 
@@ -421,9 +413,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
             <span>Page {staffPage + 1} of {staffTotalPages} ({staffTotalElements} total)</span>
             <div className="space-x-2">
-              <button disabled={staffPage === 0} onClick={() => loadStaff(staffPage - 1)}
+              <button disabled={staffPage === 0} onClick={() => setStaffPage((p) => p - 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-              <button disabled={staffPage + 1 >= staffTotalPages} onClick={() => loadStaff(staffPage + 1)}
+              <button disabled={staffPage + 1 >= staffTotalPages} onClick={() => setStaffPage((p) => p + 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
             </div>
           </div>
