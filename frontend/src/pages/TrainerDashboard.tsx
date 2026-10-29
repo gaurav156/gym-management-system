@@ -4,10 +4,10 @@ import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import HourlyCrowdChart from '../components/HourlyCrowdChart'
 import MemberStoreTab from '../components/member/MemberStoreTab'
-import type { AttendanceLogEntry, HourlyCount, PageResponse } from '../types'
-import { toast, getErrorMessage } from '../store/toastStore'
+import type { HourlyCount } from '../types'
 import { usePersistedTab } from '../hooks/usePersistedTab'
-import { useMyBranches, NO_BRANCHES } from '../api/queries'
+import { useMyBranches, useMyAttendance, NO_BRANCHES } from '../api/queries'
+import RefreshButton from '../components/RefreshButton'
 
 const PAGE_SIZE = 5
 
@@ -22,36 +22,13 @@ export default function TrainerDashboard() {
   const [selectedBranch, setSelectedBranch] = useState('')
   const [summary, setSummary] = useState<HourlyCount[]>([])
 
-  const [attendance, setAttendance] = useState<AttendanceLogEntry[]>([])
-  const [attendanceLoading, setAttendanceLoading] = useState(true)
   const [attendancePage, setAttendancePage] = useState(0)
-  const [attendanceTotalPages, setAttendanceTotalPages] = useState(1)
-  const [attendanceTotalElements, setAttendanceTotalElements] = useState(0)
-
-  function loadAttendance(page = 0) {
-    setAttendanceLoading(true)
-    api.get<PageResponse<AttendanceLogEntry>>('/api/attendance/mine', { params: { page, size: PAGE_SIZE } })
-      .then((res) => {
-        setAttendance(res.data.content)
-        setAttendanceTotalPages(res.data.totalPages)
-        setAttendanceTotalElements(res.data.totalElements)
-        setAttendancePage(res.data.page)
-      })
-      .catch((err) => toast.error(getErrorMessage(err, 'Failed to load your attendance log')))
-      .finally(() => setAttendanceLoading(false))
-  }
-
-  useEffect(() => {
-    if (!user) return
-    loadAttendance(0)
-
-    // Attendance is logged from the reception kiosk, not this page - refetch on return
-    // to the tab so a check-in doesn't look missing just because this stayed open.
-    function onFocus() { loadAttendance(0) }
-    window.addEventListener('focus', onFocus)
-
-    return () => window.removeEventListener('focus', onFocus)
-  }, [user])
+  const attendanceQuery = useMyAttendance(user?.userId, attendancePage, PAGE_SIZE)
+  const attendance = attendanceQuery.data?.content ?? []
+  const attendanceLoading = attendanceQuery.isLoading
+  const attendanceTotalPages = attendanceQuery.data?.totalPages ?? 1
+  const attendanceTotalElements = attendanceQuery.data?.totalElements ?? 0
+  const loadAttendance = (p: number) => setAttendancePage(p)
 
   useEffect(() => {
     if (!selectedBranch && branches.length > 0) setSelectedBranch(branches[0].id)
@@ -113,8 +90,13 @@ export default function TrainerDashboard() {
           </div>
 
           <div className="mt-8 rounded-lg border border-gray-200 p-6">
-            <h2 className="font-medium">Your attendance log</h2>
-            <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-medium">Your attendance log</h2>
+                <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
+              </div>
+              <RefreshButton onClick={() => attendanceQuery.refetch()} spinning={attendanceQuery.isFetching} />
+            </div>
             {attendanceLoading ? (
               <div className="mt-4 space-y-3">
                 <div className="h-4 w-full animate-pulse rounded bg-gray-200" />

@@ -3,10 +3,11 @@ import { api } from '../../api/client'
 import ProductDetailModal from '../ProductDetailModal'
 import ProductImage from '../ProductImage'
 import { viewProductInvoice, printProductInvoice, downloadProductInvoice } from '../../utils/productInvoice'
-import type { Product, ProductOrder, ProductOrderInvoice, PageResponse } from '../../types'
+import type { Product, ProductOrderInvoice, PageResponse } from '../../types'
 import { useAuthStore } from '../../store/authStore'
 import { toast, getErrorMessage } from '../../store/toastStore'
-import { useAccessibleBranches, useProductCategories } from '../../api/queries'
+import { useAccessibleBranches, useProductCategories, useMyOrders } from '../../api/queries'
+import RefreshButton from '../RefreshButton'
 
 const PRODUCT_PAGE_SIZE = 9
 const SHOW_ALL_SIZE = 500
@@ -30,17 +31,17 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
 
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null)
 
-  const [orders, setOrders] = useState<ProductOrder[]>([])
-  const [ordersLoading, setOrdersLoading] = useState(true)
   const [orderPage, setOrderPage] = useState(0)
-  const [orderTotalPages, setOrderTotalPages] = useState(1)
-  const [orderTotalElements, setOrderTotalElements] = useState(0)
+  const ordersQuery = useMyOrders(memberId, orderPage, ORDER_PAGE_SIZE)
+  const orders = ordersQuery.data?.content ?? []
+  const ordersLoading = ordersQuery.isLoading
+  const orderTotalPages = ordersQuery.data?.totalPages ?? 1
+  const orderTotalElements = ordersQuery.data?.totalElements ?? 0
+  const loadOrders = (p: number) => setOrderPage(p)
 
   useEffect(() => {
     if (!selectedBranch && branches.length > 0) setSelectedBranch(branches[0].id)
   }, [branches, selectedBranch])
-
-  useEffect(() => { loadOrders(0) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function loadProducts(page = 0, all = showAll) {
     if (!selectedBranch) return
@@ -72,17 +73,6 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
     return () => clearTimeout(handle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productSearch, categoryFilter, showAll])
-
-  function loadOrders(page = 0) {
-    setOrdersLoading(true)
-    api.get<PageResponse<ProductOrder>>('/api/product-orders/mine', { params: { memberId, page, size: ORDER_PAGE_SIZE } })
-      .then((res) => {
-        setOrders(res.data.content)
-        setOrderTotalPages(res.data.totalPages)
-        setOrderTotalElements(res.data.totalElements)
-        setOrderPage(res.data.page)
-      }).finally(() => setOrdersLoading(false))
-  }
 
   function lowStockLabel(p: Product): string | null {
     if (p.outOfStock) return 'Out of stock'
@@ -181,7 +171,10 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
       </div>
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">Your purchases</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-medium">Your purchases</h2>
+          <RefreshButton onClick={() => ordersQuery.refetch()} spinning={ordersQuery.isFetching} />
+        </div>
         {ordersLoading ? (
           <div className="mt-3 space-y-2">
             <div className="h-4 w-full animate-pulse rounded bg-gray-200" />

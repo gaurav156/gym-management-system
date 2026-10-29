@@ -5,13 +5,14 @@ import { useAuthStore } from '../store/authStore'
 import { getEffectiveStatus } from '../utils/membership'
 import HourlyCrowdChart from '../components/HourlyCrowdChart'
 import { CardSkeleton } from '../components/Skeleton'
-import type { Membership, Plan, Payment, Branch, AttendanceLogEntry, HourlyCount, PageResponse } from '../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../utils/invoice'
 import type { InvoiceResponse } from '../types'
 import MemberStoreTab from '../components/member/MemberStoreTab'
 import { toast, getErrorMessage } from '../store/toastStore'
 import { usePersistedTab } from '../hooks/usePersistedTab'
-import { usePlans, useMyBranches, NO_BRANCHES, useAttendanceSummary } from '../api/queries'
+import { usePlans, useMyBranches, useAttendanceSummary, useMyMemberships, useMyPayments, useMyAttendance, qk, NO_BRANCHES, } from '../api/queries'
+import { queryClient } from '../api/queryClient'
+import RefreshButton from '../components/RefreshButton'
 
 const PAGE_SIZE = 5
 type Tab = 'OVERVIEW' | 'STORE'
@@ -21,62 +22,35 @@ export default function MemberDashboard() {
   const user = useAuthStore((s) => s.user)
   const [activeTab, setActiveTab] = usePersistedTab<Tab>('member', TAB_KEYS, 'OVERVIEW')
 
-  const [memberships, setMemberships] = useState<Membership[]>([])
-  const [membershipLoading, setMembershipLoading] = useState(true)
   const { data: plans = [], isLoading: plansLoading } = usePlans()
   const { data: branches = NO_BRANCHES } = useMyBranches(user?.userId)
   const [selectedBranch, setSelectedBranch] = useState('')
   const { data: summary = [] } = useAttendanceSummary(selectedBranch)
 
-  const [payments, setPayments] = useState<Payment[]>([])
-  const [paymentsLoading, setPaymentsLoading] = useState(true)
   const [paymentPage, setPaymentPage] = useState(0)
-  const [paymentTotalPages, setPaymentTotalPages] = useState(1)
-  const [paymentTotalElements, setPaymentTotalElements] = useState(0)
-
-  const [attendance, setAttendance] = useState<AttendanceLogEntry[]>([])
-  const [attendanceLoading, setAttendanceLoading] = useState(true)
   const [attendancePage, setAttendancePage] = useState(0)
-  const [attendanceTotalPages, setAttendanceTotalPages] = useState(1)
-  const [attendanceTotalElements, setAttendanceTotalElements] = useState(0)
 
-  function loadPayments(page = 0) {
-    if (!user) return
-    setPaymentsLoading(true)
-    api.get<PageResponse<Payment>>('/api/payments/mine', { params: { memberId: user.userId, page, size: PAGE_SIZE } })
-      .then((res) => {
-        setPayments(res.data.content)
-        setPaymentTotalPages(res.data.totalPages)
-        setPaymentTotalElements(res.data.totalElements)
-        setPaymentPage(res.data.page)
-      })
-      .catch((err) => toast.error(getErrorMessage(err, 'Failed to load your payment history')))
-      .finally(() => setPaymentsLoading(false))
-  }
-  
-  function loadAttendance(page = 0) {
-    if (!user) return
-    setAttendanceLoading(true)
-    api.get<PageResponse<AttendanceLogEntry>>('/api/attendance/mine', { params: { page, size: PAGE_SIZE } })
-      .then((res) => {
-        setAttendance(res.data.content)
-        setAttendanceTotalPages(res.data.totalPages)
-        setAttendanceTotalElements(res.data.totalElements)
-        setAttendancePage(res.data.page)
-      })
-      .catch((err) => toast.error(getErrorMessage(err, 'Failed to load your attendance log')))
-      .finally(() => setAttendanceLoading(false))
-  }
+  const membershipsQuery = useMyMemberships(user?.userId)
+  const paymentsQuery = useMyPayments(user?.userId, paymentPage, PAGE_SIZE)
+  const attendanceQuery = useMyAttendance(user?.userId, attendancePage, PAGE_SIZE)
 
-  function loadMembershipData() {
-    if (!user) return
-    setMembershipLoading(true)
-    api.get<Membership[]>('/api/memberships/mine', { params: { memberId: user.userId } })
-      .then((res) => setMemberships(res.data))
-      .catch((err) => toast.error(getErrorMessage(err, 'Failed to load your memberships')))
-      .finally(() => setMembershipLoading(false))
-    loadPayments(0)
-    loadAttendance(0)
+  const memberships = membershipsQuery.data ?? []
+  const membershipLoading = membershipsQuery.isLoading
+  const payments = paymentsQuery.data?.content ?? []
+  const paymentsLoading = paymentsQuery.isLoading
+  const paymentTotalPages = paymentsQuery.data?.totalPages ?? 1
+  const paymentTotalElements = paymentsQuery.data?.totalElements ?? 0
+  const attendance = attendanceQuery.data?.content ?? []
+  const attendanceLoading = attendanceQuery.isLoading
+  const attendanceTotalPages = attendanceQuery.data?.totalPages ?? 1
+  const attendanceTotalElements = attendanceQuery.data?.totalElements ?? 0
+
+  const loadPayments = (p: number) => setPaymentPage(p)
+  const loadAttendance = (p: number) => setAttendancePage(p)
+
+  const refreshing = membershipsQuery.isFetching || paymentsQuery.isFetching || attendanceQuery.isFetching
+  function refreshAll() {
+    if (user) queryClient.invalidateQueries({ queryKey: qk.my(user.userId) })
   }
 
   async function handleInvoiceAction(paymentId: string, action: 'view' | 'print' | 'download') {
@@ -89,18 +63,6 @@ export default function MemberDashboard() {
       toast.error(getErrorMessage(err, 'Failed to load invoice'))
     }
   }
-
-  useEffect(() => {
-    if (!user) return
-    loadMembershipData()
-
-    // Purchases are recorded from the manager's screen, not this page - if a member
-    // leaves this tab open, refetch when they come back to it so status doesn't go stale.
-    function onFocus() { loadMembershipData() }
-    window.addEventListener('focus', onFocus)
-
-    return () => window.removeEventListener('focus', onFocus)
-  }, [user])
 
   useEffect(() => {
     if (!selectedBranch && branches.length > 0) setSelectedBranch(branches[0].id)
@@ -119,10 +81,7 @@ export default function MemberDashboard() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Welcome, {user.name}</h1>
         {activeTab === 'OVERVIEW' && (
-          <button onClick={loadMembershipData}
-            className="rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200">
-            Refresh status
-          </button>
+          <RefreshButton onClick={refreshAll} spinning={refreshing} label="Refresh status" />
         )}
       </div>
 
@@ -228,8 +187,13 @@ export default function MemberDashboard() {
           </div>
 
           <div className="mt-8 rounded-lg border border-gray-200 p-6">
-            <h2 className="font-medium">Your attendance log</h2>
-            <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-medium">Your attendance log</h2>
+                <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
+              </div>
+              <RefreshButton onClick={() => attendanceQuery.refetch()} spinning={attendanceQuery.isFetching} />
+            </div>
             {attendanceLoading ? (
               <div className="mt-4 space-y-3">
                 <div className="h-4 w-full animate-pulse rounded bg-gray-200" />

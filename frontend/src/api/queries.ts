@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { api } from './client'
 import type { Branch, Plan, ProductCategory } from '../types'
 import { queryClient } from './queryClient'
-import type { Payment, ProductOrder, MemberSummary, StaffSummary, Expense, PageResponse, HourlyCount, TodayAttendanceEntry, LastCheckinEntry } from '../types'
+import type { Payment, ProductOrder, MemberSummary, StaffSummary, Expense, PageResponse, HourlyCount, TodayAttendanceEntry, LastCheckinEntry, Membership, AttendanceLogEntry } from '../types'
 
 const STATIC = 5 * 60_000
 const SHORT = 30_000
@@ -20,6 +20,7 @@ export const qk = {
   staff: ['staff'] as const,
   expenses: ['expenses'] as const,
   attendance: ['attendance'] as const,
+  my: (userId?: string) => ['my', userId] as const,   // everything about the logged-in person
 }
 
 export const usePlans = () => useQuery({
@@ -128,3 +129,28 @@ export const invalidatePeople = () =>
 // A purchase or payment changes both the payments list and a member's status badge.
 export const invalidateMembershipData = () =>
   Promise.all([qk.members, qk.payments].map((k) => queryClient.invalidateQueries({ queryKey: k })))
+
+export const useMyMemberships = (userId?: string) => useQuery({
+  queryKey: [...qk.my(userId), 'memberships'], enabled: !!userId, staleTime: SHORT,
+  queryFn: () => api.get<Membership[]>('/api/memberships/mine', { params: { memberId: userId } }).then((r) => r.data),
+})
+
+export const useMyPayments = (userId: string | undefined, page: number, size: number) => useQuery({
+  queryKey: [...qk.my(userId), 'payments', page, size], enabled: !!userId, staleTime: SHORT,
+  placeholderData: keepPreviousData,
+  queryFn: () => api.get<PageResponse<Payment>>('/api/payments/mine', { params: { memberId: userId, page, size } }).then((r) => r.data),
+})
+
+// Identity comes from the JWT on the server; userId is only part of the cache key.
+export const useMyAttendance = (userId: string | undefined, page: number, size: number, enabled = true) => useQuery({
+  queryKey: [...qk.my(userId), 'attendance', page, size], enabled: enabled && !!userId, staleTime: SHORT,
+  placeholderData: keepPreviousData,
+  queryFn: () => api.get<PageResponse<AttendanceLogEntry>>('/api/attendance/mine', { params: { page, size } }).then((r) => r.data),
+})
+
+// Lives under qk.productOrders, so a staff purchase or cancel on the same device refreshes it too.
+export const useMyOrders = (userId: string | undefined, page: number, size: number) => useQuery({
+  queryKey: [...qk.productOrders, 'mine', userId, page, size], enabled: !!userId, staleTime: SHORT,
+  placeholderData: keepPreviousData,
+  queryFn: () => api.get<PageResponse<ProductOrder>>('/api/product-orders/mine', { params: { memberId: userId, page, size } }).then((r) => r.data),
+})

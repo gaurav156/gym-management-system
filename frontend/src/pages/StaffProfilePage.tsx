@@ -9,12 +9,13 @@ import PersonalDetailsFields from '../components/PersonalDetailsFields'
 import IdProofField from '../components/IdProofField'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useConfirm } from '../hooks/useConfirm'
-import type { Gender, Profile, AttendanceLogEntry, PageResponse } from '../types'
+import type { Gender, Profile } from '../types'
 import Avatar from '../components/Avatar'
 import MemberStoreTab from '../components/member/MemberStoreTab'
 import MarketingPreferenceSection from '../components/MarketingPreferenceSection'
 import { toast, getErrorMessage } from '../store/toastStore'
 import { usePersistedTab } from '../hooks/usePersistedTab'
+import { useMyAttendance } from '../api/queries'
 
 const PAGE_SIZE = 5
 
@@ -38,11 +39,13 @@ export default function StaffProfilePage() {
     const { confirm, dialogProps } = useConfirm()
     const [saving, setSaving] = useState(false)
 
-    const [attendance, setAttendance] = useState<AttendanceLogEntry[]>([])
     const [attendancePage, setAttendancePage] = useState(0)
-    const [attendanceTotalPages, setAttendanceTotalPages] = useState(1)
-    const [attendanceTotalElements, setAttendanceTotalElements] = useState(0)
-    const [attendanceLoaded, setAttendanceLoaded] = useState(false)
+    const attendanceQuery = useMyAttendance(user?.userId, attendancePage, PAGE_SIZE, activeTab === 'ATTENDANCE')
+    const attendance = attendanceQuery.data?.content ?? []
+    const attendanceLoaded = attendanceQuery.data !== undefined
+    const attendanceTotalPages = attendanceQuery.data?.totalPages ?? 1
+    const attendanceTotalElements = attendanceQuery.data?.totalElements ?? 0
+    const loadAttendance = (p: number) => setAttendancePage(p)
 
     function load() {
         api.get<Profile>('/api/profile/me').then((res) => {
@@ -58,28 +61,7 @@ export default function StaffProfilePage() {
         }).finally(() => setProfileLoading(false))
     }
 
-    function loadAttendance(page = 0) {
-    api.get<PageResponse<AttendanceLogEntry>>('/api/attendance/mine', { params: { page, size: PAGE_SIZE } })
-        .then((res) => {
-        setAttendance(res.data.content)
-        setAttendanceTotalPages(res.data.totalPages)
-        setAttendanceTotalElements(res.data.totalElements)
-        setAttendancePage(res.data.page)
-        })
-        .catch((err) => toast.error(getErrorMessage(err, 'Failed to load your attendance log')))
-        .finally(() => setAttendanceLoaded(true))
-    }
-
     useEffect(() => { load() }, [])
-
-    // Attendance log is only fetched once the tab is actually opened, rather than
-    // eagerly on mount alongside the profile - it's not needed until the person
-    // switches over, and this keeps the initial page load to just what's visible.
-    useEffect(() => {
-        if (activeTab === 'ATTENDANCE' && !attendanceLoaded) {
-            loadAttendance(0)
-        }
-    }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
     function detailsChanged(): boolean {
         if (!profile) return false
