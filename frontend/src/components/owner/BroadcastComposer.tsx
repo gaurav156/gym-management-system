@@ -7,11 +7,9 @@ import ConfirmDialog from '../ConfirmDialog'
 import { useConfirm } from '../../hooks/useConfirm'
 import { AUDIENCES, CHANNEL_LABELS, audienceLabel } from './broadcastConstants'
 import { BROADCAST_TEMPLATES } from './broadcastTemplates'
-import type {
-  BroadcastAttachmentInput, BroadcastAudience, BroadcastChannel, BroadcastFormat, BroadcastPreview,
-  BroadcastType, ChannelAvailability,
-} from '../../types'
+import type { BroadcastAttachmentInput, BroadcastAudience, BroadcastChannel, BroadcastFormat, BroadcastType } from '../../types'
 import { toast, getErrorMessage } from '../../store/toastStore'
+import { useBroadcastChannels, useBroadcastPreview } from '../../api/queries'
 
 const SMS_MAX = 600
 const MAX_ATTACHMENTS = 3
@@ -22,7 +20,6 @@ interface Props {
 }
 
 export default function BroadcastComposer({ anySending, onSent }: Props) {
-  const [channels, setChannels] = useState<ChannelAvailability[]>([])
   const [channel, setChannel] = useState<BroadcastChannel>('EMAIL')
   const [audience, setAudience] = useState<BroadcastAudience>('ALL_MEMBERS')
   const [type, setType] = useState<BroadcastType>('ANNOUNCEMENT')
@@ -38,9 +35,6 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
   const [accent, setAccent] = useState('#e11d48')
   const [attachments, setAttachments] = useState<BroadcastAttachmentInput[]>([])
 
-  const [counts, setCounts] = useState<BroadcastPreview | null>(null)
-  const [countsLoading, setCountsLoading] = useState(false)
-
   const [previewHtml, setPreviewHtml] = useState('')
   const [previewError, setPreviewError] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -54,6 +48,11 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
   const isEmail = channel === 'EMAIL'
   const effectiveFormat: BroadcastFormat = isEmail ? format : 'PLAIN'
   const body = effectiveFormat === 'DESIGNER' ? designerBody : effectiveFormat === 'HTML' ? htmlBody : plainBody
+
+  const { data: channels = [] } = useBroadcastChannels()
+  const countsQuery = useBroadcastPreview(audience, channel, type)
+  const counts = countsQuery.data ?? null
+  const countsLoading = countsQuery.isFetching
 
   function buildPayload() {
     return {
@@ -69,25 +68,9 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
   const payload = buildPayload()
   const previewKey = JSON.stringify({ ...payload, audience: null })
 
-  useEffect(() => {
-    api.get<ChannelAvailability[]>('/api/owner/broadcasts/channels').then((res) => setChannels(res.data))
-  }, [])
-
   function isAvailable(c: BroadcastChannel): boolean {
     return channels.find((x) => x.channel === c)?.available ?? c === 'EMAIL'
   }
-
-  // Live "will send to N people" - depends on audience, channel AND type (consent filtering).
-  useEffect(() => {
-    setCountsLoading(true)
-    const handle = setTimeout(() => {
-      api.get<BroadcastPreview>('/api/owner/broadcasts/preview', { params: { audience, channel, type } })
-        .then((res) => setCounts(res.data))
-        .catch(() => setCounts(null))
-        .finally(() => setCountsLoading(false))
-    }, 250)
-    return () => clearTimeout(handle)
-  }, [audience, channel, type])
 
   // Live preview comes from the SERVER renderer - the same code that sends - so it can't drift.
   useEffect(() => {
@@ -133,18 +116,20 @@ export default function BroadcastComposer({ anySending, onSent }: Props) {
   const canSend = !!body.trim() && (!isEmail || !!subject.trim())
     && !!counts && counts.eligibleRecipients > 0 && !anySending
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!canSend || !counts) return
+    if (!canSend) return
+    const { data: fresh } = await countsQuery.refetch()
+    if (!fresh || fresh.eligibleRecipients === 0) return
 
     const notes: string[] = []
-    if (counts.optedOut > 0) notes.push(`${counts.optedOut} opted out of promotions`)
-    if (counts.missingContact > 0) notes.push(`${counts.missingContact} have no ${isEmail ? 'email' : 'phone number'}`)
+    if (fresh.optedOut > 0) notes.push(`${fresh.optedOut} opted out of promotions`)
+    if (fresh.missingContact > 0) notes.push(`${fresh.missingContact} have no ${isEmail ? 'email' : 'phone number'}`)
 
     confirm({
       title: 'Send broadcast',
       message: `Send this ${type === 'PROMOTIONAL' ? 'promotional' : 'announcement'} ${CHANNEL_LABELS[channel]} message to `
-        + `${counts.eligibleRecipients} recipient${counts.eligibleRecipients === 1 ? '' : 's'} (${audienceLabel(audience)})?`
+        + `${fresh.eligibleRecipients} recipient${fresh.eligibleRecipients === 1 ? '' : 's'} (${audienceLabel(audience)})?`
         + `${notes.length ? ` Skipped: ${notes.join(', ')}.` : ''} It can't be recalled once sent.`,
       confirmLabel: 'Send now',
       danger: true,

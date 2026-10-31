@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useState } from 'react'
 import { api } from '../../api/client'
 import Spinner from '../Spinner'
 import ConfirmDialog from '../ConfirmDialog'
@@ -8,6 +8,9 @@ import RowActionsMenu from '../RowActionsMenu'
 import { PencilIcon, BanIcon, CheckIcon, TrashIcon } from '../icons/ActionIcons'
 import { toast, getErrorMessage } from '../../store/toastStore'
 import EditModal from '../EditModal'
+import { useCoupons, qk } from '../../api/queries'
+import { queryClient } from '../../api/queryClient'
+import RefreshButton from '../RefreshButton'
 
 interface CouponFormState {
   code: string
@@ -26,6 +29,8 @@ const emptyForm: CouponFormState = {
   code: '', description: '', discountType: 'PERCENTAGE', discountValue: '', maxDiscountAmount: '',
   startsAt: '', endsAt: '', firstTimeBuyersOnly: false, maxRedemptions: '', appliesTo: 'PRODUCT'
 }
+
+const NO_COUPONS: Coupon[] = []
 
 function toFormState(c: Coupon): CouponFormState {
   return {
@@ -77,8 +82,6 @@ function DiscountFields({ f, onChange }: { f: CouponFormState; onChange: (next: 
 }
 
 export default function CouponsSection() {
-  const [coupons, setCoupons] = useState<Coupon[]>([])
-  const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState<CouponFormState>(emptyForm)
   const [submitting, setSubmitting] = useState(false)
@@ -89,12 +92,9 @@ export default function CouponsSection() {
 
   const { confirm, dialogProps } = useConfirm()
 
-  function loadCoupons() {
-    setLoading(true)
-    api.get<Coupon[]>('/api/coupons/manage').then((res) => setCoupons(res.data)).finally(() => setLoading(false))
-  }
+  const { data: coupons = NO_COUPONS, isLoading: loading } = useCoupons()
 
-  useEffect(() => { loadCoupons() }, [])
+  function loadCoupons() { queryClient.invalidateQueries({ queryKey: qk.coupons }) }
 
   function validateForm(f: CouponFormState): boolean {
     if (!f.code.trim()) { toast.warning('Enter a code.'); return false }
@@ -197,10 +197,13 @@ export default function CouponsSection() {
           <h2 className="font-medium">Coupons</h2>
           <p className="mt-1 text-xs text-gray-500">Applied at checkout on the front desk.</p>
         </div>
-        <button onClick={() => { setCreating((v) => !v)}}
-          className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark">
-          {creating ? 'Cancel' : 'Add coupon'}
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => { setCreating((v) => !v)}}
+            className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark">
+            {creating ? 'Cancel' : 'Add coupon'}
+          </button>
+          <RefreshButton onClick={loadCoupons} spinning={loading} />
+        </div>
       </div>
 
       {creating && (

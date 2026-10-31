@@ -3,12 +3,15 @@ import { api } from '../../api/client'
 import ProductDetailModal from '../ProductDetailModal'
 import ProductImage from '../ProductImage'
 import { viewProductInvoice, printProductInvoice, downloadProductInvoice } from '../../utils/productInvoice'
-import type { Product, ProductOrderInvoice, PageResponse } from '../../types'
+import type { Product, ProductOrderInvoice } from '../../types'
 import { useAuthStore } from '../../store/authStore'
 import { toast, getErrorMessage } from '../../store/toastStore'
 import { useAccessibleBranches, useProductCategories, useMyOrders } from '../../api/queries'
+import { useCatalog } from '../../api/queries'
+import { useDebounced } from '../../hooks/useDebounced'
 import RefreshButton from '../RefreshButton'
 
+const NO_PRODUCTS: Product[] = []
 const PRODUCT_PAGE_SIZE = 9
 const SHOW_ALL_SIZE = 500
 const ORDER_PAGE_SIZE = 5
@@ -22,12 +25,17 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
   const { data: categories = [] } = useProductCategories()
   const [categoryFilter, setCategoryFilter] = useState('')
 
-  const [products, setProducts] = useState<Product[]>([])
-  const [productsLoading, setProductsLoading] = useState(true)
   const [productSearch, setProductSearch] = useState('')
   const [productPage, setProductPage] = useState(0)
-  const [productTotalPages, setProductTotalPages] = useState(1)
   const [showAll, setShowAll] = useState(false)
+  const debouncedSearch = useDebounced(productSearch, 300)
+  const catalogQuery = useCatalog({
+    branchId: selectedBranch, search: debouncedSearch, categoryId: categoryFilter,
+    page: showAll ? 0 : productPage, size: showAll ? SHOW_ALL_SIZE : PRODUCT_PAGE_SIZE,
+  })
+  const products = catalogQuery.data?.content ?? NO_PRODUCTS
+  const productsLoading = catalogQuery.isLoading
+  const productTotalPages = catalogQuery.data?.totalPages ?? 1
 
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null)
 
@@ -42,37 +50,6 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
   useEffect(() => {
     if (!selectedBranch && branches.length > 0) setSelectedBranch(branches[0].id)
   }, [branches, selectedBranch])
-
-  function loadProducts(page = 0, all = showAll) {
-    if (!selectedBranch) return
-    setProductsLoading(true)
-    api.get<PageResponse<Product>>('/api/products', {
-      params: {
-        branchId: selectedBranch,
-        search: productSearch || undefined,
-        categoryId: categoryFilter || undefined,
-        page: all ? 0 : page,
-        size: all ? SHOW_ALL_SIZE : PRODUCT_PAGE_SIZE,
-      },
-    }).then((res) => {
-      setProducts(res.data.content)
-      setProductTotalPages(res.data.totalPages)
-      setProductPage(res.data.page)
-    }).finally(() => setProductsLoading(false))
-  }
-
-  useEffect(() => {
-    if (!selectedBranch) return
-    loadProducts(0)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedBranch])
-
-  useEffect(() => {
-    if (!selectedBranch) return
-    const handle = setTimeout(() => loadProducts(0), 300)
-    return () => clearTimeout(handle)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productSearch, categoryFilter, showAll])
 
   function lowStockLabel(p: Product): string | null {
     if (p.outOfStock) return 'Out of stock'
@@ -94,24 +71,29 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
   return (
     <div>
       <div className="rounded-lg border border-gray-200 p-6">
-        <h2 className="font-medium">Store</h2>
-        <p className="mt-1 text-xs text-gray-500">Browse what's available for pickup at your selected branch, then purchase at the front desk.</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-medium">Store</h2>
+            <p className="mt-1 text-xs text-gray-500">Browse what's available for pickup at your selected branch, then purchase at the front desk.</p>
+          </div>
+          <RefreshButton onClick={() => catalogQuery.refetch()} spinning={catalogQuery.isFetching} />
+        </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
           {branches.length > 1 && (
-            <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}
+            <select value={selectedBranch} onChange={(e) => { setSelectedBranch(e.target.value); setProductPage(0) }}
               className="rounded-md border border-gray-300 px-3 py-2 text-sm">
               {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           )}
-          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+          <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setProductPage(0) }}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm">
             <option value="">All categories</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <input placeholder="Search products..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
+          <input placeholder="Search products..." value={productSearch} onChange={(e) => { setProductSearch(e.target.value); setProductPage(0) }}
             className="min-w-[180px] flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm" />
-          <button onClick={() => setShowAll((v) => !v)}
+          <button onClick={() => { setShowAll((v) => !v); setProductPage(0) }}
             className={`rounded-md border px-3 py-2 text-sm ${showAll ? 'border-brand bg-brand/10 text-brand' : 'border-gray-300 text-gray-600'}`}>
             {showAll ? 'Show paginated' : 'Show all'}
           </button>
@@ -161,9 +143,9 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
           <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
             <span>Page {productPage + 1} of {productTotalPages}</span>
             <div className="space-x-2">
-              <button disabled={productPage === 0} onClick={() => loadProducts(productPage - 1)}
+              <button disabled={productPage === 0} onClick={() => setProductPage((p) => p - 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-              <button disabled={productPage + 1 >= productTotalPages} onClick={() => loadProducts(productPage + 1)}
+              <button disabled={productPage + 1 >= productTotalPages} onClick={() => setProductPage((p) => p + 1)}
                 className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
             </div>
           </div>

@@ -355,24 +355,26 @@ export default function OwnerDashboard() {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
+                        <div>
+                          <div className="flex items-center justify-between gap-3">
                             <p className={b.active ? '' : 'text-gray-400'}>
                               {b.name}
                               {!b.active && <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">Inactive</span>}
                             </p>
+                            <div className="flex flex-shrink-0 items-center gap-3 text-xs mb-2">
+                              <ActionButton icon={<PencilIcon />} onClick={() => startEditBranch(b)}>Edit</ActionButton>
+                              <ActionButton variant={b.active ? "warning" : "success"} icon={b.active ? <PauseIcon /> : <PlayIcon />} onClick={() => toggleBranchActive(b)}>{b.active ? 'Deactivate' : 'Reactivate'}</ActionButton>
+                              {b.deletable && (
+                                <ActionButton variant="danger" className='text-red-600' icon={<TrashIcon />} onClick={() => deleteBranch(b)}>Delete</ActionButton>
+                              )}
+                            </div>
+                          </div>
+                          <div className="min-w-0">
                             <p className="text-xs text-gray-500">{b.address}</p>
                             <p className="text-xs text-gray-400">{b.phone || 'No phone on file'}</p>
                             {b.mapUrl && <a href={b.mapUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-brand hover:underline">Map link set</a>}
                             {b.deletable === false && (
                               <p className="text-[10px] text-gray-400">Has recorded activity - can be deactivated but not deleted.</p>
-                            )}
-                          </div>
-                          <div className="flex flex-shrink-0 items-center gap-3 text-xs">
-                            <ActionButton icon={<PencilIcon />} onClick={() => startEditBranch(b)}>Edit</ActionButton>
-                            <ActionButton variant={b.active ? "warning" : "success"} icon={b.active ? <PauseIcon /> : <PlayIcon />} onClick={() => toggleBranchActive(b)}>{b.active ? 'Deactivate' : 'Reactivate'}</ActionButton>
-                            {b.deletable && (
-                              <ActionButton variant="danger" className='text-red-600' icon={<TrashIcon />} onClick={() => deleteBranch(b)}>Delete</ActionButton>
                             )}
                           </div>
                         </div>

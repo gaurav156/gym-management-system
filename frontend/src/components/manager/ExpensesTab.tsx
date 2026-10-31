@@ -165,8 +165,10 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
 
       <div className="mt-8 rounded-lg border border-gray-200 p-6">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-medium">Expense history</h2>
-          <p className="mt-1 text-xs text-gray-500">Most recent expense date first.</p>
+          <div>
+            <h2 className="font-medium">Expense history</h2>
+            <p className="mt-1 text-xs text-gray-500">Most recent expense date first.</p>
+          </div>
           <RefreshButton onClick={() => expensesQuery.refetch()} spinning={expensesQuery.isFetching} />
         </div>
         <div className="mt-4 overflow-x-auto">

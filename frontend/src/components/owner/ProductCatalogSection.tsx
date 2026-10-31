@@ -12,7 +12,12 @@ import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PencilIcon, BanIcon, CheckIcon, TrashIcon } from '../icons/ActionIcons'
 import { toast, getErrorMessage } from '../../store/toastStore'
 import EditModal from '../EditModal'
-import { useProductCategories } from '../../api/queries'
+import { useProductCategories, useManagedProducts, qk } from '../../api/queries'
+import { queryClient } from '../../api/queryClient'
+import { useDebounced } from '../../hooks/useDebounced'
+import RefreshButton from '../RefreshButton'
+
+const NO_PRODUCTS: Product[] = []
 
 const PAGE_SIZE = 10
 
@@ -44,10 +49,6 @@ function StockTable({ branches, stocks, onChange }: {
 }
 
 export default function ProductCatalogSection({ branches }: Props) {
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [totalPages, setTotalPages] = useState(1)
-  const [totalElements, setTotalElements] = useState(0)
   const [page, setPage] = useState(0)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
@@ -71,25 +72,17 @@ export default function ProductCatalogSection({ branches }: Props) {
 
   const { confirm, dialogProps } = useConfirm()
 
-  function loadProducts(p = 0, s = search, cat = categoryFilter) {
-    setLoading(true)
-    api.get<PageResponse<Product>>('/api/products/manage', {
-      params: { search: s || undefined, categoryId: cat || undefined, page: p, size: PAGE_SIZE },
-    }).then((res) => {
-      setProducts(res.data.content)
-      setTotalPages(res.data.totalPages)
-      setTotalElements(res.data.totalElements)
-      setPage(res.data.page)
-    }).finally(() => setLoading(false))
+  const debouncedSearch = useDebounced(search, 300)
+  const productsQuery = useManagedProducts({ search: debouncedSearch, categoryId: categoryFilter, page, size: PAGE_SIZE })
+  const products = productsQuery.data?.content ?? NO_PRODUCTS
+  const loading = productsQuery.isLoading
+  const totalPages = productsQuery.data?.totalPages ?? 1
+  const totalElements = productsQuery.data?.totalElements ?? 0
+
+  function loadProducts(p?: number) {
+    if (p !== undefined && p !== page) setPage(p)
+    queryClient.invalidateQueries({ queryKey: qk.products })
   }
-
-  useEffect(() => { loadProducts(0) }, [])
-
-  useEffect(() => {
-    const handle = setTimeout(() => loadProducts(0, search, categoryFilter), 300)
-    return () => clearTimeout(handle)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, categoryFilter])
 
   function blankStocks(): BranchStockInput[] {
     return branches.map((b) => ({ branchId: b.id, stockQuantity: '' }))
@@ -229,9 +222,12 @@ export default function ProductCatalogSection({ branches }: Props) {
           <h2 className="font-medium">Product catalog</h2>
           <p className="mt-1 text-xs text-gray-500">Chain-wide - stock is tracked separately per branch.</p>
         </div>
-        <button onClick={openCreate} className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark">
-          {creating ? 'Cancel' : 'Add product'}
-        </button>
+        <div className="flex gap-2">
+          <button onClick={openCreate} className="rounded-md bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark">
+            {creating ? 'Cancel' : 'Add product'}
+          </button>
+          <RefreshButton onClick={() => productsQuery.refetch()} spinning={productsQuery.isFetching} />
+        </div>
       </div>
 
       {creating && (
@@ -309,9 +305,9 @@ export default function ProductCatalogSection({ branches }: Props) {
       )}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <input placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)}
+        <input placeholder="Search products..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(0) }}
           className="min-w-[180px] flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm" />
-        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+        <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(0) }}
           className="rounded-md border border-gray-300 px-3 py-2 text-sm">
           <option value="">All categories</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -378,9 +374,9 @@ export default function ProductCatalogSection({ branches }: Props) {
         <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
           <span>Page {page + 1} of {totalPages} ({totalElements} total)</span>
           <div className="space-x-2">
-            <button disabled={page === 0} onClick={() => loadProducts(page - 1)}
+            <button disabled={page === 0} onClick={() => setPage((p) => p - 1)}
               className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-            <button disabled={page + 1 >= totalPages} onClick={() => loadProducts(page + 1)}
+            <button disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}
               className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
           </div>
         </div>

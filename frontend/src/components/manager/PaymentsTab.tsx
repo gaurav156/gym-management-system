@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState, useRef } from 'react'
 import { api } from '../../api/client'
-import type { MemberSummary, InvoiceResponse, PageResponse } from '../../types'
+import type { MemberSummary, InvoiceResponse } from '../../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
 import { TableSkeleton } from '../Skeleton'
 import Spinner from '../Spinner'
@@ -9,7 +9,11 @@ import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon } from '../i
 import { toast, getErrorMessage } from '../../store/toastStore'
 import { usePayments, usePlans, invalidateMembershipData } from '../../api/queries'
 import RefreshButton from '../RefreshButton'
+import { useMemberOptions } from '../../api/queries'
+import { useDebounced } from '../../hooks/useDebounced'
 
+
+const NO_MEMBERS: MemberSummary[] = []
 const PAGE_SIZE = 10
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
 const MEMBER_SEARCH_SIZE = 20
@@ -20,7 +24,6 @@ interface Props {
 
 export default function PaymentsTab({ selectedBranch }: Props) {
   const { data: plans = [] } = usePlans()
-  const [members, setMembers] = useState<MemberSummary[]>([])
   const [selectedMember, setSelectedMember] = useState<MemberSummary | null>(null)
 
   const [paymentPage, setPaymentPage] = useState(0) // 0-indexed to match Spring's Pageable
@@ -62,29 +65,13 @@ export default function PaymentsTab({ selectedBranch }: Props) {
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [memberDropdownOpen, setMemberDropdownOpen] = useState(false)
   const memberDropdownRef = useRef<HTMLDivElement>(null)
-
-  function loadMemberOptions(search: string) {
-    if (!selectedBranch) return
-    api.get<PageResponse<MemberSummary>>('/api/members', {
-      params: { branchId: selectedBranch, search: search || undefined, page: 0, size: MEMBER_SEARCH_SIZE },
-    }).then((res) => setMembers(res.data.content))
-  }
+  const debouncedMemberSearch = useDebounced(memberSearchQuery, 300)
+  const { data: members = NO_MEMBERS } = useMemberOptions(selectedBranch, debouncedMemberSearch, memberDropdownOpen)
 
   useEffect(() => {
     if (!selectedBranch) return
     setPaymentPage(0)
-    loadMemberOptions('')
   }, [selectedBranch])
-
-  // Debounced server-side search while the dropdown is open, same pattern as
-  // MembersTab's search box - avoids silently truncating to whatever fit in the
-  // first page when a branch has more than MEMBER_SEARCH_SIZE members.
-  useEffect(() => {
-    if (!memberDropdownOpen) return
-    const handle = setTimeout(() => loadMemberOptions(memberSearchQuery), 300)
-    return () => clearTimeout(handle)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [memberSearchQuery, memberDropdownOpen])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -188,7 +175,6 @@ export default function PaymentsTab({ selectedBranch }: Props) {
                 onFocus={() => {
                   setMemberDropdownOpen(true)
                   setMemberSearchQuery('')
-                  loadMemberOptions('')
                 }}
                 onChange={(e) => setMemberSearchQuery(e.target.value)}
               />

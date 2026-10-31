@@ -4,7 +4,8 @@ import type { Branch, Plan, ProductCategory } from '../types'
 import { queryClient } from './queryClient'
 import type { 
   Payment, ProductOrder, MemberSummary, StaffSummary, Expense, PageResponse, HourlyCount, TodayAttendanceEntry, LastCheckinEntry, Membership, AttendanceLogEntry, 
-  MembershipAdmin, RoleHistoryEntry, FinanceReportResponse, FinanceTransaction 
+  MembershipAdmin, RoleHistoryEntry, FinanceReportResponse, FinanceTransaction, Product, Coupon, Broadcast, ChannelAvailability, BroadcastPreview, BroadcastAudience, 
+  BroadcastChannel, BroadcastType
 } from '../types'
 
 const STATIC = 5 * 60_000
@@ -24,6 +25,9 @@ export const qk = {
   expenses: ['expenses'] as const,
   attendance: ['attendance'] as const,
   finance: ['finance'] as const,
+  products: ['products'] as const,
+  coupons: ['coupons'] as const,
+  broadcasts: ['broadcasts'] as const,
   my: (userId?: string) => ['my', userId] as const,   // everything about the logged-in person
 }
 
@@ -132,7 +136,11 @@ export const invalidatePeople = () =>
 
 // A purchase or payment changes both the payments list and a member's status badge.
 export const invalidateMembershipData = () =>
-  Promise.all([qk.members, qk.payments, qk.finance].map((k) => queryClient.invalidateQueries({ queryKey: k })))
+  Promise.all([qk.members, qk.payments, qk.finance, qk.coupons].map((k) => queryClient.invalidateQueries({ queryKey: k })))
+
+// A product sale or cancellation changes orders, stock, coupon redemptions and income.
+export const invalidateSales = () =>
+  Promise.all([qk.productOrders, qk.products, qk.coupons, qk.finance].map((k) => queryClient.invalidateQueries({ queryKey: k })))
 
 export const useMyMemberships = (userId?: string) => useQuery({
   queryKey: [...qk.my(userId), 'memberships'], enabled: !!userId, staleTime: SHORT,
@@ -219,4 +227,78 @@ export const useFinanceTransactions = (
   queryFn: () => api.get<PageResponse<FinanceTransaction>>('/api/finance/transactions', {
     params: { ...params, page, size, sort },
   }).then((r) => r.data),
+})
+
+export interface BuyerOption { id: string; name: string; email: string; role: string }
+
+// Member picker (Payments tab). Under qk.members so any member/people change refreshes it.
+export const useMemberOptions = (branchId: string, search: string, enabled: boolean) => useQuery({
+  queryKey: [...qk.members, 'options', branchId, search],
+  enabled: enabled && !!branchId, staleTime: MEDIUM,
+  placeholderData: keepForBranch<MemberSummary[]>(branchId),
+  queryFn: () => api.get<PageResponse<MemberSummary>>('/api/members', {
+    params: { branchId, search: search || undefined, page: 0, size: 20 },
+  }).then((r) => r.data.content),
+})
+
+// Buyer picker (Store tab): members + staff in one cached result.
+export const useBuyerOptions = (branchId: string, search: string, enabled: boolean) => useQuery({
+  queryKey: [...qk.members, 'buyers', branchId, search],
+  enabled: enabled && !!branchId, staleTime: MEDIUM,
+  placeholderData: keepForBranch<BuyerOption[]>(branchId),
+  queryFn: async () => {
+    const [m, s] = await Promise.all([
+      api.get<PageResponse<MemberSummary>>('/api/members', { params: { branchId, search: search || undefined, page: 0, size: 20 } }),
+      api.get<PageResponse<StaffSummary>>('/api/staff', { params: { branchId, role: 'ALL', includeLeft: false, sort: 'NAME', page: 0, size: 20 } }),
+    ])
+    const q = search.toLowerCase()
+    const members: BuyerOption[] = m.data.content.map((x) => ({ id: x.id, name: x.name, email: x.email, role: 'MEMBER' }))
+    const staff: BuyerOption[] = s.data.content
+      .filter((x) => !q || x.name.toLowerCase().includes(q) || x.email.toLowerCase().includes(q))
+      .map((x) => ({ id: x.id, name: x.name, email: x.email, role: x.role }))
+    return [...members, ...staff]
+  },
+})
+
+export interface CatalogParams { branchId: string; search: string; categoryId: string; page: number; size: number }
+// Stock changes with every sale, so 30s plus invalidateSales() on any purchase/cancel.
+export const useCatalog = (p: CatalogParams) => useQuery({
+  queryKey: [...qk.products, 'catalog', p.branchId, p.search, p.categoryId, p.page, p.size],
+  enabled: !!p.branchId, staleTime: SHORT,
+  placeholderData: keepForBranch<PageResponse<Product>>(p.branchId),
+  queryFn: () => api.get<PageResponse<Product>>('/api/products', {
+    params: { branchId: p.branchId, search: p.search || undefined, categoryId: p.categoryId || undefined, page: p.page, size: p.size },
+  }).then((r) => r.data),
+})
+
+export interface ManagedProductParams { search: string; categoryId: string; page: number; size: number }
+export const useManagedProducts = (p: ManagedProductParams) => useQuery({
+  queryKey: [...qk.products, 'manage', p.search, p.categoryId, p.page, p.size],
+  staleTime: MEDIUM, placeholderData: keepPreviousData,
+  queryFn: () => api.get<PageResponse<Product>>('/api/products/manage', {
+    params: { search: p.search || undefined, categoryId: p.categoryId || undefined, page: p.page, size: p.size },
+  }).then((r) => r.data),
+})
+
+export const useCoupons = () => useQuery({
+  queryKey: qk.coupons, staleTime: MEDIUM,
+  queryFn: () => api.get<Coupon[]>('/api/coupons/manage').then((r) => r.data),
+})
+
+// Polls every 3s ONLY while some broadcast on the page is still SENDING.
+export const useBroadcasts = (page: number, size: number) => useQuery({
+  queryKey: [...qk.broadcasts, 'list', page, size], staleTime: SHORT,
+  placeholderData: keepPreviousData,
+  refetchInterval: (q) => (q.state.data?.content.some((b) => b.status === 'SENDING') ? 3000 : false),
+  queryFn: () => api.get<PageResponse<Broadcast>>('/api/owner/broadcasts', { params: { page, size } }).then((r) => r.data),
+})
+
+export const useBroadcastChannels = () => useQuery({
+  queryKey: [...qk.broadcasts, 'channels'], staleTime: STATIC,
+  queryFn: () => api.get<ChannelAvailability[]>('/api/owner/broadcasts/channels').then((r) => r.data),
+})
+
+export const useBroadcastPreview = (audience: BroadcastAudience, channel: BroadcastChannel, type: BroadcastType) => useQuery({
+  queryKey: [...qk.broadcasts, 'preview', audience, channel, type], staleTime: SHORT,
+  queryFn: () => api.get<BroadcastPreview>('/api/owner/broadcasts/preview', { params: { audience, channel, type } }).then((r) => r.data),
 })

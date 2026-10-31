@@ -7,14 +7,17 @@ import { viewProductInvoice, printProductInvoice, downloadProductInvoice } from 
 import { useConfirm } from '../../hooks/useConfirm'
 import Spinner from '../Spinner'
 import { TableSkeleton } from '../Skeleton'
-import type { Product, ProductOrder, ProductOrderInvoice, MemberSummary, StaffSummary, PageResponse } from '../../types'
+import type { Product, ProductOrder, ProductOrderInvoice } from '../../types'
 import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, BanIcon } from '../icons/ActionIcons'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { toast, getErrorMessage } from '../../store/toastStore'
-import { useProductCategories, qk, useBranchOrders, invalidateFinance } from '../../api/queries'
-import { queryClient } from '../../api/queryClient'
+import { useProductCategories, useBranchOrders, useCatalog, useBuyerOptions, invalidateSales, type BuyerOption } from '../../api/queries'
 import RefreshButton from '../RefreshButton'
+import { useDebounced } from '../../hooks/useDebounced'
+
+const NO_PRODUCTS: Product[] = []
+const NO_BUYERS: BuyerOption[] = []
 
 const ORDER_PAGE_SIZE = 10
 const PRODUCT_PAGE_SIZE = 8
@@ -23,23 +26,34 @@ const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
 
 interface CartLine { product: Product; quantity: number }
 interface Props { selectedBranch: string }
-interface BuyerOption { id: string; name: string; email: string; role: string }
 
 export default function StoreTab({ selectedBranch }: Props) {
-  const [products, setProducts] = useState<Product[]>([])
   const [productSearch, setProductSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const { data: categories = [] } = useProductCategories()
-  const [productPage, setProductPage] = useState(0)
-  const [productTotalPages, setProductTotalPages] = useState(1)
+
   const [cart, setCart] = useState<CartLine[]>([])
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null)
 
-  const [buyers, setBuyers] = useState<BuyerOption[]>([])
   const [selectedBuyer, setSelectedBuyer] = useState<BuyerOption | null>(null)
   const [buyerSearchQuery, setBuyerSearchQuery] = useState('')
   const [buyerDropdownOpen, setBuyerDropdownOpen] = useState(false)
   const buyerDropdownRef = useRef<HTMLDivElement>(null)
+
+  const [productPage, setProductPage] = useState(0)
+  const debouncedProductSearch = useDebounced(productSearch, 300)
+  const catalogQuery = useCatalog({
+    branchId: selectedBranch, search: debouncedProductSearch, categoryId: categoryFilter,
+    page: productPage, size: PRODUCT_PAGE_SIZE,
+  })
+  const products = catalogQuery.data?.content ?? NO_PRODUCTS
+  const productTotalPages = catalogQuery.data?.totalPages ?? 1
+
+  const debouncedBuyerSearch = useDebounced(buyerSearchQuery, 300)
+  const buyersQuery = useBuyerOptions(selectedBranch, debouncedBuyerSearch, buyerDropdownOpen)
+  const buyers = buyersQuery.data ?? NO_BUYERS
+
+  useEffect(() => { setProductPage(0); setOrderPage(0) }, [selectedBranch])
 
   const [mode, setMode] = useState('CASH')
   const [couponCode, setCouponCode] = useState('')
@@ -68,62 +82,6 @@ export default function StoreTab({ selectedBranch }: Props) {
   const [cancelling, setCancelling] = useState(false)
 
   const { confirm, dialogProps } = useConfirm()
-
-  function loadProducts(page = 0, search = productSearch, cat = categoryFilter) {
-    if (!selectedBranch) return
-    api.get<PageResponse<Product>>('/api/products', {
-      params: { branchId: selectedBranch, search: search || undefined, categoryId: cat || undefined, page, size: PRODUCT_PAGE_SIZE },
-    }).then((res) => {
-      setProducts(res.data.content)
-      setProductTotalPages(res.data.totalPages)
-      setProductPage(res.data.page)
-    })
-  }
-
-  function loadBuyerOptions(search: string) {
-    if (!selectedBranch) return
-    Promise.all([
-      api.get<PageResponse<MemberSummary>>('/api/members', {
-        params: { branchId: selectedBranch, search: search || undefined, page: 0, size: MEMBER_SEARCH_SIZE },
-      }),
-      api.get<PageResponse<StaffSummary>>('/api/staff', {
-        params: { branchId: selectedBranch, role: 'ALL', includeLeft: false, sort: 'NAME', page: 0, size: MEMBER_SEARCH_SIZE },
-      }),
-    ]).then(([membersRes, staffRes]) => {
-      const memberOptions: BuyerOption[] = membersRes.data.content.map((m) => ({ id: m.id, name: m.name, email: m.email, role: 'MEMBER' }))
-      const staffOptions: BuyerOption[] = staffRes.data.content
-        .filter((s) => search === '' || s.name.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase()))
-        .map((s) => ({ id: s.id, name: s.name, email: s.email, role: s.role }))
-      setBuyers([...memberOptions, ...staffOptions])
-    })
-  }
-
-  function loadOrders(page?: number) {
-    if (page !== undefined && page !== orderPage) setOrderPage(page)
-    queryClient.invalidateQueries({ queryKey: qk.productOrders })
-    invalidateFinance()
-  }
-
-  useEffect(() => {
-    if (!selectedBranch) return
-    loadProducts(0)
-    loadBuyerOptions('')
-    setOrderPage(0)
-  }, [selectedBranch]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!selectedBranch) return
-    const handle = setTimeout(() => loadProducts(0, productSearch, categoryFilter), 300)
-    return () => clearTimeout(handle)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productSearch, categoryFilter])
-
-  useEffect(() => {
-    if (!buyerDropdownOpen) return
-    const handle = setTimeout(() => loadBuyerOptions(buyerSearchQuery), 300)
-    return () => clearTimeout(handle)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buyerSearchQuery, buyerDropdownOpen])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -213,8 +171,8 @@ export default function StoreTab({ selectedBranch }: Props) {
       )
       toast.success(`Recorded - invoice ${data.invoiceNumber}, total ₹${data.totalAmount}.`)
       resetCart()
-      loadProducts(productPage)
-      loadOrders(0)
+      setOrderPage(0)
+      invalidateSales()
     } catch (err: any) {
       toast.error(getErrorMessage(err, 'Failed to record purchase'))
     } finally {
@@ -236,8 +194,7 @@ export default function StoreTab({ selectedBranch }: Props) {
       })
       toast.success('Order cancelled and refunded.')
       setCancelTarget(null)
-      loadOrders(orderPage)
-      loadProducts(productPage)
+      invalidateSales()
     } catch (err: any) {
       toast.error(getErrorMessage(err, 'Failed to cancel order'))
     } finally {
@@ -271,11 +228,14 @@ export default function StoreTab({ selectedBranch }: Props) {
     <div>
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
         <div className="rounded-lg border border-gray-200 p-6 lg:col-span-3">
-          <h2 className="font-medium">Products</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-medium">Products</h2>
+            <RefreshButton onClick={() => catalogQuery.refetch()} spinning={catalogQuery.isFetching} />
+          </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <input placeholder="Search products..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
+            <input placeholder="Search products..." value={productSearch} onChange={(e) => { setProductSearch(e.target.value); setProductPage(0) }}
               className="min-w-[160px] flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm" />
-            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+            <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setProductPage(0) }}
               className="rounded-md border border-gray-300 px-3 py-2 text-sm">
               <option value="">All categories</option>
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -327,15 +287,15 @@ export default function StoreTab({ selectedBranch }: Props) {
                 </div>
               )
             })}
-            {products.length === 0 && <p className="text-sm text-gray-400 sm:col-span-2">No products found.</p>}
+            {!catalogQuery.isLoading && products.length === 0 && <p className="text-sm text-gray-400 sm:col-span-2">No products found.</p>}
           </div>
           {productTotalPages > 1 && (
             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
               <span>Page {productPage + 1} of {productTotalPages}</span>
               <div className="space-x-2">
-                <button disabled={productPage === 0} onClick={() => loadProducts(productPage - 1)}
+                <button disabled={productPage === 0} onClick={() => setProductPage((p) => p - 1)}
                   className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                <button disabled={productPage + 1 >= productTotalPages} onClick={() => loadProducts(productPage + 1)}
+                <button disabled={productPage + 1 >= productTotalPages} onClick={() => setProductPage((p) => p + 1)}
                   className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
               </div>
             </div>
@@ -350,7 +310,7 @@ export default function StoreTab({ selectedBranch }: Props) {
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Search member or staff by name or email..."
               value={buyerDropdownOpen ? buyerSearchQuery : selectedBuyer?.name ?? ''}
-              onFocus={() => { setBuyerDropdownOpen(true); setBuyerSearchQuery(''); loadBuyerOptions('') }}
+              onFocus={() => { setBuyerDropdownOpen(true); setBuyerSearchQuery('') }}
               onChange={(e) => setBuyerSearchQuery(e.target.value)}
             />
             {buyerDropdownOpen && (

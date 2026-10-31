@@ -156,12 +156,7 @@ export default function FinanceReportSection({ branches }: Props) {
   return (
     <div className="rounded-lg border border-gray-200 p-6">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="font-medium">Income &amp; Profit</h2>
-          <p className="mt-1 text-xs text-gray-500">
-            Membership and store income minus logged expenses, for the period and branch you pick.
-          </p>
-        </div>
+        <h2 className="font-medium">Income &amp; Profit</h2>
         <div className="flex flex-shrink-0 items-center gap-2">
           <RefreshButton onClick={() => invalidateFinance()} spinning={reportQuery.isFetching || txBusy} />
           <button type="button" onClick={() => setRevealed((v) => !v)} aria-pressed={revealed}
@@ -171,6 +166,7 @@ export default function FinanceReportSection({ branches }: Props) {
           </button>
         </div>
       </div>
+      <p className="mt-1 text-xs text-gray-500">Membership and store income minus logged expenses, for the period and branch you pick.</p>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <div>

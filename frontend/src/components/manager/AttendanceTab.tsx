@@ -46,7 +46,7 @@ export default function AttendanceTab({ selectedBranch }: Props) {
 
   function renderDatePicker() {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between w-full md:w-auto gap-2">
         <input
           type="date"
           value={selectedDate}
