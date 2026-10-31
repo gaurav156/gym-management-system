@@ -2,7 +2,10 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { api } from './client'
 import type { Branch, Plan, ProductCategory } from '../types'
 import { queryClient } from './queryClient'
-import type { Payment, ProductOrder, MemberSummary, StaffSummary, Expense, PageResponse, HourlyCount, TodayAttendanceEntry, LastCheckinEntry, Membership, AttendanceLogEntry, MembershipAdmin, RoleHistoryEntry } from '../types'
+import type { 
+  Payment, ProductOrder, MemberSummary, StaffSummary, Expense, PageResponse, HourlyCount, TodayAttendanceEntry, LastCheckinEntry, Membership, AttendanceLogEntry, 
+  MembershipAdmin, RoleHistoryEntry, FinanceReportResponse, FinanceTransaction 
+} from '../types'
 
 const STATIC = 5 * 60_000
 const SHORT = 30_000
@@ -20,6 +23,7 @@ export const qk = {
   staff: ['staff'] as const,
   expenses: ['expenses'] as const,
   attendance: ['attendance'] as const,
+  finance: ['finance'] as const,
   my: (userId?: string) => ['my', userId] as const,   // everything about the logged-in person
 }
 
@@ -128,7 +132,7 @@ export const invalidatePeople = () =>
 
 // A purchase or payment changes both the payments list and a member's status badge.
 export const invalidateMembershipData = () =>
-  Promise.all([qk.members, qk.payments].map((k) => queryClient.invalidateQueries({ queryKey: k })))
+  Promise.all([qk.members, qk.payments, qk.finance].map((k) => queryClient.invalidateQueries({ queryKey: k })))
 
 export const useMyMemberships = (userId?: string) => useQuery({
   queryKey: [...qk.my(userId), 'memberships'], enabled: !!userId, staleTime: SHORT,
@@ -192,4 +196,27 @@ export const usePersonOrders = (personId: string, page: number, size: number) =>
   enabled: !!personId, staleTime: SHORT,
   placeholderData: keepForBranch<PageResponse<ProductOrder>>(personId),
   queryFn: () => api.get<PageResponse<ProductOrder>>(`/api/product-orders/member/${personId}`, { params: { page, size } }).then((r) => r.data),
+})
+
+export const invalidateFinance = () => queryClient.invalidateQueries({ queryKey: qk.finance })
+
+export type FinanceParams = Record<string, string | number>
+
+// params = the filters the Owner last applied (null until the first Generate).
+export const useFinanceReport = (params: FinanceParams | null) => useQuery({
+  queryKey: [...qk.finance, 'report', params],
+  enabled: !!params, staleTime: MEDIUM,
+  placeholderData: keepPreviousData,
+  queryFn: () => api.get<FinanceReportResponse>('/api/finance/report', { params }).then((r) => r.data),
+})
+
+export const useFinanceTransactions = (
+  params: FinanceParams | null, page: number, size: number, sort: string, enabled: boolean,
+) => useQuery({
+  queryKey: [...qk.finance, 'transactions', params, page, size, sort],
+  enabled: enabled && !!params, staleTime: MEDIUM,
+  placeholderData: keepPreviousData,
+  queryFn: () => api.get<PageResponse<FinanceTransaction>>('/api/finance/transactions', {
+    params: { ...params, page, size, sort },
+  }).then((r) => r.data),
 })

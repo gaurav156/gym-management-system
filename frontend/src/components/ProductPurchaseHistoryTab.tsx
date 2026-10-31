@@ -7,7 +7,7 @@ import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, BanIcon } f
 import type { ProductOrder, ProductOrderInvoice } from '../types'
 import { useScrollLock } from '../hooks/useScrollLock'
 import { toast, getErrorMessage } from '../store/toastStore'
-import { qk, usePersonOrders } from '../api/queries'
+import { qk, usePersonOrders, invalidateFinance } from '../api/queries'
 import { queryClient } from '../api/queryClient'
 
 const PAGE_SIZE = 5
@@ -75,6 +75,7 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
       toast.success('Order cancelled and refunded.')
       setCancelTarget(null)
       queryClient.invalidateQueries({ queryKey: qk.productOrders })
+      invalidateFinance()
     } catch (err: any) {
       toast.error(getErrorMessage(err, 'Failed to cancel order'))
     } finally {

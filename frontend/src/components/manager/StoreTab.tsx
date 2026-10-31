@@ -12,7 +12,7 @@ import RowActionsMenu from '../RowActionsMenu'
 import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, BanIcon } from '../icons/ActionIcons'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { toast, getErrorMessage } from '../../store/toastStore'
-import { useProductCategories, qk, useBranchOrders } from '../../api/queries'
+import { useProductCategories, qk, useBranchOrders, invalidateFinance } from '../../api/queries'
 import { queryClient } from '../../api/queryClient'
 import RefreshButton from '../RefreshButton'
 
@@ -101,6 +101,7 @@ export default function StoreTab({ selectedBranch }: Props) {
   function loadOrders(page?: number) {
     if (page !== undefined && page !== orderPage) setOrderPage(page)
     queryClient.invalidateQueries({ queryKey: qk.productOrders })
+    invalidateFinance()
   }
 
   useEffect(() => {

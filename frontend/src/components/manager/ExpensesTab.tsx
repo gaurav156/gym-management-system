@@ -7,7 +7,7 @@ import { useConfirm } from '../../hooks/useConfirm'
 import { TableSkeleton } from '../Skeleton'
 import type { ExpenseCategory, AuthUser } from '../../types'
 import { toast, getErrorMessage } from '../../store/toastStore'
-import { qk, useExpenses } from '../../api/queries'
+import { qk, useExpenses, invalidateFinance } from '../../api/queries'
 import { queryClient } from '../../api/queryClient'
 import RefreshButton from '../RefreshButton'
 
@@ -51,6 +51,7 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
   function loadExpenses(page?: number) {
     if (page !== undefined && page !== expensePage) setExpensePage(page)
     queryClient.invalidateQueries({ queryKey: qk.expenses })
+    invalidateFinance()
   }
 
   useEffect(() => { setExpensePage(0) }, [selectedBranch])

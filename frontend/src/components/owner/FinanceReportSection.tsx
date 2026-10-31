@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import Spinner from '../Spinner'
 import { TableSkeleton } from '../Skeleton'
-import type { Branch, FinanceGranularity, FinanceReportResponse, FinanceTransaction, PageResponse } from '../../types'
+import type { Branch, FinanceGranularity, FinanceTransaction } from '../../types'
 import { toast, getErrorMessage } from '../../store/toastStore'
 import { EyeIcon, EyeOffIcon } from '../icons/ActionIcons'
+import { useFinanceReport, useFinanceTransactions, invalidateFinance, type FinanceParams } from '../../api/queries'
+import RefreshButton from '../RefreshButton'
 
 interface Props {
   branches: Branch[]
@@ -57,28 +59,32 @@ export default function FinanceReportSection({ branches }: Props) {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
 
-  const [report, setReport] = useState<FinanceReportResponse | null>(null)
-  const [loading, setLoading] = useState(false)
   const [downloading, setDownloading] = useState(false)
 
   // "Show details" - per-transaction rows, paged by the server.
   const [showDetails, setShowDetails] = useState(false)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [transactions, setTransactions] = useState<FinanceTransaction[]>([])
-  const [txLoading, setTxLoading] = useState(false)
   const [txPage, setTxPage] = useState(0)
-  const [txTotalPages, setTxTotalPages] = useState(1)
-  const [txTotalElements, setTxTotalElements] = useState(0)
-
-  // The params of the report currently on screen. Paging/page-size changes use these, not the
-  // live form, so editing the form without clicking "Generate" can't change what's being paged.
-  const appliedParams = useRef<Record<string, string | number> | null>(null)
-  const txTicket = useRef(0)
 
   const yearOptions = currentYearOptions()
-  const detailsActive = showDetails && !!report && supportsDetails(report.granularity)
 
   const [txSort, setTxSort] = useState<TxSort>('ASC') // oldest first by default
+
+  // The filters currently on screen. Paging, sorting and the cache all key off these, not the live form,
+  // so editing the form without clicking "Generate" can't change what's being shown.
+  const [applied, setApplied] = useState<FinanceParams | null>(null)
+
+  const reportQuery = useFinanceReport(applied)
+  const report = reportQuery.data ?? null
+  const loading = reportQuery.isFetching
+
+  const detailsActive = showDetails && !!report && supportsDetails(report.granularity)
+  const txQuery = useFinanceTransactions(applied, txPage, pageSize, txSort, detailsActive)
+  const transactions = txQuery.data?.content ?? []
+  const txLoading = txQuery.isLoading
+  const txBusy = txQuery.isFetching
+  const txTotalPages = txQuery.data?.totalPages ?? 1
+  const txTotalElements = txQuery.data?.totalElements ?? 0
 
   function buildParams(): Record<string, string | number> {
     const params: Record<string, string | number> = { granularity }
@@ -99,55 +105,20 @@ export default function FinanceReportSection({ branches }: Props) {
     return true
   }
 
-  function loadTransactions(page = 0, size = pageSize, sort = txSort) {
-    const params = appliedParams.current
-    if (!params) return
-    const ticket = ++txTicket.current
-    setTxLoading(true)
-    api.get<PageResponse<FinanceTransaction>>('/api/finance/transactions', { params: { ...params, page, size, sort } })
-      .then((res) => {
-        if (ticket !== txTicket.current) return
-        setTransactions(res.data.content)
-        setTxTotalPages(res.data.totalPages)
-        setTxTotalElements(res.data.totalElements)
-        setTxPage(res.data.page)
-      })
-      .catch((err) => {
-        if (ticket === txTicket.current) toast.error(getErrorMessage(err, 'Failed to load transactions'))
-      })
-      .finally(() => { if (ticket === txTicket.current) setTxLoading(false) })
-  }
-
-  async function generateReport() {
+  function generateReport() {
     if (!validateCustomRange()) return
     const params = buildParams()
-    setLoading(true)
-    try {
-      const { data } = await api.get<FinanceReportResponse>('/api/finance/report', { params })
-      appliedParams.current = params
-      setReport(data)
-      if (showDetails && supportsDetails(data.granularity)) loadTransactions(0)
-    } catch (err: any) {
-      toast.error(getErrorMessage(err, 'Failed to load report'))
-    } finally {
-      setLoading(false)
+    setTxPage(0)
+    if (applied && JSON.stringify(applied) === JSON.stringify(params)) {
+      invalidateFinance()          // same filters: Generate behaves as "refresh"
+    } else {
+      setApplied(params)           // new filters: fetches, or reuses the cache if still fresh
     }
   }
 
-  function handleShowDetailsChange(checked: boolean) {
-    setShowDetails(checked)
-    if (checked && report && supportsDetails(report.granularity)) loadTransactions(0)
-  }
-
-  function handlePageSizeChange(size: number) {
-    setPageSize(size)
-    loadTransactions(0, size)
-  }
-
-  function handleSortChange(sort: TxSort) {
-    setTxSort(sort)
-    loadTransactions(0, pageSize, sort)
-  }
+  function handleShowDetailsChange(checked: boolean) { setShowDetails(checked); setTxPage(0) }
+  function handlePageSizeChange(size: number) { setPageSize(size); setTxPage(0) }
+  function handleSortChange(sort: TxSort) { setTxSort(sort); setTxPage(0) }
 
   async function downloadExcel() {
     if (!validateCustomRange()) return
@@ -191,12 +162,14 @@ export default function FinanceReportSection({ branches }: Props) {
             Membership and store income minus logged expenses, for the period and branch you pick.
           </p>
         </div>
-        <button type="button" onClick={() => setRevealed((v) => !v)}
-          aria-pressed={revealed}
-          className="flex flex-shrink-0 items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-          {revealed ? <EyeOffIcon /> : <EyeIcon />}
-          {revealed ? 'Hide figures' : 'Show figures'}
-        </button>
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <RefreshButton onClick={() => invalidateFinance()} spinning={reportQuery.isFetching || txBusy} />
+          <button type="button" onClick={() => setRevealed((v) => !v)} aria-pressed={revealed}
+            className="flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+            {revealed ? <EyeOffIcon /> : <EyeIcon />}
+            {revealed ? 'Hide figures' : 'Show figures'}
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
@@ -409,9 +382,9 @@ export default function FinanceReportSection({ branches }: Props) {
                   </label>
                   <span>Page {txPage + 1} of {txTotalPages} ({txTotalElements} total)</span>
                   <div className="space-x-2">
-                    <button disabled={txPage === 0 || txLoading} onClick={() => loadTransactions(txPage - 1)}
+                    <button disabled={txPage === 0 || txBusy} onClick={() => setTxPage((p) => p - 1)}
                       className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                    <button disabled={txPage + 1 >= txTotalPages || txLoading} onClick={() => loadTransactions(txPage + 1)}
+                    <button disabled={txPage + 1 >= txTotalPages || txBusy} onClick={() => setTxPage((p) => p + 1)}
                       className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
                   </div>
                 </div>
