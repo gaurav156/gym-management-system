@@ -16,6 +16,7 @@ import MarketingPreferenceSection from '../components/MarketingPreferenceSection
 import { toast, getErrorMessage } from '../store/toastStore'
 import { usePersistedTab } from '../hooks/usePersistedTab'
 import { useMyAttendance } from '../api/queries'
+import RefreshButton from '../components/RefreshButton'
 
 const PAGE_SIZE = 5
 
@@ -238,8 +239,13 @@ export default function StaffProfilePage() {
                     )}
 
                     <div className="rounded-lg border border-gray-200 p-6">
-                        <h2 className="font-medium">Your attendance log</h2>
-                        <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <h2 className="font-medium">Your attendance log</h2>
+                                <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
+                            </div>
+                            <RefreshButton onClick={() => attendanceQuery.refetch()} spinning={attendanceQuery.isFetching} />
+                        </div>
                         {!attendanceLoaded ? (
                             <div className="mt-4 space-y-3">
                                 <div className="h-4 w-full animate-pulse rounded bg-gray-200" />

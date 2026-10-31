@@ -235,7 +235,10 @@ export default function MemberDashboard() {
           </div>
 
           <div className="mt-8 rounded-lg border border-gray-200 p-6">
-            <h2 className="font-medium">Your payment history</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-medium">Your payment history</h2>
+              <RefreshButton onClick={() => paymentsQuery.refetch()} spinning={paymentsQuery.isFetching} />
+            </div>
             {paymentsLoading ? (
               <div className="mt-4 space-y-3">
                 <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
