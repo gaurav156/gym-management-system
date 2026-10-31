@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import PhotoUploadButton from '../PhotoUploadButton'
-import type { Branch, StaffSummary, AttendanceLogEntry, AuthUser, RoleHistoryEntry, PageResponse, Gender } from '../../types'
+import type { Branch, StaffSummary, AuthUser, Gender } from '../../types'
 import ConfirmDialog from '../ConfirmDialog'
 import { TableSkeleton } from '../Skeleton'
 import { useConfirm } from '../../hooks/useConfirm'
@@ -16,7 +16,8 @@ import { toast, getErrorMessage } from '../../store/toastStore'
 import EditActions from '../EditActions'
 import ActionButton from '../ActionButton'
 import { PencilIcon, TrashIcon, CalendarIcon, CheckIcon, MapPinIcon } from '../icons/ActionIcons'
-import { useStaff, invalidatePeople } from '../../api/queries'
+import { useStaff, invalidatePeople, usePersonAttendance, useMyBranches, useRoleHistory, qk, NO_BRANCHES } from '../../api/queries'
+import { queryClient } from '../../api/queryClient'
 import RefreshButton from '../RefreshButton'
 
 const NO_STAFF: StaffSummary[] = []
@@ -78,21 +79,39 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const [joiningDateInput, setJoiningDateInput] = useState('')
   const [leftDateInput, setLeftDateInput] = useState('')
 
-  const [detailStaffBranches, setDetailStaffBranches] = useState<Branch[]>([])
   const [editingStaffBranches, setEditingStaffBranches] = useState(false)
   const [staffBranchEditIds, setStaffBranchEditIds] = useState<string[]>([])
 
-  const [detailStaffAttendance, setDetailStaffAttendance] = useState<AttendanceLogEntry[]>([])
   const [staffModalPage, setStaffModalPage] = useState(0)
-  const [staffModalTotalPages, setStaffModalTotalPages] = useState(1)
-  const [staffModalTotalElements, setStaffModalTotalElements] = useState(0)
 
   // Change Role + its history - Owner-only, fetched/shown only when the caller is Owner.
-  const [roleHistory, setRoleHistory] = useState<RoleHistoryEntry[]>([])
   const [selectedNewRole, setSelectedNewRole] = useState('')
   const [changingRole, setChangingRole] = useState(false)
   const [otpTarget, setOtpTarget] = useState<RoleChangeOtpTarget | null>(null)
   const [demotionBranchIds, setDemotionBranchIds] = useState<string[]>([])
+
+  const detailStaffRole = staff.find((x) => x.id === detailStaffId)?.role
+
+  const staffAttendanceQ = usePersonAttendance(detailStaffId ?? undefined, staffModalPage, MODAL_PAGE_SIZE, staffModalTab === 'ATTENDANCE')
+  const detailStaffAttendance = staffAttendanceQ.data?.content ?? []
+  const staffModalTotalPages = staffAttendanceQ.data?.totalPages ?? 1
+  const staffModalTotalElements = staffAttendanceQ.data?.totalElements ?? 0
+
+  // The Owner has no branch assignments (implicit access to all), so skip the call for them.
+  const { data: detailStaffBranches = NO_BRANCHES } = useMyBranches(
+    staffModalTab === 'BRANCHES' && detailStaffRole && detailStaffRole !== 'OWNER' ? detailStaffId ?? undefined : undefined)
+
+  const { data: roleHistory = [] } = useRoleHistory(detailStaffId ?? undefined, user?.role === 'OWNER')
+
+  function refreshDetail() {
+    [qk.attendance, qk.staff, qk.productOrders]
+      .forEach((k) => queryClient.invalidateQueries({ queryKey: k }))
+    queryClient.invalidateQueries({ queryKey: qk.members })   // role history lives here
+  }
+
+  function openDetail(id: string) {
+    setDetailStaffId(id); setStaffModalTab('INFO'); setStaffModalPage(0)
+  }
 
   function loadStaff(page?: number) {
     if (page !== undefined && page !== staffPage) setStaffPage(page)
@@ -107,45 +126,12 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
 
   function handleSortChange(value: typeof staffSort) { setStaffSort(value); setStaffPage(0) }
 
-  function loadDetailStaffAttendance(staffId: string, page = 0) {
-    api.get<PageResponse<AttendanceLogEntry>>(`/api/attendance/history/${staffId}`, { params: { page, size: MODAL_PAGE_SIZE } })
-      .then((res) => {
-        setDetailStaffAttendance(res.data.content)
-        setStaffModalTotalPages(res.data.totalPages)
-        setStaffModalTotalElements(res.data.totalElements)
-        setStaffModalPage(res.data.page)
-      })
-  }
-
-  function loadDetailStaffBranches(staffId: string) {
-    api.get<Branch[]>('/api/branches/mine', { params: { userId: staffId } }).then((res) => setDetailStaffBranches(res.data))
-  }
-
-  function loadRoleHistory(staffId: string) {
-    if (user?.role !== 'OWNER') return
-    api.get<RoleHistoryEntry[]>(`/api/owner/users/${staffId}/role-history`)
-      .then((res) => setRoleHistory(res.data))
-      .catch(() => setRoleHistory([]))
-  }
-
   useEffect(() => {
     setEditingStaffInfo(false)
     setEditingStaffBranches(false)
     setEditingStaffDates(false)
     setSelectedNewRole('')
     setDemotionBranchIds([])
-    setRoleHistory([])
-    if (detailStaffId) {
-      const s = staff.find((x) => x.id === detailStaffId)
-      setStaffModalTab('INFO')
-      loadDetailStaffAttendance(detailStaffId, 0)
-      loadRoleHistory(detailStaffId)
-      if (s?.role !== 'OWNER') {
-        loadDetailStaffBranches(detailStaffId)
-      } else {
-        setDetailStaffBranches([])
-      }
-    }
   }, [detailStaffId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function startEditStaffInfo(s: StaffSummary) {
@@ -225,7 +211,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
       await api.put(`/api/branches/assignments/${staffId}`, { branchIds: staffBranchEditIds })
       toast.success('Branches updated.')
       setEditingStaffBranches(false)
-      loadDetailStaffBranches(staffId)
+      queryClient.invalidateQueries({ queryKey: qk.branches })
       loadStaff(staffPage)
     } catch (err: any) {
       toast.error(getErrorMessage(err, 'Failed to update branch assignments'))
@@ -395,7 +381,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                     {lastCheckins[s.id] ? new Date(lastCheckins[s.id]).toLocaleString() : 'Never'}
                   </td>
                   <td className="py-2">
-                    <button onClick={() => setDetailStaffId(s.id)} className="text-xs text-brand hover:underline">
+                    <button onClick={() => openDetail(s.id)} className="text-xs text-brand hover:underline">
                       View/Edit details
                     </button>
                   </td>
@@ -440,8 +426,11 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                     </p>
                   </div>
                 </div>
-                <button onClick={() => setDetailStaffId(null)}
-                  className="flex-shrink-0 text-gray-400 hover:text-gray-600" aria-label="Close">✕</button>
+                <div className="flex flex-shrink-0 items-center gap-1">
+                  <RefreshButton onClick={refreshDetail} spinning={staffAttendanceQ.isFetching} />
+                  <button onClick={() => setDetailStaffId(null)}
+                    className="text-gray-400 hover:text-gray-600" aria-label="Close">✕</button>
+                </div> 
               </div>
 
               <div className="mt-4 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
@@ -660,14 +649,14 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                       </tbody>
                     </table>
                   </div>
-                  {detailStaffAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
+                  {!staffAttendanceQ.isLoading && detailStaffAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
                   {staffModalTotalElements > 0 && (
                     <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                       <span>Page {staffModalPage + 1} of {staffModalTotalPages} ({staffModalTotalElements} total)</span>
                       <div className="space-x-2">
-                        <button disabled={staffModalPage === 0} onClick={() => loadDetailStaffAttendance(detailStaff!.id, staffModalPage - 1)}
+                        <button disabled={staffModalPage === 0} onClick={() => setStaffModalPage((p) => p - 1)}
                           className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                        <button disabled={staffModalPage + 1 >= staffModalTotalPages} onClick={() => loadDetailStaffAttendance(detailStaff!.id, staffModalPage + 1)}
+                        <button disabled={staffModalPage + 1 >= staffModalTotalPages} onClick={() => setStaffModalPage((p) => p + 1)}
                           className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
                       </div>
                     </div>

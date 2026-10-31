@@ -4,9 +4,11 @@ import { viewProductInvoice, printProductInvoice, downloadProductInvoice } from 
 import RowActionsMenu from './RowActionsMenu'
 import Spinner from './Spinner'
 import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, BanIcon } from './icons/ActionIcons'
-import type { ProductOrder, ProductOrderInvoice, PageResponse } from '../types'
+import type { ProductOrder, ProductOrderInvoice } from '../types'
 import { useScrollLock } from '../hooks/useScrollLock'
 import { toast, getErrorMessage } from '../store/toastStore'
+import { qk, usePersonOrders } from '../api/queries'
+import { queryClient } from '../api/queryClient'
 
 const PAGE_SIZE = 5
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
@@ -20,31 +22,20 @@ interface Props {
 // personId works for a Member OR a staff person (Trainer/Manager/Owner) - see
 // ProductOrderController.memberHistory.
 export default function ProductPurchaseHistoryTab({ personId }: Props) {
-  const [orders, setOrders] = useState<ProductOrder[]>([])
-  const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
-  const [totalElements, setTotalElements] = useState(0)
-
+  const ordersQuery = usePersonOrders(personId, page, PAGE_SIZE)
+  const orders = ordersQuery.data?.content ?? []
+  const loading = ordersQuery.isLoading
+  const totalPages = ordersQuery.data?.totalPages ?? 1
+  const totalElements = ordersQuery.data?.totalElements ?? 0
+  
   const [cancelTarget, setCancelTarget] = useState<ProductOrder | null>(null)
   const [refundAmount, setRefundAmount] = useState('')
   const [refundMode, setRefundMode] = useState('CASH')
   const [refundNote, setRefundNote] = useState('')
   const [cancelling, setCancelling] = useState(false)
 
-  function load(p = 0) {
-    setLoading(true)
-    api.get<PageResponse<ProductOrder>>(`/api/product-orders/member/${personId}`, { params: { page: p, size: PAGE_SIZE } })
-      .then((res) => {
-        setOrders(res.data.content)
-        setTotalPages(res.data.totalPages)
-        setTotalElements(res.data.totalElements)
-        setPage(res.data.page)
-      })
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => { load(0) }, [personId]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPage(0) }, [personId])
 
   async function handleInvoiceAction(orderId: string, action: 'view' | 'print' | 'download') {
     try {
@@ -83,7 +74,7 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
       })
       toast.success('Order cancelled and refunded.')
       setCancelTarget(null)
-      load(page)
+      queryClient.invalidateQueries({ queryKey: qk.productOrders })
     } catch (err: any) {
       toast.error(getErrorMessage(err, 'Failed to cancel order'))
     } finally {
@@ -142,9 +133,9 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
         <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
           <span>Page {page + 1} of {totalPages} ({totalElements} total)</span>
           <div className="space-x-2">
-            <button disabled={page === 0} onClick={() => load(page - 1)}
+            <button disabled={page === 0} onClick={() => setPage((p) => p - 1)}
               className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-            <button disabled={page + 1 >= totalPages} onClick={() => load(page + 1)}
+            <button disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}
               className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
           </div>
         </div>

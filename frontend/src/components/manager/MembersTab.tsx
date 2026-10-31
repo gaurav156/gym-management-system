@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { getEffectiveStatus, statusColorClass, statusLabel, type EffectiveStatus } from '../../utils/membership'
 import PhotoUploadButton from '../PhotoUploadButton'
-import type { Branch, MembershipAdmin, Payment, AttendanceLogEntry, MemberSummary, InvoiceResponse, AuthUser, RoleHistoryEntry, PageResponse, Gender } from '../../types'
+import type { Branch, MembershipAdmin, MemberSummary, InvoiceResponse, AuthUser, Gender } from '../../types'
 import { viewInvoice, printInvoice, downloadInvoice } from '../../utils/invoice'
 import ConfirmDialog from '../ConfirmDialog'
 import { TableSkeleton } from '../Skeleton'
@@ -11,7 +11,7 @@ import RoleChangeOtpDialog, { type RoleChangeOtpTarget } from '../RoleChangeOtpD
 import Avatar from '../Avatar'
 import RowActionsMenu from '../RowActionsMenu'
 import ActionButton from '../ActionButton'
-import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, PencilIcon, TrashIcon, BanIcon, CheckIcon, CalendarIcon, PauseIcon, PlayIcon, CoinIcon, MapPinIcon } from '../icons/ActionIcons'
+import { EyeIcon, PrinterIcon, DownloadIcon, MailIcon, WhatsAppIcon, PencilIcon, TrashIcon, BanIcon, CalendarIcon, PauseIcon, PlayIcon, CoinIcon, MapPinIcon } from '../icons/ActionIcons'
 import ProductPurchaseHistoryTab from '../ProductPurchaseHistoryTab'
 import PersonalDetailsFields from '../PersonalDetailsFields'
 import IdProofField from '../IdProofField'
@@ -19,9 +19,11 @@ import { genderLabel, formatDobWithAge } from '../../utils/person'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { toast, getErrorMessage } from '../../store/toastStore'
 import EditActions from '../EditActions'
-import { useMembers, invalidatePeople, invalidateMembershipData } from '../../api/queries'
+import { useMembers, invalidatePeople, invalidateMembershipData, usePersonPayments, usePersonAttendance, usePersonMemberships, useMyBranches, useRoleHistory, qk, NO_BRANCHES } from '../../api/queries'
 import RefreshButton from '../RefreshButton'
+import { queryClient } from '../../api/queryClient'
 
+const NO_MEMBERSHIPS: MembershipAdmin[] = []
 const NO_MEMBERS: MemberSummary[] = []
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -56,7 +58,6 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [modalPage, setModalPage] = useState(1)
 
   // Change Role + its history - Owner-only, so a Member can be promoted to Trainer/Manager.
-  const [roleHistory, setRoleHistory] = useState<RoleHistoryEntry[]>([])
   const [selectedNewRole, setSelectedNewRole] = useState('')
   const [changingRole, setChangingRole] = useState(false)
   const [promotionTarget, setPromotionTarget] = useState<RoleChangeOtpTarget | null>(null)
@@ -74,21 +75,11 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [memberEditDob, setMemberEditDob] = useState('')
   const [memberEditIdProof, setMemberEditIdProof] = useState<string | null>(null)
 
-  const [detailMemberBranches, setDetailMemberBranches] = useState<Branch[]>([])
   const [editingMemberBranches, setEditingMemberBranches] = useState(false)
   const [memberBranchEditIds, setMemberBranchEditIds] = useState<string[]>([])
 
-  const [detailPayments, setDetailPayments] = useState<Payment[]>([])
   const [detailPaymentsPage, setDetailPaymentsPage] = useState(0)
-  const [detailPaymentsTotalPages, setDetailPaymentsTotalPages] = useState(1)
-  const [detailPaymentsTotalElements, setDetailPaymentsTotalElements] = useState(0)
-
-  const [detailAttendance, setDetailAttendance] = useState<AttendanceLogEntry[]>([])
   const [detailAttendancePage, setDetailAttendancePage] = useState(0)
-  const [detailAttendanceTotalPages, setDetailAttendanceTotalPages] = useState(1)
-  const [detailAttendanceTotalElements, setDetailAttendanceTotalElements] = useState(0)
-
-  const [detailMembershipsFetched, setDetailMembershipsFetched] = useState<MembershipAdmin[]>([]) // unchanged, still full list
 
   const { confirm, dialogProps } = useConfirm()
   const [savingMemberInfo, setSavingMemberInfo] = useState(false)
@@ -99,6 +90,37 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const [payAmount, setPayAmount] = useState('')
   const [payMode, setPayMode] = useState('CASH')
   const [paying, setPaying] = useState(false)
+
+  const paymentsQ = usePersonPayments(detailMemberId ?? undefined, detailPaymentsPage, MODAL_PAGE_SIZE, modalTab === 'PAYMENTS')
+  const detailPayments = paymentsQ.data?.content ?? []
+  const detailPaymentsTotalPages = paymentsQ.data?.totalPages ?? 1
+  const detailPaymentsTotalElements = paymentsQ.data?.totalElements ?? 0
+
+  const attendanceQ = usePersonAttendance(detailMemberId ?? undefined, detailAttendancePage, MODAL_PAGE_SIZE, modalTab === 'ATTENDANCE')
+  const detailAttendance = attendanceQ.data?.content ?? []
+  const detailAttendanceTotalPages = attendanceQ.data?.totalPages ?? 1
+  const detailAttendanceTotalElements = attendanceQ.data?.totalElements ?? 0
+
+  const membershipsQ = usePersonMemberships(detailMemberId ?? undefined, modalTab === 'MEMBERSHIPS')
+  const detailMembershipsFetched = membershipsQ.data ?? NO_MEMBERSHIPS
+
+  const { data: detailMemberBranches = NO_BRANCHES } =
+    useMyBranches(modalTab === 'BRANCHES' ? detailMemberId ?? undefined : undefined)
+
+  const { data: roleHistory = [] } = useRoleHistory(detailMemberId ?? undefined, user?.role === 'OWNER')
+
+  const detailFetching = paymentsQ.isFetching || attendanceQ.isFetching || membershipsQ.isFetching
+  function refreshDetail() {
+    [qk.payments, qk.attendance, qk.members, qk.productOrders]
+      .forEach((k) => queryClient.invalidateQueries({ queryKey: k }))
+  }
+
+  // One place that opens the modal, so tab and page state reset in the same render
+  // (otherwise the previously open tab would fire a request for the new person first).
+  function openDetail(id: string) {
+    setDetailMemberId(id); setModalShowExpired(false)
+    setModalTab('INFO'); setDetailPaymentsPage(0); setDetailAttendancePage(0)
+  }
 
   // Mutations call this. It refreshes the lists and optionally jumps to a page.
   function loadMembers(page?: number) {
@@ -123,64 +145,20 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     setMemberSort(value); setMemberPage(0)
   }
 
-  function loadDetailMemberBranches(memberId: string) {
-    api.get<Branch[]>('/api/branches/mine', { params: { userId: memberId } }).then((res) => setDetailMemberBranches(res.data))
-  }
-
-  function loadRoleHistory(memberId: string) {
-    if (user?.role !== 'OWNER') return
-    api.get<RoleHistoryEntry[]>(`/api/owner/users/${memberId}/role-history`)
-      .then((res) => setRoleHistory(res.data))
-      .catch(() => setRoleHistory([]))
-  }
-
-  function loadDetailPayments(memberId: string, page = 0) {
-    api.get<PageResponse<Payment>>(`/api/payments/member/${memberId}`, { params: { page, size: MODAL_PAGE_SIZE } })
-      .then((res) => {
-        setDetailPayments(res.data.content)
-        setDetailPaymentsTotalPages(res.data.totalPages)
-        setDetailPaymentsTotalElements(res.data.totalElements)
-        setDetailPaymentsPage(res.data.page)
-      })
-  }
-
-  function loadDetailAttendance(memberId: string, page = 0) {
-    api.get<PageResponse<AttendanceLogEntry>>(`/api/attendance/history/${memberId}`, { params: { page, size: MODAL_PAGE_SIZE } })
-      .then((res) => {
-        setDetailAttendance(res.data.content)
-        setDetailAttendanceTotalPages(res.data.totalPages)
-        setDetailAttendanceTotalElements(res.data.totalElements)
-        setDetailAttendancePage(res.data.page)
-      })
-  }
-
   useEffect(() => {
     setModalPage(1)
   }, [detailMemberId, modalShowExpired])
 
   useEffect(() => {
     if (!detailMemberId) return
-    setModalTab('INFO')
     setEditingMemberInfo(false)
     setEditingMemberBranches(false)
     setSelectedNewRole('')
-    setRoleHistory([])
-    loadDetailPayments(detailMemberId, 0)
-    loadDetailAttendance(detailMemberId, 0)
-    api.get<MembershipAdmin[]>(`/api/memberships/member/${detailMemberId}`).then((res) => setDetailMembershipsFetched(res.data))
-    loadDetailMemberBranches(detailMemberId)
-    loadRoleHistory(detailMemberId)
   }, [detailMemberId])
 
-  // Refreshes both the branch-scoped table and the currently-open member modal's own
-  // fetch - the modal derives from its own fetch (not the branch list), so an action
-  // taken inside it needs its own explicit refresh too.
+  // Refreshes the table, the open modal's membership list, and payments - all share these key prefixes.
   function refreshMembershipViews() {
     invalidateMembershipData()
-    if (detailMemberId) {
-      api.get<MembershipAdmin[]>(`/api/memberships/member/${detailMemberId}`)
-        .then((res) => setDetailMembershipsFetched(res.data))
-    }
   }
 
   function openPayDialog(m: MembershipAdmin) {
@@ -377,7 +355,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
       await api.put(`/api/branches/assignments/${memberId}`, { branchIds: memberBranchEditIds })
       toast.success('Branches updated.')
       setEditingMemberBranches(false)
-      loadDetailMemberBranches(memberId)
+      queryClient.invalidateQueries({ queryKey: qk.branches })
       loadMembers()
     } catch (err: any) {
       toast.error(getErrorMessage(err, 'Failed to update branch assignments'))
@@ -464,8 +442,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                       {lastCheckins[member.id] ? new Date(lastCheckins[member.id]).toLocaleString() : 'Never'}
                     </td>
                     <td className="py-2">
-                      <button onClick={() => { setDetailMemberId(member.id); setModalShowExpired(false) }}
-                        className="text-xs text-brand hover:underline">
+                      <button onClick={() => openDetail(member.id)} className="text-xs text-brand hover:underline">
                         View/Edit details
                       </button>
                     </td>
@@ -503,8 +480,11 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                     <p className="break-words text-xs text-gray-500">{detailMember.email} · PIN {detailMember.checkinPin ?? '—'}</p>
                   </div>
                 </div>
-                <button onClick={() => { setDetailMemberId(null); cancelEdit() }}
-                  className="flex-shrink-0 text-gray-400 hover:text-gray-600" aria-label="Close">✕</button>
+                <div className="flex flex-shrink-0 items-center gap-1">
+                  <RefreshButton onClick={refreshDetail} spinning={detailFetching} />
+                  <button onClick={() => { setDetailMemberId(null); cancelEdit() }}
+                    className="text-gray-400 hover:text-gray-600" aria-label="Close">✕</button>
+                </div>  
               </div>
 
               <div className="mt-4 overflow-x-auto overflow-y-hidden scrollbar-hide border-b border-gray-200">
@@ -713,7 +693,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                       </tbody>
                     </table>
                   </div>
-                  {detailMemberships.length === 0 && <p className="py-4 text-sm text-gray-400">No memberships to show.</p>}
+                  {!membershipsQ.isLoading && detailMemberships.length === 0 && <p className="py-4 text-sm text-gray-400">No memberships to show.</p>}
                   {detailMemberships.length > 0 && (
                     <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                       <span>Page {modalPage} of {modalTotalPages} ({detailMemberships.length} total)</span>
@@ -764,14 +744,14 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                       </tbody>
                     </table>
                   </div>
-                  {detailPayments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
+                  {!paymentsQ.isLoading && detailPayments.length === 0 && <p className="py-4 text-sm text-gray-400">No payments recorded yet.</p>}
                   {detailPaymentsTotalElements > 0 && (
                     <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                       <span>Page {detailPaymentsPage + 1} of {detailPaymentsTotalPages} ({detailPaymentsTotalElements} total)</span>
                       <div className="space-x-2">
-                        <button disabled={detailPaymentsPage === 0} onClick={() => loadDetailPayments(detailMember!.id, detailPaymentsPage - 1)}
+                        <button disabled={detailPaymentsPage === 0} onClick={() => setDetailPaymentsPage((p) => p - 1)}
                           className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                        <button disabled={detailPaymentsPage + 1 >= detailPaymentsTotalPages} onClick={() => loadDetailPayments(detailMember!.id, detailPaymentsPage + 1)}
+                        <button disabled={detailPaymentsPage + 1 >= detailPaymentsTotalPages} onClick={() => setDetailPaymentsPage((p) => p + 1)}
                           className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
                       </div>
                     </div>
@@ -808,14 +788,14 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                       </tbody>
                     </table>
                   </div>
-                  {detailAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
+                  {!attendanceQ.isLoading && detailAttendance.length === 0 && <p className="py-4 text-sm text-gray-400">No visits logged yet.</p>}
                   {detailAttendanceTotalElements > 0 && (
                     <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                       <span>Page {detailAttendancePage + 1} of {detailAttendanceTotalPages} ({detailAttendanceTotalElements} total)</span>
                       <div className="space-x-2">
-                        <button disabled={detailAttendancePage === 0} onClick={() => loadDetailAttendance(detailMemberId!, detailAttendancePage - 1)}
+                        <button disabled={detailAttendancePage === 0} onClick={() => setDetailAttendancePage((p) => p - 1)}
                           className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Prev</button>
-                        <button disabled={detailAttendancePage + 1 >= detailAttendanceTotalPages} onClick={() => loadDetailAttendance(detailMemberId!, detailAttendancePage + 1)}
+                        <button disabled={detailAttendancePage + 1 >= detailAttendanceTotalPages} onClick={() => setDetailAttendancePage((p) => p + 1)}
                           className="rounded border border-gray-300 px-2 py-1 disabled:opacity-40">Next</button>
                       </div>
                     </div>

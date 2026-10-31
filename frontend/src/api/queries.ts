@@ -2,7 +2,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { api } from './client'
 import type { Branch, Plan, ProductCategory } from '../types'
 import { queryClient } from './queryClient'
-import type { Payment, ProductOrder, MemberSummary, StaffSummary, Expense, PageResponse, HourlyCount, TodayAttendanceEntry, LastCheckinEntry, Membership, AttendanceLogEntry } from '../types'
+import type { Payment, ProductOrder, MemberSummary, StaffSummary, Expense, PageResponse, HourlyCount, TodayAttendanceEntry, LastCheckinEntry, Membership, AttendanceLogEntry, MembershipAdmin, RoleHistoryEntry } from '../types'
 
 const STATIC = 5 * 60_000
 const SHORT = 30_000
@@ -153,4 +153,43 @@ export const useMyOrders = (userId: string | undefined, page: number, size: numb
   queryKey: [...qk.productOrders, 'mine', userId, page, size], enabled: !!userId, staleTime: SHORT,
   placeholderData: keepPreviousData,
   queryFn: () => api.get<PageResponse<ProductOrder>>('/api/product-orders/mine', { params: { memberId: userId, page, size } }).then((r) => r.data),
+})
+
+// personId can be a Member or a staff person. keepForBranch (above) is reused here:
+// it only keeps previous-page data for the SAME id, so another person's rows never flash in.
+export const usePersonPayments = (personId: string | undefined, page: number, size: number, enabled = true) => useQuery({
+  queryKey: [...qk.payments, 'person', personId, page, size],
+  enabled: enabled && !!personId, staleTime: SHORT,
+  placeholderData: keepForBranch<PageResponse<Payment>>(personId ?? ''),
+  queryFn: () => api.get<PageResponse<Payment>>(`/api/payments/member/${personId}`, { params: { page, size } }).then((r) => r.data),
+})
+
+// Under qk.attendance, so a check-in (reloadAttendance) refreshes it.
+export const usePersonAttendance = (personId: string | undefined, page: number, size: number, enabled = true) => useQuery({
+  queryKey: [...qk.attendance, 'history', personId, page, size],
+  enabled: enabled && !!personId, staleTime: SHORT,
+  placeholderData: keepForBranch<PageResponse<AttendanceLogEntry>>(personId ?? ''),
+  queryFn: () => api.get<PageResponse<AttendanceLogEntry>>(`/api/attendance/history/${personId}`, { params: { page, size } }).then((r) => r.data),
+})
+
+// Under qk.members, so invalidateMembershipData / invalidatePeople refresh it.
+export const usePersonMemberships = (personId: string | undefined, enabled = true) => useQuery({
+  queryKey: [...qk.members, 'memberships', personId],
+  enabled: enabled && !!personId, staleTime: SHORT,
+  queryFn: () => api.get<MembershipAdmin[]>(`/api/memberships/member/${personId}`).then((r) => r.data),
+})
+
+// Owner-only endpoint - pass enabled=false for everyone else. Under qk.members so a role change refreshes it.
+export const useRoleHistory = (personId: string | undefined, enabled: boolean) => useQuery({
+  queryKey: [...qk.members, 'role-history', personId],
+  enabled: enabled && !!personId, staleTime: STATIC,
+  queryFn: () => api.get<RoleHistoryEntry[]>(`/api/owner/users/${personId}/role-history`).then((r) => r.data),
+})
+
+// Under qk.productOrders, so a store purchase or cancel refreshes it.
+export const usePersonOrders = (personId: string, page: number, size: number) => useQuery({
+  queryKey: [...qk.productOrders, 'person', personId, page, size],
+  enabled: !!personId, staleTime: SHORT,
+  placeholderData: keepForBranch<PageResponse<ProductOrder>>(personId),
+  queryFn: () => api.get<PageResponse<ProductOrder>>(`/api/product-orders/member/${personId}`, { params: { page, size } }).then((r) => r.data),
 })
