@@ -20,7 +20,10 @@ import ActionButton from '../components/ActionButton'
 import { PencilIcon, TrashIcon, PlayIcon, PauseIcon } from '../components/icons/ActionIcons'
 import { usePersistedTab } from '../hooks/usePersistedTab'
 import { queryClient } from '../api/queryClient'
-import { qk, useOwnerBranches, usePlans, NO_BRANCHES } from '../api/queries'
+import EditModal from '../components/EditModal'
+import RowActionsMenu from '../components/RowActionsMenu'
+import { BanIcon, CheckIcon } from '../components/icons/ActionIcons'
+import { qk, useOwnerBranches, useManagedPlans, NO_BRANCHES } from '../api/queries'
 
 type AccountRole = 'MEMBER' | 'TRAINER' | 'MANAGER'
 type Tab = 'FINANCE' | 'BRANCHES' | 'PLANS' | 'PRODUCTS' | 'BROADCASTS' | 'BACKUP'
@@ -91,7 +94,14 @@ export default function OwnerDashboard() {
   const [accountBranchIds, setAccountBranchIds] = useState<string[]>([])
   const [creatingAccount, setCreatingAccount] = useState(false)
 
-  const { data: plans = [], isLoading: plansLoading } = usePlans()
+  const { data: plans = [], isLoading: plansLoading } = useManagedPlans()
+
+  const [editingPlan, setEditingPlan] = useState<Plan | null>(null)
+  const [planForm, setPlanForm] = useState({
+    name: '', durationMonths: '1', price: '', discountPrice: '', discountStartsAt: '', discountEndsAt: '',
+  })
+  const [savingPlan, setSavingPlan] = useState(false)
+
   const [planName, setPlanName] = useState('')
   const [planMonths, setPlanMonths] = useState(1)
   const [planPrice, setPlanPrice] = useState('')
@@ -238,6 +248,86 @@ export default function OwnerDashboard() {
     } finally {
       setCreatingPlan(false)
     }
+  }
+
+  // updatePlan on the backend clears discount fields that aren't sent, so every PUT
+  // carries the plan's full current values.
+  function planPayload(p: Plan, overrides: Record<string, unknown> = {}) {
+    return {
+      name: p.name, durationMonths: p.durationMonths, price: p.price,
+      discountPrice: p.discountPrice, discountStartsAt: p.discountStartsAt, discountEndsAt: p.discountEndsAt,
+      active: p.active, ...overrides,
+    }
+  }
+
+  function startEditPlan(p: Plan) {
+    setEditingPlan(p)
+    setPlanForm({
+      name: p.name,
+      durationMonths: String(p.durationMonths),
+      price: String(p.price),
+      discountPrice: p.discountPrice != null ? String(p.discountPrice) : '',
+      discountStartsAt: p.discountStartsAt ? p.discountStartsAt.slice(0, 16) : '',
+      discountEndsAt: p.discountEndsAt ? p.discountEndsAt.slice(0, 16) : '',
+    })
+  }
+
+  async function saveEditPlan() {
+    if (!editingPlan) return
+    if (!planForm.name.trim()) { toast.warning('Enter a plan name.'); return }
+    if (!planForm.price || Number.isNaN(Number(planForm.price))) { toast.warning('Enter a valid price.'); return }
+    if (!planForm.durationMonths || Number(planForm.durationMonths) < 1) { toast.warning('Duration must be at least 1 month.'); return }
+    if (planForm.discountPrice && Number(planForm.discountPrice) >= Number(planForm.price)) {
+      toast.warning('Discount price must be lower than the price.'); return
+    }
+    setSavingPlan(true)
+    try {
+      await api.put(`/api/plans/manage/${editingPlan.id}`, planPayload(editingPlan, {
+        name: planForm.name.trim(),
+        durationMonths: Number(planForm.durationMonths),
+        price: Number(planForm.price),
+        discountPrice: planForm.discountPrice ? Number(planForm.discountPrice) : null,
+        discountStartsAt: planForm.discountPrice ? (planForm.discountStartsAt || null) : null,
+        discountEndsAt: planForm.discountPrice ? (planForm.discountEndsAt || null) : null,
+      }))
+      toast.success('Plan updated.')
+      setEditingPlan(null)
+      loadPlans()
+    } catch (err: any) {
+      toast.error(getErrorMessage(err, 'Failed to update plan'))
+    } finally {
+      setSavingPlan(false)
+    }
+  }
+
+  function togglePlanActive(p: Plan) {
+    confirm({
+      title: p.active ? 'Deactivate plan' : 'Reactivate plan',
+      message: p.active
+        ? `Deactivate "${p.name}"? It won't be offered for new purchases. Existing memberships are unaffected.`
+        : `Reactivate "${p.name}"? It becomes available for purchase again.`,
+      confirmLabel: p.active ? 'Deactivate' : 'Reactivate',
+      danger: p.active,
+      onConfirm: async () => {
+        await api.put(`/api/plans/manage/${p.id}`, planPayload(p, { active: !p.active }))
+        toast.success(p.active ? 'Plan deactivated.' : 'Plan reactivated.')
+        loadPlans()
+      },
+    })
+  }
+
+  function deletePlan(p: Plan) {
+    confirm({
+      title: 'Delete plan',
+      message: `Permanently delete "${p.name}"? This only works if no member has ever purchased it - otherwise deactivate it instead. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+      onConfirm: async () => {
+        await api.delete(`/api/plans/manage/${p.id}`)
+        toast.success('Plan deleted.')
+        loadPlans()
+      },
+    })
   }
 
   return (
@@ -422,11 +512,21 @@ export default function OwnerDashboard() {
               ) : (
                 <ul className="mt-4 divide-y divide-gray-100 text-sm">
                   {plans.map((p) => (
-                    <li key={p.id} className="flex justify-between py-2">
-                      <span>{p.name} <span className="text-xs text-gray-400">({p.durationMonths} month{p.durationMonths > 1 ? 's' : ''})</span></span>
-                      <span className="text-gray-500">
-                        {p.discountActive ? <><span className="line-through">₹{p.price}</span> ₹{p.effectivePrice}</> : `₹${p.price}`}
+                    <li key={p.id} className="flex items-center justify-between gap-3 py-2">
+                      <span className={`min-w-0 ${p.active ? '' : 'text-gray-400'}`}>
+                        {p.name} <span className="text-xs text-gray-400">({p.durationMonths} month{p.durationMonths > 1 ? 's' : ''})</span>
+                        {!p.active && <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">Inactive</span>}
                       </span>
+                      <div className="flex flex-shrink-0 items-center gap-2">
+                        <span className="text-gray-500">
+                          {p.discountActive ? <><span className="line-through">₹{p.price}</span> ₹{p.effectivePrice}</> : `₹${p.price}`}
+                        </span>
+                        <RowActionsMenu actions={[
+                          { label: 'Edit', icon: <PencilIcon />, onClick: () => startEditPlan(p) },
+                          { label: p.active ? 'Deactivate' : 'Reactivate', icon: p.active ? <BanIcon /> : <CheckIcon />, onClick: () => togglePlanActive(p), danger: p.active },
+                          { label: 'Delete', icon: <TrashIcon />, onClick: () => deletePlan(p), danger: true },
+                        ]} />
+                      </div>
                     </li>
                   ))}
                   {plans.length === 0 && <li className="py-2 text-gray-400">No plans yet - add one above.</li>}
@@ -455,6 +555,57 @@ export default function OwnerDashboard() {
       </div>
 
       <ConfirmDialog {...dialogProps} />
+
+      {editingPlan && (
+        <EditModal title="Edit plan" saving={savingPlan} onSave={saveEditPlan} onClose={() => setEditingPlan(null)}>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-gray-500">Plan name</label>
+              <input value={planForm.name} onChange={(e) => setPlanForm((f) => ({ ...f, name: e.target.value }))}
+                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs text-gray-500">Duration (months)</label>
+                <input type="number" min={1} value={planForm.durationMonths}
+                  onChange={(e) => setPlanForm((f) => ({ ...f, durationMonths: e.target.value }))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Price</label>
+                <input type="number" min={0} step="0.01" value={planForm.price}
+                  onChange={(e) => setPlanForm((f) => ({ ...f, price: e.target.value }))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Discount price (optional - clear to remove the discount)</label>
+              <input type="number" min={0} step="0.01" value={planForm.discountPrice}
+                onChange={(e) => setPlanForm((f) => ({ ...f, discountPrice: e.target.value }))}
+                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+            </div>
+            {planForm.discountPrice && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs text-gray-500">Discount starts (blank = now)</label>
+                  <input type="datetime-local" value={planForm.discountStartsAt}
+                    onChange={(e) => setPlanForm((f) => ({ ...f, discountStartsAt: e.target.value }))}
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500">Discount ends (blank = no end)</label>
+                  <input type="datetime-local" value={planForm.discountEndsAt}
+                    onChange={(e) => setPlanForm((f) => ({ ...f, discountEndsAt: e.target.value }))}
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm" />
+                </div>
+              </div>
+            )}
+            <p className="text-[11px] text-gray-400">
+              Changes apply to future purchases only - memberships already bought keep the price they were bought at.
+            </p>
+          </div>
+        </EditModal>
+      )}
     </div>
   )
 }

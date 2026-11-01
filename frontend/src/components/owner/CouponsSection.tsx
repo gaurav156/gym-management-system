@@ -32,6 +32,12 @@ const emptyForm: CouponFormState = {
 
 const NO_COUPONS: Coupon[] = []
 
+const APPLIES_TO_LABEL: Record<Coupon['appliesTo'], string> = {
+  PRODUCT: 'Store products',
+  MEMBERSHIP: 'Plans',
+  BOTH: 'Products & plans',
+}
+
 function toFormState(c: Coupon): CouponFormState {
   return {
     code: c.code,
@@ -262,6 +268,7 @@ export default function CouponsSection() {
             <tr className="border-b border-gray-200 text-gray-500">
               <th className="pb-2 pr-4">Code</th>
               <th className="pb-2 pr-4">Discount</th>
+              <th className="pb-2 pr-4">Applies to</th>
               <th className="pb-2 pr-4">Window</th>
               <th className="pb-2 pr-4">Redeemed</th>
               <th className="pb-2 pr-4">Status</th>
@@ -281,6 +288,7 @@ export default function CouponsSection() {
                     <span className="ml-1 text-xs text-gray-400">(up to ₹{c.maxDiscountAmount})</span>
                   )}
                 </td>
+                <td className="py-2 pr-4 text-gray-500">{APPLIES_TO_LABEL[c.appliesTo]}</td>
                 <td className="py-2 pr-4 text-xs text-gray-500">
                   {c.startsAt ? new Date(c.startsAt).toLocaleString() : 'Any time'} –{' '}
                   {c.endsAt ? new Date(c.endsAt).toLocaleString() : 'No end'}

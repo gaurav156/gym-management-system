@@ -59,4 +59,6 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     boolean existsByMemberId(UUID memberId);
 
     boolean existsByBranchId(UUID branchId);
+
+    boolean existsByPlanId(UUID planId);
 }

@@ -43,6 +43,7 @@ export interface Plan {
   discountEndsAt: string | null
   effectivePrice: number
   discountActive: boolean
+  active: boolean
 }
 
 export interface Membership {

@@ -99,4 +99,16 @@ public class MembershipController {
         UUID recordedBy = UUID.fromString((String) authentication.getDetails());
         return membershipService.recordAdditionalPayment(id, req, recordedBy);
     }
+
+    @GetMapping("/plans/manage")
+    @PreAuthorize("hasRole('OWNER')")
+    public List<PlanResponse> listAllPlans() {
+        return membershipService.listAllPlans();
+    }
+
+    @DeleteMapping("/plans/manage/{id}")
+    @PreAuthorize("hasRole('OWNER')")
+    public void deletePlan(@PathVariable UUID id) {
+        membershipService.deletePlan(id);
+    }
 }

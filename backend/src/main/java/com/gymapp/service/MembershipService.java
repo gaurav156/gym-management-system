@@ -350,7 +350,29 @@ public class MembershipService {
     private PlanResponse toPlanResponse(MembershipPlan p) {
         return new PlanResponse(p.getId(), p.getName(), p.getDurationMonths(), p.getPrice(),
                 p.getDiscountPrice(), p.getDiscountStartsAt(), p.getDiscountEndsAt(),
-                effectivePrice(p), isPlanDiscountActive(p));
+                effectivePrice(p), isPlanDiscountActive(p), p.isActive());
+    }
+
+    // Owner-only (enforced at the controller) - includes inactive plans, unlike listPlans().
+    @Transactional(readOnly = true)
+    public List<PlanResponse> listAllPlans() {
+        return planRepository.findAll().stream()
+                .sorted(java.util.Comparator.comparing(MembershipPlan::getName))
+                .map(this::toPlanResponse).toList();
+    }
+
+    // Owner-only. A plan that has ever been purchased stays so past memberships/invoices
+    // keep their plan details - those can only be deactivated.
+    @Transactional
+    public void deletePlan(UUID planId) {
+        MembershipPlan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new IllegalArgumentException("Plan not found"));
+        if (membershipRepository.existsByPlanId(planId)) {
+            throw new IllegalArgumentException(
+                    "This plan has been purchased by at least one member - deleting it would break their " +
+                            "membership history. Deactivate it instead so it stops being offered.");
+        }
+        planRepository.delete(plan);
     }
 
     private MembershipResponse toMembershipResponse(Membership m) {

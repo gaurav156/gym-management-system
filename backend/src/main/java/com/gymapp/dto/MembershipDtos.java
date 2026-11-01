@@ -46,7 +46,8 @@ public class MembershipDtos {
             LocalDateTime discountStartsAt,
             LocalDateTime discountEndsAt,
             BigDecimal effectivePrice,
-            boolean discountActive
+            boolean discountActive,
+            boolean active
     ) {}
 
     public record PurchaseRequest(

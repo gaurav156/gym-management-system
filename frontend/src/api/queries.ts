@@ -36,6 +36,11 @@ export const usePlans = () => useQuery({
   queryFn: () => api.get<Plan[]>('/api/plans').then((r) => r.data),
 })
 
+export const useManagedPlans = () => useQuery({
+  queryKey: [...qk.plans, 'manage'], staleTime: SHORT,
+  queryFn: () => api.get<Plan[]>('/api/plans/manage').then((r) => r.data),
+})
+
 export const useProductCategories = () => useQuery({
   queryKey: qk.categories, staleTime: STATIC,
   queryFn: () => api.get<ProductCategory[]>('/api/product-categories').then((r) => r.data),
