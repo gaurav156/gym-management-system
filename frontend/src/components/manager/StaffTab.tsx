@@ -369,7 +369,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                 <tr key={s.id}>
                   <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">
-                      <Avatar src={s.photo} name={s.name} className="h-6 w-6" textClassName="text-[10px]" />
+                      <Avatar src={s.photo} name={s.name} className="h-6 w-6" textClassName="text-[10px]" enlargeable />
                       {s.name}
                       {s.leftDate && (s.role === 'TRAINER' || s.role === 'MANAGER') && (
                         <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">Left</span>

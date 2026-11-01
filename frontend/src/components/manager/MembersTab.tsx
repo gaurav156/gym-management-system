@@ -428,7 +428,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                   <tr key={member.id}>
                     <td className="py-2 pr-4">
                       <div className="flex items-center gap-2">
-                        <Avatar src={member.photo} name={member.name} className="h-6 w-6" textClassName="text-[10px]" />
+                        <Avatar src={member.photo} name={member.name} className="h-6 w-6" textClassName="text-[10px]" enlargeable />
                         {member.name}
                       </div>
                     </td>
