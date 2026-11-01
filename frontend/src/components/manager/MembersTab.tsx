@@ -22,6 +22,7 @@ import EditActions from '../EditActions'
 import { useMembers, invalidatePeople, invalidateMembershipData, usePersonPayments, usePersonAttendance, usePersonMemberships, useMyBranches, useRoleHistory, qk, NO_BRANCHES } from '../../api/queries'
 import RefreshButton from '../RefreshButton'
 import { queryClient } from '../../api/queryClient'
+import { PhoneLink, EmailLink, ContactActions } from '../ContactLinks'
 
 const NO_MEMBERSHIPS: MembershipAdmin[] = []
 const NO_MEMBERS: MemberSummary[] = []
@@ -474,7 +475,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
             <div className="flex-shrink-0 px-6 pt-6">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <Avatar src={detailMember.photo} name={detailMember.name} className="h-12 w-12" textClassName="text-lg" />
+                  <Avatar src={detailMember.photo} name={detailMember.name} className="h-12 w-12" textClassName="text-lg" enlargeable />
                   <div className="min-w-0">
                     <h3 className="break-words text-lg font-medium">{detailMember.name}</h3>
                     <p className="break-words text-xs text-gray-500">{detailMember.email} · PIN {detailMember.checkinPin ?? '—'}</p>
@@ -509,7 +510,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                   {editingMemberInfo ? (
                     <div className="space-y-3 rounded-md border border-gray-200 p-3">
                       <div className="flex items-center gap-3">
-                        <Avatar src={memberEditPhoto} name={memberEditName} className="h-14 w-14" textClassName="text-lg" />
+                        <Avatar src={memberEditPhoto} name={memberEditName} className="h-14 w-14" textClassName="text-lg" enlargeable />
                         <div className="flex flex-col items-start gap-1.5">
                           <PhotoUploadButton onLoaded={setMemberEditPhoto} label="Change photo" size="sm" />
                           {memberEditPhoto && (
@@ -545,8 +546,9 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                   ) : (
                     <>
                       <p><span className="text-gray-500">Name:</span> {detailMember.name}</p>
-                      <p><span className="text-gray-500">Email:</span> {detailMember.email}</p>
-                      <p><span className="text-gray-500">Phone:</span> {detailMember.phone ?? '—'}</p>
+                      <p><span className="text-gray-500">Email:</span> <EmailLink email={detailMember.email} /></p>
+                      <p><span className="text-gray-500">Phone:</span> <PhoneLink phone={detailMember.phone} /></p>
+                      <ContactActions phone={detailMember.phone} />
                       <p><span className="text-gray-500">Address:</span> {detailMember.address ?? '—'}</p>
                       <p><span className="text-gray-500">Gender:</span> {genderLabel(detailMember.gender)}</p>
                       <p><span className="text-gray-500">Date of birth:</span> {formatDobWithAge(detailMember.dateOfBirth)}</p>

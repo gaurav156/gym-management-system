@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import PhotoLightbox from './PhotoLightbox'
 
 interface Props {
   src?: string | null
@@ -7,6 +8,7 @@ interface Props {
   // the 96px profile avatar, e.g. className="h-6 w-6" textClassName="text-[10px]".
   className?: string
   textClassName?: string
+  enlargeable?: boolean   // click to view the photo full size
 }
 
 type Status = 'loading' | 'loaded' | 'error'
@@ -50,6 +52,20 @@ function AvatarInner({ src, name, className = 'h-8 w-8', textClassName = 'text-s
 
 // Keyed by src so a changed URL (e.g. a freshly uploaded photo) remounts the inner
 // component and starts from the "loading" state again instead of keeping a stale "error".
-export default function Avatar(props: Props) {
-  return <AvatarInner key={props.src ?? ''} {...props} />
+export default function Avatar({ enlargeable, ...props }: Props) {
+  const [open, setOpen] = useState(false)
+  const inner = <AvatarInner key={props.src ?? ''} {...props} />
+
+  if (!enlargeable || !props.src) return inner
+
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}
+        aria-label={`View ${props.name}'s photo enlarged`} title="Click to enlarge"
+        className="inline-flex flex-shrink-0 cursor-zoom-in rounded-full focus:outline-none focus:ring-2 focus:ring-brand">
+        {inner}
+      </button>
+      {open && <PhotoLightbox src={props.src} name={props.name} onClose={() => setOpen(false)} />}
+    </>
+  )
 }

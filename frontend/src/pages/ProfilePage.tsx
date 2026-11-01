@@ -98,7 +98,7 @@ export default function ProfilePage() {
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div className="flex flex-col items-center gap-3">
-          <Avatar src={photo} name={profile.name} className="h-24 w-24" textClassName="text-2xl" />
+          <Avatar src={photo} name={profile.name} className="h-24 w-24" textClassName="text-2xl" enlargeable />
           {!locked && (
             <>
               <PhotoUploadButton onLoaded={setPhoto} label="Upload photo" />

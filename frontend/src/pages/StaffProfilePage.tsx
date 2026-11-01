@@ -151,17 +151,19 @@ export default function StaffProfilePage() {
             {activeTab === 'PROFILE' && (
                 <div className="mt-6">
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        {locked && (
-                            <div className="flex flex-col items-center gap-3">
-                                <Avatar src={photo} name={profile.name} className="h-24 w-24" textClassName="text-2xl" />
+                        <div className="flex flex-col items-center gap-3">
+                            <Avatar src={photo} name={profile.name} className="h-24 w-24" textClassName="text-2xl" enlargeable />
+                            {!locked && (
+                                <>
                                 <PhotoUploadButton onLoaded={setPhoto} label="Upload photo" />
                                 {photo && (
                                     <button type="button" onClick={() => setPhoto(null)} className="text-xs text-red-600 hover:underline">
-                                        Remove photo
+                                    Remove photo
                                     </button>
                                 )}
-                            </div>
-                        )}
+                                </>
+                            )}
+                        </div>
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Full name</label>

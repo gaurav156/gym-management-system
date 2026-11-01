@@ -19,6 +19,7 @@ import { PencilIcon, TrashIcon, CalendarIcon, CheckIcon, MapPinIcon } from '../i
 import { useStaff, invalidatePeople, usePersonAttendance, useMyBranches, useRoleHistory, qk, NO_BRANCHES } from '../../api/queries'
 import { queryClient } from '../../api/queryClient'
 import RefreshButton from '../RefreshButton'
+import { PhoneLink, EmailLink, ContactActions } from '../ContactLinks'
 
 const NO_STAFF: StaffSummary[] = []
 const PAGE_SIZE = 10
@@ -417,7 +418,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
             <div className="flex-shrink-0 px-6 pt-6">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <Avatar src={detailStaff.photo} name={detailStaff.name} className="h-12 w-12" textClassName="text-lg" />
+                  <Avatar src={detailStaff.photo} name={detailStaff.name} className="h-12 w-12" textClassName="text-lg" enlargeable />
                   <div className="min-w-0">
                     <h3 className="break-words text-lg font-medium">{detailStaff.name}</h3>
                     <p className="break-words text-xs text-gray-500">
@@ -455,7 +456,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                   {editingStaffInfo ? (
                     <div className="space-y-3 rounded-md border border-gray-200 p-3">
                       <div className="flex items-center gap-3">
-                        <Avatar src={staffEditPhoto} name={staffEditName} className="h-14 w-14" textClassName="text-lg" />
+                        <Avatar src={staffEditPhoto} name={staffEditName} className="h-14 w-14" textClassName="text-lg" enlargeable />
                         <div className="flex flex-col items-start gap-1.5">
                           <PhotoUploadButton onLoaded={setStaffEditPhoto} label="Change photo" size="sm" />
                           {staffEditPhoto && (
@@ -493,8 +494,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                     <>
                       <p><span className="text-gray-500">Role:</span> {roleLabel(detailStaff.role)}</p>
                       <p><span className="text-gray-500">Name:</span> {detailStaff.name}</p>
-                      <p><span className="text-gray-500">Email:</span> {detailStaff.email}</p>
-                      <p><span className="text-gray-500">Phone:</span> {detailStaff.phone ?? '—'}</p>
+                      <p><span className="text-gray-500">Email:</span> <EmailLink email={detailStaff.email} /></p>
+                      <p><span className="text-gray-500">Phone:</span> <PhoneLink phone={detailStaff.phone} /></p>
+                      <ContactActions phone={detailStaff.phone} />
                       <p><span className="text-gray-500">Address:</span> {detailStaff.address ?? '—'}</p>
                       <p><span className="text-gray-500">Gender:</span> {genderLabel(detailStaff.gender)}</p>
                       <p><span className="text-gray-500">Date of birth:</span> {formatDobWithAge(detailStaff.dateOfBirth)}</p>
