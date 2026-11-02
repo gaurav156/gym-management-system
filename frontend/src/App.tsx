@@ -19,6 +19,7 @@ import InvoiceViewPage from './pages/InvoiceViewPage'
 import ProductInvoiceViewPage from './pages/ProductInvoiceViewPage'
 import UnsubscribePage from './pages/UnsubscribePage'
 import ToastContainer from './components/ToastContainer'
+import DocumentViewerHost from './components/DocumentViewerHost'
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
       <ScrollToTop />
       <Navbar />
       <ToastContainer />
+      <DocumentViewerHost />
       <Routes>
         <Route path="/" element={<LandingPage />} />
 

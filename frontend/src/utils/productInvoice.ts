@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf'
 import type { ProductOrderInvoice } from '../types'
+import { openViewer } from '../store/viewerStore'
 
 const GYM_NAME = import.meta.env.VITE_GYM_NAME || 'Gym Invoice'
 const GYM_LOGO_URL = import.meta.env.VITE_GYM_LOGO_URL || ''
@@ -182,7 +183,7 @@ async function buildInvoiceDoc(inv: ProductOrderInvoice): Promise<jsPDF> {
 
 export async function viewProductInvoice(inv: ProductOrderInvoice) {
   const doc = await buildInvoiceDoc(inv)
-  window.open(doc.output('bloburl') as unknown as string, '_blank')
+  openViewer({ title: `Order ${inv.invoiceNumber}`, blob: doc.output('blob'), filename: `order-${inv.invoiceNumber}.pdf` })
 }
 
 function isMobileDevice(): boolean {
