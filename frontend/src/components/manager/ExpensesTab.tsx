@@ -10,6 +10,7 @@ import { toast, getErrorMessage } from '../../store/toastStore'
 import { qk, useExpenses, invalidateFinance } from '../../api/queries'
 import { queryClient } from '../../api/queryClient'
 import RefreshButton from '../RefreshButton'
+import { openViewer } from '../../store/viewerStore'
 
 const PAGE_SIZE = 10
 
@@ -138,7 +139,7 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
                   size="sm" purpose="BILL" accept="image/*,application/pdf" />
                 {billUrl && (
                   <>
-                    <a href={billUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-brand hover:underline">View</a>
+                    <button type="button" onClick={() => openViewer({ title: 'Bill', url: billUrl })} className="text-xs text-brand hover:underline">View</button>
                     <button type="button" onClick={() => setBillUrl(null)} className="text-xs text-red-600 hover:underline">Remove</button>
                   </>
                 )}
@@ -196,7 +197,8 @@ export default function ExpensesTab({ selectedBranch, user }: Props) {
                   <td className="py-2 pr-4 text-gray-500">{e.recordedByName}</td>
                   <td className="py-2 pr-4">
                     {e.billUrl ? (
-                      <a href={e.billUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-brand hover:underline">View</a>
+                      <button type="button" onClick={() => openViewer({ title: `Bill · ${categoryLabel(e.category)} · ${e.expenseDate}`, url: e.billUrl! })}
+                        className="text-xs text-brand hover:underline">View</button>
                     ) : <span className="text-xs text-gray-400">—</span>}
                   </td>
                   {user?.role === 'OWNER' && (

@@ -2,8 +2,9 @@ import { create } from 'zustand'
 
 export interface ViewerDoc {
   title: string
-  blob: Blob            // PDF or image; type decides how it's shown
-  filename?: string     // when set, a Download link is offered
+  blob?: Blob           // generated/authenticated documents (invoices, ID proofs)
+  url?: string          // publicly hosted files (expense bills)
+  filename?: string     // Download link; only offered for blobs
 }
 
 interface ViewerState {

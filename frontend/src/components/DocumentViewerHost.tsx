@@ -8,15 +8,16 @@ const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 export default function DocumentViewerHost() {
   const doc = useViewerStore((s) => s.doc)
   const close = useViewerStore((s) => s.close)
-  const [url, setUrl] = useState<string | null>(null)
 
   useScrollLock(!!doc)
 
-  // One object URL per opened document, revoked as soon as it's closed.
+  const [blobUrl, setBlobUrl] = useState<string | null>(null)
+
+  // Object URL only for blob documents, revoked as soon as the viewer closes.
   useEffect(() => {
-    if (!doc) { setUrl(null); return }
+    if (!doc?.blob) { setBlobUrl(null); return }
     const u = URL.createObjectURL(doc.blob)
-    setUrl(u)
+    setBlobUrl(u)
     return () => URL.revokeObjectURL(u)
   }, [doc])
 
@@ -27,9 +28,15 @@ export default function DocumentViewerHost() {
     return () => document.removeEventListener('keydown', onKey)
   }, [doc, close])
 
+  const url = doc?.url ?? blobUrl
   if (!doc || !url) return null
 
-  const isPdf = doc.blob.type === 'application/pdf'
+  // Blobs carry their MIME type; hosted files are told apart by extension
+  // (bill keys always end in .pdf / .jpg / .png / .webp - see ImageUploadService).
+  const isPdf = doc.blob
+    ? doc.blob.type === 'application/pdf'
+    : /\.pdf(\?|#|$)/i.test(doc.url ?? '')
+
   const linkClass = 'text-brand hover:underline'
 
   return (
@@ -40,7 +47,7 @@ export default function DocumentViewerHost() {
           <h3 className="min-w-0 truncate text-sm font-semibold text-gray-900">{doc.title}</h3>
           <div className="flex flex-shrink-0 items-center gap-3 text-xs">
             <a href={url} target="_blank" rel="noopener noreferrer" className={linkClass}>Open in new tab</a>
-            {doc.filename && <a href={url} download={doc.filename} className={linkClass}>Download</a>}
+            {doc.blob && doc.filename && <a href={url} download={doc.filename} className={linkClass}>Download</a>}
             <button type="button" onClick={close} aria-label="Close" className="text-gray-400 hover:text-gray-600">✕</button>
           </div>
         </div>
@@ -56,7 +63,7 @@ export default function DocumentViewerHost() {
               <div className="mt-4 flex justify-center gap-3">
                 <a href={url} target="_blank" rel="noopener noreferrer"
                   className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">Open PDF</a>
-                {doc.filename && (
+                {doc.blob && doc.filename && (
                   <a href={url} download={doc.filename}
                     className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Download</a>
                 )}
