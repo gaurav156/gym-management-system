@@ -39,6 +39,8 @@ function AvatarInner({ src, name, className = 'h-8 w-8', textClassName = 'text-s
           ref={imgRef}
           src={src}
           alt=""
+          loading="lazy"
+          decoding="async"
           onLoad={() => setStatus('loaded')}
           onError={() => setStatus('error')}
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${

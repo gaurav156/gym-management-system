@@ -48,6 +48,8 @@ function ProductImageInner({ src, alt, className = '', imgClassName = 'object-co
           src={src}
           alt={alt}
           draggable={draggable}
+          loading="lazy"
+          decoding="async"
           onLoad={() => setStatus('loaded')}
           onError={() => setStatus('error')}
           className={`max-h-full max-w-full transition-opacity duration-200 ${imgClassName} ${
