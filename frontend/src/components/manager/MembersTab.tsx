@@ -19,11 +19,15 @@ import { genderLabel, formatDobWithAge } from '../../utils/person'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { toast, getErrorMessage } from '../../store/toastStore'
 import EditActions from '../EditActions'
-import { useMembers, invalidatePeople, invalidateMembershipData, usePersonPayments, usePersonAttendance, usePersonMemberships, useMyBranches, useRoleHistory, qk, NO_BRANCHES } from '../../api/queries'
+import { useMembers, useMemberDetail, invalidatePeople, invalidateMembershipData, usePersonPayments, usePersonAttendance, usePersonMemberships, useMyBranches, useRoleHistory, qk, NO_BRANCHES } from '../../api/queries'
 import RefreshButton from '../RefreshButton'
 import { queryClient } from '../../api/queryClient'
 import { PhoneLink, EmailLink, ContactActions } from '../ContactLinks'
+import { usePersistedState } from '../../hooks/usePersistedState'
+import { usePersistedTab } from '../../hooks/usePersistedTab'
 
+type ModalTab = 'INFO' | 'MEMBERSHIPS' | 'PAYMENTS' | 'STORE' | 'ATTENDANCE' | 'BRANCHES'
+const MODAL_TABS: readonly ModalTab[] = ['INFO', 'MEMBERSHIPS', 'PAYMENTS', 'STORE', 'ATTENDANCE', 'BRANCHES']
 const NO_MEMBERSHIPS: MembershipAdmin[] = []
 const NO_MEMBERS: MemberSummary[] = []
 const PAGE_SIZE = 10
@@ -53,8 +57,8 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const memberTotalElements = membersQuery.data?.totalElements ?? 0
   const membersLoading = membersQuery.isLoading
 
-  const [detailMemberId, setDetailMemberId] = useState<string | null>(null)
-  const [modalTab, setModalTab] = useState<'INFO' | 'MEMBERSHIPS' | 'PAYMENTS' | 'STORE' | 'ATTENDANCE' | 'BRANCHES'>('INFO')
+  const [detailMemberId, setDetailMemberId] = usePersistedState('members-detail')
+  const [modalTab, setModalTab] = usePersistedTab<ModalTab>('members-detail-tab', MODAL_TABS, 'INFO')
   const [modalShowExpired, setModalShowExpired] = useState(false)
   const [modalPage, setModalPage] = useState(1)
 
@@ -110,11 +114,20 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
 
   const { data: roleHistory = [] } = useRoleHistory(detailMemberId ?? undefined, user?.role === 'OWNER')
 
-  const detailFetching = paymentsQ.isFetching || attendanceQ.isFetching || membershipsQ.isFetching
+  const detailQuery = useMemberDetail(detailMemberId)
+
+  // Drop the id only when the server says that person no longer exists (4xx).
+  // A network blip keeps it, so the modal comes back once you're online again.
+  useEffect(() => {
+    if (detailQuery.isError && (detailQuery.error as any)?.response) setDetailMemberId(null)
+  }, [detailQuery.isError, detailQuery.error, setDetailMemberId])
+
+  const detailFetching = paymentsQ.isFetching || attendanceQ.isFetching || membershipsQ.isFetching || detailQuery.isFetching
   function refreshDetail() {
     [qk.payments, qk.attendance, qk.members, qk.productOrders]
       .forEach((k) => queryClient.invalidateQueries({ queryKey: k }))
   }
+
 
   // One place that opens the modal, so tab and page state reset in the same render
   // (otherwise the previously open tab would fire a request for the new person first).
@@ -156,6 +169,13 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
     setEditingMemberBranches(false)
     setSelectedNewRole('')
   }, [detailMemberId])
+
+  useEffect(() => {
+    if (!detailMemberId) return
+    if (membersQuery.isSuccess && !membersQuery.isFetching && !members.some((m) => m.id === detailMemberId)) {
+      setDetailMemberId(null)
+    }
+  }, [detailMemberId, members, membersQuery.isSuccess, membersQuery.isFetching, setDetailMemberId])
 
   // Refreshes the table, the open modal's membership list, and payments - all share these key prefixes.
   function refreshMembershipViews() {
@@ -367,7 +387,7 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
 
   const memberRows = members.map((member) => ({ member, status: member.membershipStatus }))
 
-  const detailMember = members.find((m) => m.id === detailMemberId) ?? null
+  const detailMember = detailQuery.data ?? members.find((m) => m.id === detailMemberId) ?? null
   const detailMemberships = detailMembershipsFetched
     .filter((ms) => {
       const effective = getEffectiveStatus(ms)

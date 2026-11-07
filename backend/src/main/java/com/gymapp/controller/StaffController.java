@@ -29,4 +29,10 @@ public class StaffController {
                                                 @RequestParam(defaultValue = "20") int size) {
         return staffDirectoryService.listStaffForBranch(branchId, role, includeLeft, sort, PageRequest.of(page, size));
     }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public StaffSummary getStaff(@PathVariable UUID id) {
+        return staffDirectoryService.getStaff(id);
+    }
 }

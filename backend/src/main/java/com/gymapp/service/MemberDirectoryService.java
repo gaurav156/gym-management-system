@@ -93,4 +93,14 @@ public class MemberDirectoryService {
                 u.getAddress(), u.getCheckinPin(), u.getEnrollmentDate(),
                 u.getGender(), u.getDateOfBirth(), u.getIdProofKey() != null, status);
     }
+
+    @Transactional(readOnly = true)
+    public MemberSummary getMember(UUID memberId) {
+        User u = userRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("Member not found"));
+        if (u.getRole() != Role.MEMBER) {
+            throw new IllegalArgumentException("This account is not a member");
+        }
+        return toSummary(u, statusOf(membershipRepository.findByMemberId(u.getId()), LocalDate.now()));
+    }
 }

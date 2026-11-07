@@ -106,6 +106,12 @@ export const useMembers = (p: MemberListParams) => useQuery({
   }).then((r) => r.data),
 })
 
+export const useMemberDetail = (id: string | null) => useQuery({
+  queryKey: [...qk.members, 'detail', id],
+  enabled: !!id, staleTime: SHORT,
+  queryFn: () => api.get<MemberSummary>(`/api/members/${id}`).then((r) => r.data),
+})
+
 export interface StaffListParams { branchId: string; role: string; includeLeft: boolean; sort: string; page: number; size: number }
 export const useStaff = (p: StaffListParams) => useQuery({
   queryKey: [...qk.staff, p.branchId, p.role, p.includeLeft, p.sort, p.page, p.size],
@@ -114,6 +120,12 @@ export const useStaff = (p: StaffListParams) => useQuery({
   queryFn: () => api.get<PageResponse<StaffSummary>>('/api/staff', {
     params: { branchId: p.branchId, role: p.role, includeLeft: p.includeLeft, sort: p.sort, page: p.page, size: p.size },
   }).then((r) => r.data),
+})
+
+export const useStaffDetail = (id: string | null) => useQuery({
+  queryKey: [...qk.staff, 'detail', id],
+  enabled: !!id, staleTime: SHORT,
+  queryFn: () => api.get<StaffSummary>(`/api/staff/${id}`).then((r) => r.data),
 })
 
 // date undefined = today. live = also auto-refresh every 60s while mounted (reception screen only).

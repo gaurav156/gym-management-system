@@ -38,4 +38,10 @@ public class MemberController {
     public MemberSummary updateMember(@PathVariable UUID id, @RequestBody UpdateProfileRequest req) {
         return memberDirectoryService.updateMember(id, req);
     }
+
+    @GetMapping("/api/members/{id}")
+    @PreAuthorize("hasAnyRole('OWNER','MANAGER')")
+    public MemberSummary getMember(@PathVariable UUID id) {
+        return memberDirectoryService.getMember(id);
+    }
 }

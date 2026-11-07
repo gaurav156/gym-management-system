@@ -16,11 +16,16 @@ import { toast, getErrorMessage } from '../../store/toastStore'
 import EditActions from '../EditActions'
 import ActionButton from '../ActionButton'
 import { PencilIcon, TrashIcon, CalendarIcon, CheckIcon, MapPinIcon } from '../icons/ActionIcons'
-import { useStaff, invalidatePeople, usePersonAttendance, useMyBranches, useRoleHistory, qk, NO_BRANCHES } from '../../api/queries'
+import { useStaff, useStaffDetail, invalidatePeople, usePersonAttendance, useMyBranches, useRoleHistory, qk, NO_BRANCHES } from '../../api/queries'
 import { queryClient } from '../../api/queryClient'
 import RefreshButton from '../RefreshButton'
 import { PhoneLink, EmailLink, ContactActions } from '../ContactLinks'
 
+import { usePersistedState } from '../../hooks/usePersistedState'
+import { usePersistedTab } from '../../hooks/usePersistedTab'
+
+type StaffModalTab = 'INFO' | 'ATTENDANCE' | 'BRANCHES' | 'STORE'
+const STAFF_MODAL_TABS: readonly StaffModalTab[] = ['INFO', 'ATTENDANCE', 'BRANCHES', 'STORE']
 const NO_STAFF: StaffSummary[] = []
 const PAGE_SIZE = 10
 const MODAL_PAGE_SIZE = 5
@@ -62,8 +67,8 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const staffTotalElements = staffQuery.data?.totalElements ?? 0
   const staffLoading = staffQuery.isLoading
 
-  const [detailStaffId, setDetailStaffId] = useState<string | null>(null)
-  const [staffModalTab, setStaffModalTab] = useState<'INFO' | 'ATTENDANCE' | 'BRANCHES' | 'STORE'>('INFO')
+  const [detailStaffId, setDetailStaffId] = usePersistedState('staff-detail')
+  const [staffModalTab, setStaffModalTab] = usePersistedTab<StaffModalTab>('staff-detail-tab', STAFF_MODAL_TABS, 'INFO')
 
   const [editingStaffInfo, setEditingStaffInfo] = useState(false)
   const [staffEditName, setStaffEditName] = useState('')
@@ -91,7 +96,9 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
   const [otpTarget, setOtpTarget] = useState<RoleChangeOtpTarget | null>(null)
   const [demotionBranchIds, setDemotionBranchIds] = useState<string[]>([])
 
-  const detailStaffRole = staff.find((x) => x.id === detailStaffId)?.role
+  const staffDetailQ = useStaffDetail(detailStaffId)
+
+  const detailStaffRole = (staffDetailQ.data ?? staff.find((x) => x.id === detailStaffId))?.role
 
   const staffAttendanceQ = usePersonAttendance(detailStaffId ?? undefined, staffModalPage, MODAL_PAGE_SIZE, staffModalTab === 'ATTENDANCE')
   const detailStaffAttendance = staffAttendanceQ.data?.content ?? []
@@ -134,6 +141,17 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     setSelectedNewRole('')
     setDemotionBranchIds([])
   }, [detailStaffId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (staffDetailQ.isError && (staffDetailQ.error as any)?.response) setDetailStaffId(null)
+  }, [staffDetailQ.isError, staffDetailQ.error, setDetailStaffId])
+
+  useEffect(() => {
+    if (!detailStaffId) return
+    if (staffQuery.isSuccess && !staffQuery.isFetching && !staff.some((s) => s.id === detailStaffId)) {
+      setDetailStaffId(null)
+    }
+  }, [detailStaffId, staff, staffQuery.isSuccess, staffQuery.isFetching, setDetailStaffId])
 
   function startEditStaffInfo(s: StaffSummary) {
     setEditingStaffInfo(true)
@@ -290,7 +308,7 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
     })
   }
 
-  const detailStaff = staff.find((s) => s.id === detailStaffId) ?? null
+  const detailStaff = staffDetailQ.data ?? staff.find((s) => s.id === detailStaffId) ?? null
 
   // Edit-info is available for Trainer (Owner or Manager) and Manager (Owner only).
   const canEditInfo = detailStaff && detailStaff.role !== 'OWNER' &&

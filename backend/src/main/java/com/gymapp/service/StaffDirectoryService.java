@@ -2,6 +2,7 @@ package com.gymapp.service;
 
 import com.gymapp.dto.PageDtos.PageResponse;
 import com.gymapp.dto.StaffDtos.StaffSummary;
+import com.gymapp.entity.Role;
 import com.gymapp.entity.User;
 import com.gymapp.repository.UserRepository;
 import com.gymapp.storage.ImageRefs;
@@ -46,5 +47,15 @@ public class StaffDirectoryService {
         return new StaffSummary(u.getId(), u.getName(), u.getEmail(), u.getPhone(), u.getAddress(), imageRefs.toUrl(u.getPhoto()),
                 u.getCheckinPin(), u.getRole().name(), u.getJoiningDate(), u.getLeftDate(),
                 u.getGender(), u.getDateOfBirth(), u.getIdProofKey() != null);
+    }
+
+    @Transactional(readOnly = true)
+    public StaffSummary getStaff(UUID id) {
+        User u = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Staff member not found"));
+        if (u.getRole() == Role.MEMBER) {
+            throw new IllegalArgumentException("This account is not a staff account");
+        }
+        return toSummary(u);
     }
 }
