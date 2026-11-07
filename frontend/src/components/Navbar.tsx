@@ -8,6 +8,21 @@ import { useConfirm } from '../hooks/useConfirm'
 const GYM_NAME = import.meta.env.VITE_GYM_NAME || 'FitZone Gym'
 const GYM_LOGO_URL = import.meta.env.VITE_GYM_LOGO_URL || '/logo.svg'
 
+// Logo geometry (px) - mobile values; sm+ sizes are set in the classes below.
+const LOGO_MOBILE = 72
+const HAMBURGER = 44   // button width incl. padding
+const SIDE_PAD = 32    // px-4 on both sides
+const NAME_GAP = 8     // logo -> name
+const BREATHING = 20   // guaranteed free space between name and hamburger
+
+// Name font size shrinks to fit the free width on narrow screens, capped at 1.25rem.
+const nameSize = `clamp(0.65rem, calc((100vw - ${(SIDE_PAD + LOGO_MOBILE + NAME_GAP + HAMBURGER + BREATHING) / 16}rem) / ${GYM_NAME.length * 0.85}), 1.25rem)`
+
+// Slide-in menu: the drawer is min(20rem, 88vw) wide. Free width for the name =
+// drawer - side padding (2rem) - logo (3.5rem) - gap (0.75rem) - close button (2.25rem) - breathing room (0.75rem).
+const drawerNameSize =
+  `clamp(0.65rem, calc((min(20rem, 88vw) - 9.25rem) / ${GYM_NAME.length * 0.85}), 1.25rem)`
+
 function MenuIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-6 w-6">
@@ -124,10 +139,27 @@ export default function Navbar() {
           scrolled ? 'border-gray-200 shadow-sm' : 'border-transparent'
         }`}
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <Link to="/" className="flex min-w-0 items-center gap-2 text-xl font-semibold text-brand">
-            <img src={GYM_LOGO_URL} alt="" className="h-7 w-7 flex-shrink-0" />
-            <span className="truncate">{GYM_NAME}</span>
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:h-16">
+          <Link to="/" className="relative flex h-full min-w-0 items-center text-brand">
+            {/* Mobile: 56px bar, 72px logo, top 4px -> bottom at 76px, so 20px (~28%) overhangs.
+                sm+: 64px bar, 88px logo, top 1px -> 25px (~28%) overhangs. */}
+            <span
+              aria-hidden="true"
+              className="absolute left-0 top-1 z-10 h-[72px] w-[72px] rounded-full bg-white p-1.5
+                        shadow-[0_3px_4px_-2px_rgba(0,0,0,0.18)]
+                        sm:top-px sm:h-[88px] sm:w-[88px]"
+            >
+              <img src={GYM_LOGO_URL} alt="" className="h-full w-full rounded-full object-cover" />
+            </span>
+
+            <span
+              style={{ ['--name-size' as any]: nameSize }}
+              className="ml-[80px] whitespace-nowrap font-[family-name:Bevan] text-[length:var(--name-size)]
+                        tracking-widest text-black origin-center scale-y-[1.2] sm:ml-[104px] sm:text-xl"
+            >
+              {GYM_NAME}
+            </span>
+            <span className="sr-only">Home</span>
           </Link>
 
           {/* Desktop nav - hidden on narrow screens to avoid overflow with a long gym name */}
@@ -168,13 +200,20 @@ export default function Navbar() {
       {menuOpen && (
         <div className="fixed inset-0 z-[60] sm:hidden" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/40" onClick={closeMenu} />
-          <div className="absolute right-0 top-0 flex h-full w-72 max-w-[85vw] flex-col bg-white p-4 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex min-w-0 items-center gap-2">
-                <img src={GYM_LOGO_URL} alt="" className="h-6 w-6 flex-shrink-0" />
-                <span className="truncate font-semibold text-brand">{GYM_NAME}</span>
+          <div className="absolute right-0 top-0 flex h-full w-80 max-w-[88vw] flex-col bg-white p-4 shadow-lg">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <img src={GYM_LOGO_URL} alt="" className="h-14 w-14 flex-shrink-0 rounded-full object-cover" />
+                <span
+                  style={{ ['--name-size' as any]: drawerNameSize }}
+                  className="whitespace-nowrap font-[family-name:Bevan] text-[length:var(--name-size)]
+                            tracking-widest text-black origin-center scale-y-[1.2]"
+                >
+                  {GYM_NAME}
+                </span>
               </div>
-              <button onClick={closeMenu} aria-label="Close menu" className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100">
+              <button onClick={closeMenu} aria-label="Close menu"
+                className="flex-shrink-0 rounded-md p-1.5 text-gray-500 hover:bg-gray-100">
                 <CloseIcon />
               </button>
             </div>
