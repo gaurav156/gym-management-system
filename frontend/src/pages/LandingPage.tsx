@@ -4,9 +4,9 @@ import Footer from '../components/Footer'
 import { InstagramIcon, FacebookIcon } from '../components/SocialIcons'
 import { resolveBranchMap } from '../utils/maps'
 import { usePublicBranches, NO_BRANCHES } from '../api/queries'
+import HeroEmblem from '../components/HeroEmblem'
 
 const GYM_NAME = import.meta.env.VITE_GYM_NAME || 'FitZone Gym'
-const GYM_LOGO_URL = import.meta.env.VITE_GYM_LOGO_URL || '/logo.svg'
 const DIRECTOR_NAME = import.meta.env.VITE_DIRECTOR_NAME || 'Ramesh Mane'
 const DIRECTOR_PHOTO_URL = import.meta.env.VITE_DIRECTOR_PHOTO_URL || ''
 const ESTABLISHED_YEAR = Number(import.meta.env.VITE_GYM_ESTABLISHED_YEAR) || 1995
@@ -124,14 +124,7 @@ export default function LandingPage() {
     <div>
       {/* ---------- Hero ---------- */}
       <section className="relative overflow-hidden bg-ink text-white">
-        {/* Decorative weight-plate rings, echoing the dumbbell mark in the logo. The
-            outer ring is the page's one deliberate motion - a very slow rotation,
-            like a loaded bar settling. Purely decorative: aria-hidden. */}
-        <div aria-hidden="true" className="pointer-events-none absolute -right-24 top-1/2 hidden -translate-y-1/2 sm:block">
-          <div className="animate-slow-spin h-[420px] w-[420px] rounded-full border-[18px] border-white/[0.06]" />
-          <div className="absolute inset-16 rounded-full border-[14px] border-brand/20" />
-          <div className="absolute inset-32 rounded-full border-[10px] border-white/[0.08]" />
-        </div>
+        <HeroEmblem />
 
         <div className="relative mx-auto max-w-6xl px-4 pb-24 pt-16 sm:pb-32 sm:pt-20">
           <span className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-gray-300">
