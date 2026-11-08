@@ -16,8 +16,10 @@ export default function Footer() {
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <div className="flex items-center gap-2 text-lg font-semibold text-white">
-              <img src={GYM_LOGO_URL} alt="" className="h-6 w-6" />
-              {GYM_NAME}
+              <img src={GYM_LOGO_URL} alt="" className="h-8 w-8 flex-shrink-0 rounded-full object-cover" />
+              <span className="whitespace-nowrap font-[family-name:Bevan] tracking-widest origin-center scale-y-[1.2] text-base sm:text-sm">
+                {GYM_NAME}
+              </span>
             </div>
             <p className="mt-3 max-w-xs text-sm leading-relaxed">
               Real coaching, well-kept equipment, and a membership that works the same
