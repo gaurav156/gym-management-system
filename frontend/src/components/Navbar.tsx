@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore'
 import { getDashboardPath } from '../utils/navigation'
 import ConfirmDialog from './ConfirmDialog'
 import { useConfirm } from '../hooks/useConfirm'
+import { branding, DEFAULT_LOGO, useAssetsStatus } from '../utils/branding'
 
 const GYM_NAME = import.meta.env.VITE_GYM_NAME || 'FitZone Gym'
 const GYM_LOGO_URL = import.meta.env.VITE_GYM_LOGO_URL || '/logo.svg'
@@ -88,6 +89,13 @@ export default function Navbar() {
   // flickering on/off from the tiny overscroll bounce some browsers report.
   const [scrolled, setScrolled] = useState(false)
 
+  const logoSrc = branding.logoUrl || DEFAULT_LOGO
+  const logoStatus = useAssetsStatus(branding.logoUrl ? [branding.logoUrl] : [])
+  // Emblem layout only for a configured logo that loads (optimistic while loading, so the
+  // bar doesn't jump). No URL, or a failed load, gives the original compact layout.
+  const emblem = logoStatus === 'loading' || logoStatus === 'ok'
+  const nameFontClass = 'font-[family-name:var(--gym-name-font)]'
+
   useEffect(() => {
     function onScroll() {
       setScrolled(window.scrollY > 4)
@@ -139,28 +147,28 @@ export default function Navbar() {
           scrolled ? 'border-gray-200 shadow-sm' : 'border-transparent'
         }`}
       >
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:h-16">
-          <Link to="/" className="relative flex h-full min-w-0 items-center text-brand">
-            {/* Mobile: 56px bar, 72px logo, top 4px -> bottom at 76px, so 20px (~28%) overhangs.
-                sm+: 64px bar, 88px logo, top 1px -> 25px (~28%) overhangs. */}
-            <span
-              aria-hidden="true"
-              className="absolute left-0 top-1 z-10 h-[72px] w-[72px] rounded-full bg-white p-1.5
-                        shadow-[0_3px_4px_-2px_rgba(0,0,0,0.18)]
-                        sm:top-px sm:h-[88px] sm:w-[88px]"
-            >
-              <img src={GYM_LOGO_URL} alt="" className="h-full w-full rounded-full object-cover" />
-            </span>
-
-            <span
-              style={{ ['--name-size' as any]: nameSize }}
-              className="ml-[80px] whitespace-nowrap font-[family-name:Bevan] text-[length:var(--name-size)]
-                        tracking-widest text-black origin-center scale-y-[1.2] sm:ml-[104px] sm:text-xl"
-            >
-              {GYM_NAME}
-            </span>
-            <span className="sr-only">Home</span>
-          </Link>
+        <div className={`mx-auto flex max-w-6xl items-center justify-between px-4 ${emblem ? 'h-14 sm:h-16' : 'py-4'}`}>
+          {emblem ? (
+            <Link to="/" className="relative flex h-full min-w-0 items-center text-brand">
+              <span aria-hidden="true"
+                className="absolute left-0 top-1 z-10 h-[72px] w-[72px] rounded-full bg-white p-1.5
+                          shadow-[0_3px_4px_-2px_rgba(0,0,0,0.18)] sm:top-px sm:h-[88px] sm:w-[88px]">
+                <img src={logoSrc} alt="" className="h-full w-full rounded-full object-cover" />
+              </span>
+              <span style={{ ['--name-size' as any]: nameSize }}
+                className={`ml-[80px] whitespace-nowrap ${nameFontClass} text-[length:var(--name-size)]
+                            tracking-widest text-black origin-center scale-y-[1.2] sm:ml-[104px] sm:text-xl`}>
+                {GYM_NAME}
+              </span>
+              <span className="sr-only">Home</span>
+            </Link>
+          ) : (
+            // Original layout
+            <Link to="/" className="flex min-w-0 items-center gap-2 text-xl text-brand">
+              <img src={logoSrc} alt="" className="h-7 w-7 flex-shrink-0" />
+              <span className={`truncate ${branding.nameFont ? nameFontClass : 'font-semibold'}`}>{GYM_NAME}</span>
+            </Link>
+          )}
 
           {/* Desktop nav - hidden on narrow screens to avoid overflow with a long gym name */}
           <div className="hidden flex-shrink-0 items-center gap-4 text-sm sm:flex">
@@ -203,14 +211,15 @@ export default function Navbar() {
           <div className="absolute right-0 top-0 flex h-full w-80 max-w-[88vw] flex-col bg-white p-4 shadow-lg">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <img src={GYM_LOGO_URL} alt="" className="h-14 w-14 flex-shrink-0 rounded-full object-cover" />
-                <span
-                  style={{ ['--name-size' as any]: drawerNameSize }}
-                  className="whitespace-nowrap font-[family-name:Bevan] text-[length:var(--name-size)]
-                            tracking-widest text-black origin-center scale-y-[1.2]"
-                >
-                  {GYM_NAME}
-                </span>
+                <img src={logoSrc} alt=""
+                  className={`flex-shrink-0 object-cover ${emblem ? 'h-14 w-14 rounded-full' : 'h-8 w-8'}`} />
+                {emblem ? (
+                  <span style={{ ['--name-size' as any]: drawerNameSize }}
+                    className={`whitespace-nowrap ${nameFontClass} text-[length:var(--name-size)]
+                                tracking-widest text-black origin-center scale-y-[1.2]`}>{GYM_NAME}</span>
+                ) : (
+                  <span className={`truncate text-lg text-brand ${branding.nameFont ? nameFontClass : 'font-semibold'}`}>{GYM_NAME}</span>
+                )}
               </div>
               <button onClick={closeMenu} aria-label="Close menu"
                 className="flex-shrink-0 rounded-md p-1.5 text-gray-500 hover:bg-gray-100">

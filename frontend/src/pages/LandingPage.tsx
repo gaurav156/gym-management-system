@@ -7,7 +7,7 @@ import { usePublicBranches, NO_BRANCHES } from '../api/queries'
 import HeroEmblem from '../components/HeroEmblem'
 
 const GYM_NAME = import.meta.env.VITE_GYM_NAME || 'FitZone Gym'
-const DIRECTOR_NAME = import.meta.env.VITE_DIRECTOR_NAME || 'Ramesh Mane'
+const DIRECTOR_NAME = import.meta.env.VITE_DIRECTOR_NAME || 'Gym Owner'
 const DIRECTOR_PHOTO_URL = import.meta.env.VITE_DIRECTOR_PHOTO_URL || ''
 const ESTABLISHED_YEAR = Number(import.meta.env.VITE_GYM_ESTABLISHED_YEAR) || 1995
 const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || 'hello@mygym.com'
