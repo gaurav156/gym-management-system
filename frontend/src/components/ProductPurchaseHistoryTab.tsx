@@ -9,6 +9,7 @@ import { useScrollLock } from '../hooks/useScrollLock'
 import { toast, getErrorMessage } from '../store/toastStore'
 import { qk, usePersonOrders, invalidateFinance } from '../api/queries'
 import { queryClient } from '../api/queryClient'
+import { withProgress } from '../utils/withProgress'
 
 const PAGE_SIZE = 5
 const PAYMENT_MODES = ['CASH', 'UPI', 'CARD', 'CHEQUE', 'BANK_TRANSFER']
@@ -38,23 +39,19 @@ export default function ProductPurchaseHistoryTab({ personId }: Props) {
   useEffect(() => { setPage(0) }, [personId])
 
   async function handleInvoiceAction(orderId: string, action: 'view' | 'print' | 'download') {
-    try {
+    await withProgress('Preparing invoice...', async () => {
       const { data } = await api.get<ProductOrderInvoice>(`/api/product-orders/${orderId}/invoice`)
       if (action === 'view') await viewProductInvoice(data)
       else if (action === 'print') await printProductInvoice(data)
       else await downloadProductInvoice(data)
-    } catch (err: any) {
-      toast.error(getErrorMessage(err, 'Failed to load invoice'))
-    }
+    }, 'Failed to load invoice')
   }
 
   async function handleSendAction(orderId: string, channel: 'email' | 'whatsapp') {
-    try {
+    await withProgress(`Sending invoice via ${channel === 'email' ? 'email' : 'WhatsApp'}...`, async () => {
       const { data } = await api.post<{ message: string }>(`/api/product-orders/${orderId}/send-${channel}`)
       toast.success(data.message)
-    } catch (err: any) {
-      toast.error(getErrorMessage(err, `Failed to send via ${channel}`))
-    }
+    }, `Failed to send via ${channel}`)
   }
 
   function openCancelDialog(order: ProductOrder) {

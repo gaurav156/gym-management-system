@@ -10,6 +10,7 @@ import { useAccessibleBranches, useProductCategories, useMyOrders } from '../../
 import { useCatalog } from '../../api/queries'
 import { useDebounced } from '../../hooks/useDebounced'
 import RefreshButton from '../RefreshButton'
+import { withProgress } from '../../utils/withProgress'
 
 const NO_PRODUCTS: Product[] = []
 const PRODUCT_PAGE_SIZE = 9
@@ -58,14 +59,12 @@ export default function MemberStoreTab({ memberId }: { memberId: string }) {
   }
 
   async function handleInvoiceAction(orderId: string, action: 'view' | 'print' | 'download') {
-    try {
+    await withProgress('Preparing invoice...', async () => {
       const { data } = await api.get<ProductOrderInvoice>(`/api/product-orders/${orderId}/invoice`)
       if (action === 'view') await viewProductInvoice(data)
       else if (action === 'print') await printProductInvoice(data)
       else await downloadProductInvoice(data)
-    } catch (err: any) {
-      toast.error(getErrorMessage(err, 'Failed to load invoice'))
-    }
+    }, 'Failed to load invoice')
   }
 
   return (

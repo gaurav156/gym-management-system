@@ -8,11 +8,11 @@ import { CardSkeleton } from '../components/Skeleton'
 import { viewInvoice, printInvoice, downloadInvoice } from '../utils/invoice'
 import type { InvoiceResponse } from '../types'
 import MemberStoreTab from '../components/member/MemberStoreTab'
-import { toast, getErrorMessage } from '../store/toastStore'
 import { usePersistedTab } from '../hooks/usePersistedTab'
 import { usePlans, useMyBranches, useAttendanceSummary, useMyMemberships, useMyPayments, useMyAttendance, qk, NO_BRANCHES, } from '../api/queries'
 import { queryClient } from '../api/queryClient'
 import RefreshButton from '../components/RefreshButton'
+import { withProgress } from '../utils/withProgress'
 
 const PAGE_SIZE = 5
 type Tab = 'OVERVIEW' | 'STORE'
@@ -54,14 +54,12 @@ export default function MemberDashboard() {
   }
 
   async function handleInvoiceAction(paymentId: string, action: 'view' | 'print' | 'download') {
-    try {
+    await withProgress('Preparing invoice...', async () => {
       const { data } = await api.get<InvoiceResponse>(`/api/payments/${paymentId}/invoice`)
       if (action === 'view') await viewInvoice(data)
       else if (action === 'print') await printInvoice(data)
       else await downloadInvoice(data)
-    } catch (err: any) {
-      toast.error(getErrorMessage(err, 'Failed to load invoice'))
-    }
+    }, 'Failed to load invoice')
   }
 
   useEffect(() => {

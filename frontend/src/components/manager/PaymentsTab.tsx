@@ -11,7 +11,7 @@ import { usePayments, usePlans, invalidateMembershipData } from '../../api/queri
 import RefreshButton from '../RefreshButton'
 import { useMemberOptions } from '../../api/queries'
 import { useDebounced } from '../../hooks/useDebounced'
-
+import { withProgress } from '../../utils/withProgress'
 
 const NO_MEMBERS: MemberSummary[] = []
 const PAGE_SIZE = 10
@@ -139,23 +139,19 @@ export default function PaymentsTab({ selectedBranch }: Props) {
   }
 
   async function handleInvoiceAction(paymentId: string, action: 'view' | 'print' | 'download') {
-    try {
+    await withProgress('Preparing invoice...', async () => {
       const { data } = await api.get<InvoiceResponse>(`/api/payments/${paymentId}/invoice`)
       if (action === 'view') await viewInvoice(data)
       else if (action === 'print') await printInvoice(data)
       else await downloadInvoice(data)
-    } catch (err: any) {
-      toast.error(getErrorMessage(err, 'Failed to load invoice')) // or setLoadError in MemberDashboard
-    }
+    }, 'Failed to load invoice')
   }
 
   async function handleSendAction(paymentId: string, channel: 'email' | 'whatsapp') {
-    try {
+    await withProgress(`Sending invoice via ${channel === 'email' ? 'email' : 'WhatsApp'}...`, async () => {
       const { data } = await api.post<{ message: string }>(`/api/payments/${paymentId}/send-${channel}`)
       toast.success(data.message)
-    } catch (err: any) {
-      toast.error(getErrorMessage(err, `Failed to send via ${channel}`))
-    }
+    }, `Failed to send via ${channel}`)
   }
 
   return (

@@ -26,6 +26,7 @@ import { PhoneLink, EmailLink, ContactActions } from '../ContactLinks'
 import { usePersistedState } from '../../hooks/usePersistedState'
 import { usePersistedTab } from '../../hooks/usePersistedTab'
 import Spinner from '../Spinner'
+import { withProgress } from '../../utils/withProgress'
 
 type ModalTab = 'INFO' | 'MEMBERSHIPS' | 'PAYMENTS' | 'STORE' | 'ATTENDANCE' | 'BRANCHES'
 const MODAL_TABS: readonly ModalTab[] = ['INFO', 'MEMBERSHIPS', 'PAYMENTS', 'STORE', 'ATTENDANCE', 'BRANCHES']
@@ -210,23 +211,19 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   }
 
   async function handleInvoiceAction(paymentId: string, action: 'view' | 'print' | 'download') {
-    try {
+    await withProgress('Preparing invoice...', async () => {
       const { data } = await api.get<InvoiceResponse>(`/api/payments/${paymentId}/invoice`)
       if (action === 'view') await viewInvoice(data)
       else if (action === 'print') await printInvoice(data)
       else await downloadInvoice(data)
-    } catch (err: any) {
-      toast.error(getErrorMessage(err, 'Failed to load invoice'))
-    }
+    }, 'Failed to load invoice')
   }
 
   async function handlePaymentSendAction(paymentId: string, channel: 'email' | 'whatsapp') {
-    try {
+    await withProgress(`Sending invoice via ${channel === 'email' ? 'email' : 'WhatsApp'}...`, async () => {
       const { data } = await api.post<{ message: string }>(`/api/payments/${paymentId}/send-${channel}`)
       toast.success(data.message)
-    } catch (err: any) {
-      toast.error(getErrorMessage(err, `Failed to send via ${channel}`))
-    }
+    }, `Failed to send via ${channel}`)
   }
 
   function startEdit(m: MembershipAdmin) {
