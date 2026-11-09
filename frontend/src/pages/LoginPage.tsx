@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/authStore'
 import Turnstile from '../components/Turnstile'
 import type { AuthUser } from '../types'
 import PasswordInput from '../components/PasswordInput'
+import Spinner from '../components/Spinner'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const setUser = useAuthStore((s) => s.setUser)
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const [submitting, setSubmitting] = useState(false)
 
   // Set by the api client's response interceptor. These are mutually exclusive: a
   // simply-expired token comes back as 401 ("session-expired"); a still-valid token
@@ -38,6 +40,8 @@ export default function LoginPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting) return
+    setSubmitting(true)
     try {
       const { data } = await api.post<AuthUser>('/api/auth/login', {
         email, password, rememberMe, captchaToken: captchaRequired ? captchaToken : undefined,
@@ -48,6 +52,8 @@ export default function LoginPage() {
         : data.role === 'TRAINER' ? '/trainer'
         : '/member'
       navigate(path)
+      // Deliberately not re-enabling on success - the button stays in its loading state
+      // until the redirect, same approach as ResetPasswordPage.
     } catch (err: any) {
       const needsCaptcha = err.response?.data?.captchaRequired
       toast.error(getErrorMessage(err, 'Login failed'))
@@ -58,6 +64,7 @@ export default function LoginPage() {
         setCaptchaToken('')
         setCaptchaKey((k) => k + 1)
       }
+      setSubmitting(false)
     }
   }
 
@@ -68,14 +75,14 @@ export default function LoginPage() {
         <div>
           <label className="block text-sm font-medium text-gray-700">Email</label>
           <input
-            type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+            type="email" disabled={submitting} required value={email} onChange={(e) => setEmail(e.target.value)}
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none"
           />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Password</label>
           <PasswordInput
-            required value={password} onChange={(e) => setPassword(e.target.value)}
+            disabled={submitting} required value={password} onChange={(e) => setPassword(e.target.value)}
             wrapperClassName="mt-1"
             className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none"
           />
@@ -93,9 +100,10 @@ export default function LoginPage() {
           <Turnstile key={captchaKey} onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />
         )}
 
-        <button type="submit" disabled={captchaRequired && !captchaToken}
-          className="w-full rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60">
-          Log in
+        <button type="submit" disabled={submitting || (captchaRequired && !captchaToken)}
+          className="flex w-full items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-70">
+          {submitting && <Spinner />}
+          {submitting ? 'Logging in...' : 'Log in'}
         </button>
       </form>
     </div>

@@ -25,6 +25,7 @@ import { queryClient } from '../../api/queryClient'
 import { PhoneLink, EmailLink, ContactActions } from '../ContactLinks'
 import { usePersistedState } from '../../hooks/usePersistedState'
 import { usePersistedTab } from '../../hooks/usePersistedTab'
+import Spinner from '../Spinner'
 
 type ModalTab = 'INFO' | 'MEMBERSHIPS' | 'PAYMENTS' | 'STORE' | 'ATTENDANCE' | 'BRANCHES'
 const MODAL_TABS: readonly ModalTab[] = ['INFO', 'MEMBERSHIPS', 'PAYMENTS', 'STORE', 'ATTENDANCE', 'BRANCHES']
@@ -115,6 +116,8 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   const { data: roleHistory = [] } = useRoleHistory(detailMemberId ?? undefined, user?.role === 'OWNER')
 
   const detailQuery = useMemberDetail(detailMemberId)
+
+  const [busyMembershipId, setBusyMembershipId] = useState<string | null>(null)
 
   // Drop the id only when the server says that person no longer exists (4xx).
   // A network blip keeps it, so the modal comes back once you're online again.
@@ -269,22 +272,30 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
   }
 
   async function pauseMembership(id: string) {
+    if (busyMembershipId) return
+    setBusyMembershipId(id)
     try {
       await api.post(`/api/memberships/${id}/pause`)
       toast.success('Membership paused.')
       refreshMembershipViews()
     } catch (err: any) {
       toast.error(getErrorMessage(err, 'Failed to pause'))
+    } finally {
+      setBusyMembershipId(null)
     }
   }
 
   async function resumeMembership(id: string) {
+    if (busyMembershipId) return
+    setBusyMembershipId(id)
     try {
       await api.post(`/api/memberships/${id}/resume`)
       toast.success('Membership resumed.')
       refreshMembershipViews()
     } catch (err: any) {
       toast.error(getErrorMessage(err, 'Failed to resume'))
+    } finally {
+      setBusyMembershipId(null)
     }
   }
 
@@ -605,7 +616,8 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                                 <option value="OWNER">Owner</option>
                               </select>
                               <button onClick={() => changeMemberRole(detailMember)} disabled={!selectedNewRole || changingRole}
-                                className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-60">
+                                className="flex items-center gap-2 rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-60">
+                                {changingRole && <Spinner className="h-3.5 w-3.5" />}
                                 {changingRole ? 'Changing...' : 'Change role'}
                               </button>
                             </div>
@@ -693,10 +705,14 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
                                   <td className="py-2 align-top">
                                     <div className="flex flex-wrap gap-1.5">
                                       {effective === 'ACTIVE' && (
-                                        <ActionButton variant="warning" icon={<PauseIcon />} onClick={() => pauseMembership(m.id)}>Pause</ActionButton>
+                                        <ActionButton variant="warning" disabled={busyMembershipId === m.id}
+                                          icon={busyMembershipId === m.id ? <Spinner className="h-3.5 w-3.5" /> : <PauseIcon />}
+                                          onClick={() => pauseMembership(m.id)}>Pause</ActionButton>
                                       )}
                                       {effective === 'PAUSED' && (
-                                        <ActionButton variant="success" icon={<PlayIcon />} onClick={() => resumeMembership(m.id)}>Resume</ActionButton>
+                                        <ActionButton variant="success" disabled={busyMembershipId === m.id}
+                                          icon={busyMembershipId === m.id ? <Spinner className="h-3.5 w-3.5" /> : <PlayIcon />}
+                                          onClick={() => resumeMembership(m.id)}>Resume</ActionButton>
                                       )}
                                       {(effective === 'ACTIVE' || effective === 'PAUSED' || effective === 'SCHEDULED') && (
                                         <ActionButton variant="danger" icon={<BanIcon />} onClick={() => cancelMembership(m.id)}>Cancel</ActionButton>
@@ -892,7 +908,8 @@ export default function MembersTab({ selectedBranch, allBranches, lastCheckins, 
               <button disabled={paying} onClick={() => setPayTarget(null)}
                 className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
               <button disabled={paying} onClick={submitPayment}
-                className="rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-70">
+                className="flex items-center gap-2 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-70">
+                {paying && <Spinner className="h-3.5 w-3.5" />}
                 {paying ? 'Recording...' : 'Record payment'}
               </button>
             </div>

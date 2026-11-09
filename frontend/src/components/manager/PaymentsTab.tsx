@@ -249,7 +249,8 @@ export default function PaymentsTab({ selectedBranch }: Props) {
                   className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm uppercase" />
                 <button type="button" disabled={checkingPurchaseCoupon || !purchaseCouponCode.trim() || !purchaseMemberId}
                   onClick={checkPurchaseCoupon}
-                  className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                  className="flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                  {checkingPurchaseCoupon && <Spinner className="h-3.5 w-3.5" />}
                   {checkingPurchaseCoupon ? 'Checking...' : 'Apply'}
                 </button>
               </div>

@@ -366,7 +366,8 @@ export default function StoreTab({ selectedBranch }: Props) {
                   onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponStatus(null) }}
                   className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm uppercase" />
                 <button type="button" disabled={checkingCoupon || !couponCode.trim() || !selectedBuyer} onClick={checkCoupon}
-                  className="rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                  className="flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                  {checkingCoupon && <Spinner className="h-3.5 w-3.5" />}
                   {checkingCoupon ? 'Checking...' : 'Apply'}
                 </button>
               </div>

@@ -23,6 +23,7 @@ import { PhoneLink, EmailLink, ContactActions } from '../ContactLinks'
 
 import { usePersistedState } from '../../hooks/usePersistedState'
 import { usePersistedTab } from '../../hooks/usePersistedTab'
+import Spinner from '../Spinner'
 
 type StaffModalTab = 'INFO' | 'ATTENDANCE' | 'BRANCHES' | 'STORE'
 const STAFF_MODAL_TABS: readonly StaffModalTab[] = ['INFO', 'ATTENDANCE', 'BRANCHES', 'STORE']
@@ -607,7 +608,8 @@ export default function StaffTab({ selectedBranch, allBranches, lastCheckins, us
                             {roleOptions.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
                           </select>
                           <button onClick={() => changeRole(detailStaff)} disabled={!selectedNewRole || changingRole}
-                            className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-60">
+                            className="flex items-center gap-2 rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-60">
+                            {changingRole && <Spinner className="h-3.5 w-3.5" />}
                             {changingRole ? 'Changing...' : 'Change role'}
                           </button>
                         </div>
