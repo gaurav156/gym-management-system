@@ -212,8 +212,8 @@ public class BackupImportService {
             case "timestamp", "timestamptz" -> LocalDateTime.parse(v.asText());
             case "date" -> LocalDate.parse(v.asText());
             case "numeric" -> new BigDecimal(v.asText());
-            case "int2", "int4" -> (int) v.asLong();
-            case "int8" -> v.asLong();
+            case "int2", "int4", "serial", "smallserial" -> (int) v.asLong();
+            case "int8", "bigserial" -> v.asLong();
             case "bool" -> v.asBoolean();
             default -> v.asText();
         };
