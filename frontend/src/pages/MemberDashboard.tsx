@@ -195,8 +195,7 @@ export default function MemberDashboard() {
                 <h2 className="font-medium">Your attendance log</h2>
                 <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
               </div>
-              <RefreshButton onClick={() => { attendanceQuery.refetch(); summaryQuery.refetch() }}
-                spinning={attendanceQuery.isFetching || summaryQuery.isFetching} />
+              <RefreshButton onClick={() => attendanceQuery.refetch()} spinning={attendanceQuery.isFetching} />
             </div>
             {attendanceLoading ? (
               <div className="mt-4 space-y-3">
