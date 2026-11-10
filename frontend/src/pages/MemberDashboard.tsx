@@ -25,7 +25,8 @@ export default function MemberDashboard() {
   const { data: plans = [], isLoading: plansLoading } = usePlans()
   const { data: branches = NO_BRANCHES } = useMyBranches(user?.userId)
   const [selectedBranch, setSelectedBranch] = useState('')
-  const { data: summary = [] } = useAttendanceSummary(selectedBranch)
+  const summaryQuery = useAttendanceSummary(selectedBranch, undefined, true) // true = also auto-refresh every 60s
+  const summary = summaryQuery.data ?? []
 
   const [paymentPage, setPaymentPage] = useState(0)
   const [attendancePage, setAttendancePage] = useState(0)
@@ -48,9 +49,10 @@ export default function MemberDashboard() {
   const loadPayments = (p: number) => setPaymentPage(p)
   const loadAttendance = (p: number) => setAttendancePage(p)
 
-  const refreshing = membershipsQuery.isFetching || paymentsQuery.isFetching || attendanceQuery.isFetching
+  const refreshing = membershipsQuery.isFetching || paymentsQuery.isFetching || attendanceQuery.isFetching || summaryQuery.isFetching
   function refreshAll() {
     if (user) queryClient.invalidateQueries({ queryKey: qk.my(user.userId) })
+    queryClient.invalidateQueries({ queryKey: qk.attendance })
   }
 
   async function handleInvoiceAction(paymentId: string, action: 'view' | 'print' | 'download') {
@@ -169,14 +171,17 @@ export default function MemberDashboard() {
           </div>
 
           <div className="mt-8 rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <h2 className="font-medium">Today's crowd by hour</h2>
-              {branches.length > 1 && (
-                <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}
-                  className="rounded-md border border-gray-300 px-2 py-1 text-xs">
-                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              )}
+              <div className="flex items-center gap-2">
+                {branches.length > 1 && (
+                  <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}
+                    className="rounded-md border border-gray-300 px-2 py-1 text-xs">
+                    {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                )}
+                <RefreshButton onClick={() => summaryQuery.refetch()} spinning={summaryQuery.isFetching} />
+              </div>
             </div>
             <div className="mt-4">
               <HourlyCrowdChart data={summary} />
@@ -190,7 +195,8 @@ export default function MemberDashboard() {
                 <h2 className="font-medium">Your attendance log</h2>
                 <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
               </div>
-              <RefreshButton onClick={() => attendanceQuery.refetch()} spinning={attendanceQuery.isFetching} />
+              <RefreshButton onClick={() => { attendanceQuery.refetch(); summaryQuery.refetch() }}
+                spinning={attendanceQuery.isFetching || summaryQuery.isFetching} />
             </div>
             {attendanceLoading ? (
               <div className="mt-4 space-y-3">

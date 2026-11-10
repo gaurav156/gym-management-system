@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { api } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import HourlyCrowdChart from '../components/HourlyCrowdChart'
 import MemberStoreTab from '../components/member/MemberStoreTab'
-import type { HourlyCount } from '../types'
 import { usePersistedTab } from '../hooks/usePersistedTab'
-import { useMyBranches, useMyAttendance, NO_BRANCHES } from '../api/queries'
+import { useMyBranches, useMyAttendance, useAttendanceSummary, NO_BRANCHES } from '../api/queries'
 import RefreshButton from '../components/RefreshButton'
 
 const PAGE_SIZE = 5
@@ -20,7 +18,9 @@ export default function TrainerDashboard() {
 
   const { data: branches = NO_BRANCHES } = useMyBranches(user?.userId)
   const [selectedBranch, setSelectedBranch] = useState('')
-  const [summary, setSummary] = useState<HourlyCount[]>([])
+
+  const summaryQuery = useAttendanceSummary(selectedBranch, undefined, true)
+  const summary = summaryQuery.data ?? []
 
   const [attendancePage, setAttendancePage] = useState(0)
   const attendanceQuery = useMyAttendance(user?.userId, attendancePage, PAGE_SIZE)
@@ -33,11 +33,6 @@ export default function TrainerDashboard() {
   useEffect(() => {
     if (!selectedBranch && branches.length > 0) setSelectedBranch(branches[0].id)
   }, [branches, selectedBranch])
-
-  useEffect(() => {
-    if (!selectedBranch) return
-    api.get<HourlyCount[]>(`/api/attendance/summary/${selectedBranch}`).then((res) => setSummary(res.data))
-  }, [selectedBranch])
 
   if (!user) return null
 
@@ -74,14 +69,17 @@ export default function TrainerDashboard() {
           </div>
 
           <div className="mt-8 rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <h2 className="font-medium">Today's crowd by hour</h2>
-              {branches.length > 1 && (
-                <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}
-                  className="rounded-md border border-gray-300 px-2 py-1 text-xs">
-                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              )}
+              <div className="flex items-center gap-2">
+                {branches.length > 1 && (
+                  <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}
+                    className="rounded-md border border-gray-300 px-2 py-1 text-xs">
+                    {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                )}
+                <RefreshButton onClick={() => summaryQuery.refetch()} spinning={summaryQuery.isFetching} />
+              </div>
             </div>
             <div className="mt-4">
               <HourlyCrowdChart data={summary} />
@@ -95,7 +93,8 @@ export default function TrainerDashboard() {
                 <h2 className="font-medium">Your attendance log</h2>
                 <p className="mt-1 text-xs text-gray-500">Second scan of the day at the same branch records check-out.</p>
               </div>
-              <RefreshButton onClick={() => attendanceQuery.refetch()} spinning={attendanceQuery.isFetching} />
+              <RefreshButton onClick={() => { attendanceQuery.refetch(); summaryQuery.refetch() }}
+                spinning={attendanceQuery.isFetching || summaryQuery.isFetching} />
             </div>
             {attendanceLoading ? (
               <div className="mt-4 space-y-3">
