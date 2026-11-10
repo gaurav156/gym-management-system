@@ -1,66 +1,13 @@
 import jsPDF from 'jspdf'
 import type { ProductOrderInvoice } from '../types'
 import { openViewer } from '../store/viewerStore'
+import { fetchAsDataUrl, getLogoDataUrl, dataUrlFormat, registerNameFont } from './pdfBranding'
 
 const GYM_NAME = import.meta.env.VITE_GYM_NAME || 'Gym Invoice'
-const GYM_LOGO_URL = import.meta.env.VITE_GYM_LOGO_URL || ''
-
-// Kept separate from utils/invoice.ts - the doc-building differs enough (item table vs.
-// one plan line) that sharing a single buildDoc would need a lot of branching.
-let logoDataUrlCache: string | null | undefined
-
-async function svgUrlToPngDataUrl(url: string, size = 240): Promise<string> {
-  const res = await fetch(url)
-  const svgText = await res.text()
-  const svgBlob = new Blob([svgText], { type: 'image/svg+xml' })
-  const svgUrl = URL.createObjectURL(svgBlob)
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const image = new Image()
-      image.onload = () => resolve(image)
-      image.onerror = reject
-      image.src = svgUrl
-    })
-    const canvas = document.createElement('canvas')
-    canvas.width = size; canvas.height = size
-    const ctx = canvas.getContext('2d')!
-    ctx.drawImage(img, 0, 0, size, size)
-    return canvas.toDataURL('image/png')
-  } finally {
-    URL.revokeObjectURL(svgUrl)
-  }
-}
-
-async function fetchAsDataUrl(url: string, init?: RequestInit): Promise<string> {
-  const res = await fetch(url, init)
-  const blob = await res.blob()
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(blob)
-  })
-}
-
-async function getLogoDataUrl(): Promise<string | null> {
-  if (!GYM_LOGO_URL) return null
-  if (logoDataUrlCache !== undefined) return logoDataUrlCache
-  try {
-    logoDataUrlCache = GYM_LOGO_URL.toLowerCase().endsWith('.svg')
-      ? await svgUrlToPngDataUrl(GYM_LOGO_URL)
-      : await fetchAsDataUrl(GYM_LOGO_URL)
-  } catch {
-    logoDataUrlCache = null
-  }
-  return logoDataUrlCache
-}
-
-function dataUrlFormat(dataUrl: string): 'PNG' | 'JPEG' {
-  return dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG'
-}
 
 async function buildInvoiceDoc(inv: ProductOrderInvoice): Promise<jsPDF> {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+  const brandFont = await registerNameFont(doc)
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 40
   let y = 50
@@ -70,7 +17,7 @@ async function buildInvoiceDoc(inv: ProductOrderInvoice): Promise<jsPDF> {
   if (logo) { try { doc.addImage(logo, dataUrlFormat(logo), margin, y - 26, 36, 36) } catch { /* skip */ } }
 
   doc.setFontSize(18)
-  doc.setFont('helvetica', 'bold')
+  doc.setFont(brandFont.family, brandFont.style)
   doc.text(GYM_NAME, headerTextX, y)
   doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')

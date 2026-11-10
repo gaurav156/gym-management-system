@@ -2,6 +2,7 @@ package com.gymapp.broadcast;
 
 import com.gymapp.entity.BroadcastFormat;
 import com.gymapp.entity.BroadcastType;
+import com.gymapp.mail.EmailBranding;
 import com.gymapp.storage.ImagePurpose;
 import com.gymapp.storage.StorageService;
 import org.jsoup.Jsoup;
@@ -32,14 +33,14 @@ public class BroadcastEmailRenderer {
 
     private final StorageService storage;
 
+    private final EmailBranding branding;
+
     @Value("${app.mail.gym-name}")
     private String gymName;
 
-    @Value("${app.mail.logo-url:}")
-    private String logoUrl;
-
-    public BroadcastEmailRenderer(StorageService storage) {
+    public BroadcastEmailRenderer(StorageService storage, EmailBranding branding) {
         this.storage = storage;
+        this.branding = branding;
     }
 
     public static boolean isValidAccent(String c) {
@@ -96,14 +97,7 @@ public class BroadcastEmailRenderer {
                 + "style=\"display:block;width:100%;max-width:600px;height:auto;border:0;\" /></td></tr>"
                 : "";
 
-        String logoHtml = (logoUrl != null && !logoUrl.isBlank())
-                ? "<img src=\"" + HtmlUtils.htmlEscape(logoUrl) + "\" alt=\"" + safeGym + "\" width=\"48\" height=\"48\" "
-                + "style=\"display:block;border-radius:10px;margin:0 auto 12px;\" />"
-                : "";
-        String headerHtml = branded
-                ? "<tr><td style=\"background-color:#111827;padding:24px 32px;text-align:center;\">" + logoHtml
-                + "<div style=\"color:#ffffff;font-size:18px;font-weight:600;\">" + safeGym + "</div></td></tr>"
-                : "";
+        String headerHtml = branded ? branding.headerRow("24px 32px") : "";
 
         String footerLine = promotional
                 ? "You're receiving this because you agreed to receive offers and updates from " + safeGym + "."

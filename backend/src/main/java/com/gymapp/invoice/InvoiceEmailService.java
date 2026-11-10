@@ -1,6 +1,7 @@
 package com.gymapp.invoice;
 
 import com.gymapp.dto.PaymentDtos.InvoiceResponse;
+import com.gymapp.mail.EmailBranding;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -18,20 +19,20 @@ public class InvoiceEmailService {
 
     private final JavaMailSender mailSender;
 
+    private final EmailBranding branding;
+
     @Value("${app.mail.from}")
     private String fromAddress;
 
     @Value("${app.mail.gym-name}")
     private String gymName;
 
-    @Value("${app.mail.logo-url:}")
-    private String logoUrl;
-
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
-    public InvoiceEmailService(JavaMailSender mailSender) {
+    public InvoiceEmailService(JavaMailSender mailSender, EmailBranding branding) {
         this.mailSender = mailSender;
+        this.branding = branding;
     }
 
     // Throws on failure so callers decide how to handle it - the auto-send path
@@ -72,11 +73,6 @@ public class InvoiceEmailService {
         String safePlan = inv.planName() != null ? HtmlUtils.htmlEscape(inv.planName()) : null;
         String url = invoiceUrl(inv);
 
-        String logoHtml = (logoUrl != null && !logoUrl.isBlank())
-                ? "<img src=\"" + HtmlUtils.htmlEscape(logoUrl) + "\" alt=\"" + safeGymName + "\" "
-                + "width=\"48\" height=\"48\" style=\"display:block;border-radius:10px;margin:0 auto 12px;\" />"
-                : "";
-
         String planRow = safePlan != null ? row("Plan", safePlan) : "";
         String periodRow = (inv.membershipStartDate() != null && inv.membershipEndDate() != null)
                 ? row("Period", inv.membershipStartDate() + " to " + inv.membershipEndDate())
@@ -89,10 +85,7 @@ public class InvoiceEmailService {
                 + "<table role=\"presentation\" width=\"480\" cellpadding=\"0\" cellspacing=\"0\" "
                 +   "style=\"max-width:480px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);\">"
 
-                + "<tr><td style=\"background-color:#111827;padding:28px 32px;text-align:center;\">"
-                + logoHtml
-                + "<div style=\"color:#ffffff;font-size:18px;font-weight:600;letter-spacing:-0.01em;\">" + safeGymName + "</div>"
-                + "</td></tr>"
+                + branding.headerRow("28px 32px")
 
                 + "<tr><td style=\"padding:32px;\">"
                 + "<p style=\"margin:0 0 4px;font-size:15px;color:#111827;\">Hi " + safeName + ",</p>"

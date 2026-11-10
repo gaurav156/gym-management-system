@@ -2,6 +2,7 @@ package com.gymapp.service;
 
 import com.gymapp.dto.ProductOrderDtos.OrderInvoiceResponse;
 import com.gymapp.dto.ProductOrderDtos.OrderItemResponse;
+import com.gymapp.mail.EmailBranding;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -16,20 +17,20 @@ public class ProductOrderInvoiceEmailService {
 
     private final JavaMailSender mailSender;
 
+    private final EmailBranding branding;
+
     @Value("${app.mail.from}")
     private String fromAddress;
 
     @Value("${app.mail.gym-name}")
     private String gymName;
 
-    @Value("${app.mail.logo-url:}")
-    private String logoUrl;
-
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
-    public ProductOrderInvoiceEmailService(JavaMailSender mailSender) {
+    public ProductOrderInvoiceEmailService(JavaMailSender mailSender, EmailBranding branding) {
         this.mailSender = mailSender;
+        this.branding = branding;
     }
 
     public void sendInvoiceEmail(OrderInvoiceResponse inv) {
@@ -87,11 +88,6 @@ public class ProductOrderInvoiceEmailService {
         String url = invoiceUrl(inv);
         boolean cancelled = isCancelled(inv);
 
-        String logoHtml = (logoUrl != null && !logoUrl.isBlank())
-                ? "<img src=\"" + HtmlUtils.htmlEscape(logoUrl) + "\" alt=\"" + safeGymName + "\" "
-                + "width=\"48\" height=\"48\" style=\"display:block;border-radius:10px;margin:0 auto 12px;\" />"
-                : "";
-
         StringBuilder itemRows = new StringBuilder();
         for (OrderItemResponse item : inv.items()) {
             itemRows.append(row(HtmlUtils.htmlEscape(item.productName()) + " x" + item.quantity(), "Rs. " + item.lineTotal()));
@@ -114,10 +110,7 @@ public class ProductOrderInvoiceEmailService {
                 + "<tr><td align=\"center\">"
                 + "<table role=\"presentation\" width=\"480\" cellpadding=\"0\" cellspacing=\"0\" "
                 +   "style=\"max-width:480px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);\">"
-                + "<tr><td style=\"background-color:#111827;padding:28px 32px;text-align:center;\">"
-                + logoHtml
-                + "<div style=\"color:#ffffff;font-size:18px;font-weight:600;letter-spacing:-0.01em;\">" + safeGymName + "</div>"
-                + "</td></tr>"
+                + branding.headerRow("28px 32px")
                 + "<tr><td style=\"padding:32px;\">"
                 + "<p style=\"margin:0 0 4px;font-size:15px;color:#111827;\">Hi " + safeName + ",</p>"
                 + "<p style=\"margin:0 0 16px;font-size:15px;line-height:1.5;color:#4b5563;\">" + introLine + "</p>"

@@ -1,9 +1,9 @@
 import jsPDF from 'jspdf'
 import type { InvoiceResponse } from '../types'
 import { openViewer } from '../store/viewerStore'
+import { fetchAsDataUrl, getLogoDataUrl, dataUrlFormat, registerNameFont } from './pdfBranding'
 
 const GYM_NAME = import.meta.env.VITE_GYM_NAME || 'Gym Invoice'
-const GYM_LOGO_URL = import.meta.env.VITE_GYM_LOGO_URL || ''
 const DIRECTOR_NAME = (import.meta.env.VITE_DIRECTOR_NAME || '').trim()
 
 const DEFAULT_TERMS = [
@@ -21,61 +21,9 @@ function getTermsLines(): string[] {
   return raw.split('|').map((t) => t.trim()).filter(Boolean)
 }
 
-let logoDataUrlCache: string | null | undefined // undefined = not yet attempted
-
-async function svgUrlToPngDataUrl(url: string, size = 240): Promise<string> {
-  const res = await fetch(url)
-  const svgText = await res.text()
-  const svgBlob = new Blob([svgText], { type: 'image/svg+xml' })
-  const svgUrl = URL.createObjectURL(svgBlob)
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const image = new Image()
-      image.onload = () => resolve(image)
-      image.onerror = reject
-      image.src = svgUrl
-    })
-    const canvas = document.createElement('canvas')
-    canvas.width = size
-    canvas.height = size
-    const ctx = canvas.getContext('2d')!
-    ctx.drawImage(img, 0, 0, size, size)
-    return canvas.toDataURL('image/png')
-  } finally {
-    URL.revokeObjectURL(svgUrl)
-  }
-}
-
-async function fetchAsDataUrl(url: string, init?: RequestInit): Promise<string> {
-  const res = await fetch(url, init)
-  const blob = await res.blob()
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(blob)
-  })
-}
-
-async function getLogoDataUrl(): Promise<string | null> {
-  if (!GYM_LOGO_URL) return null
-  if (logoDataUrlCache !== undefined) return logoDataUrlCache
-  try {
-    logoDataUrlCache = GYM_LOGO_URL.toLowerCase().endsWith('.svg')
-      ? await svgUrlToPngDataUrl(GYM_LOGO_URL)
-      : await fetchAsDataUrl(GYM_LOGO_URL)
-  } catch {
-    logoDataUrlCache = null // fail quietly - invoice still renders without a logo
-  }
-  return logoDataUrlCache
-}
-
-function dataUrlFormat(dataUrl: string): 'PNG' | 'JPEG' {
-  return dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG'
-}
-
 async function buildInvoiceDoc(inv: InvoiceResponse): Promise<jsPDF> {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+  const brandFont = await registerNameFont(doc)
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 40
   let y = 50
@@ -93,7 +41,7 @@ async function buildInvoiceDoc(inv: InvoiceResponse): Promise<jsPDF> {
   const leftColMaxWidth = pageWidth - margin - headerTextX - rightColWidth - 10
 
   doc.setFontSize(18)
-  doc.setFont('helvetica', 'bold')
+  doc.setFont(brandFont.family, brandFont.style)
   doc.text(GYM_NAME, headerTextX, y)
   doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')

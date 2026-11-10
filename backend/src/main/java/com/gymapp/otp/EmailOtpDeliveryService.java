@@ -2,6 +2,7 @@ package com.gymapp.otp;
 
 import com.gymapp.entity.OtpChannel;
 import com.gymapp.entity.User;
+import com.gymapp.mail.EmailBranding;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -24,22 +25,20 @@ public class EmailOtpDeliveryService implements OtpDeliveryService {
 
     private final JavaMailSender mailSender;
 
+    private final EmailBranding branding;
+
     @Value("${app.mail.from}")
     private String fromAddress;
 
     @Value("${app.mail.gym-name}")
     private String gymName;
 
-    // Optional - blank is a valid, expected configuration (falls back to a text-only
-    // header), not a misconfiguration, so this is never validated as required.
-    @Value("${app.mail.logo-url:}")
-    private String logoUrl;
-
     @Value("${app.otp.expiry-minutes}")
     private int expiryMinutes;
 
-    public EmailOtpDeliveryService(JavaMailSender mailSender) {
+    public EmailOtpDeliveryService(JavaMailSender mailSender, EmailBranding branding) {
         this.mailSender = mailSender;
+        this.branding = branding;
     }
 
     @Override
@@ -125,12 +124,6 @@ public class EmailOtpDeliveryService implements OtpDeliveryService {
         String safeIntro = HtmlUtils.htmlEscape(introFor(purpose));
         String safeReassurance = HtmlUtils.htmlEscape(reassuranceFor(purpose));
 
-        String logoHtml = (logoUrl != null && !logoUrl.isBlank())
-                ? "<img src=\"" + HtmlUtils.htmlEscape(logoUrl) + "\" alt=\"" + safeGymName + "\" "
-                + "width=\"48\" height=\"48\" "
-                + "style=\"display:block;border-radius:10px;margin:0 auto 12px;\" />"
-                : "";
-
         return "<!DOCTYPE html>"
                 + "<html><body style=\"margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;\">"
                 + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f5;padding:32px 16px;\">"
@@ -139,10 +132,7 @@ public class EmailOtpDeliveryService implements OtpDeliveryService {
                 +   "style=\"max-width:480px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);\">"
 
                 // Header
-                + "<tr><td style=\"background-color:#111827;padding:28px 32px;text-align:center;\">"
-                + logoHtml
-                + "<div style=\"color:#ffffff;font-size:18px;font-weight:600;letter-spacing:-0.01em;\">" + safeGymName + "</div>"
-                + "</td></tr>"
+                + branding.headerRow("28px 32px")
 
                 // Body
                 + "<tr><td style=\"padding:32px;\">"

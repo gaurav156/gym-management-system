@@ -64,6 +64,8 @@ app:
     from: ${MAIL_FROM:no-reply@mygym.com}
     gym-name: ${GYM_NAME:FitZone Gym}
     logo-url: ${GYM_LOGO_URL:}
+    name-image-url: ${GYM_NAME_IMAGE_URL:}
+    name-font: ${GYM_NAME_FONT:}
   otp:
     expiry-minutes: ${OTP_EXPIRY_MINUTES:10}
   captcha:
