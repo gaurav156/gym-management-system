@@ -21,11 +21,16 @@ export default defineConfig(({ mode }) => {
       {
         // Fills the favicon/title in index.html, with generic defaults when env vars are
         // empty or unset - so the repo works out of the box for any gym.
+        // order: 'pre' is required: in `vite build`, Vite parses and decodes the HTML's URLs BEFORE
+        // normal-order hooks run, so a raw "%GYM_FAVICON%" in an href would crash it ("URI malformed").
         name: 'html-branding',
-        transformIndexHtml(html: string) {
-          return html
-            .replace(/%GYM_FAVICON%/g, escapeHtml(favicon))
-            .replace(/%GYM_TITLE%/g, escapeHtml(title))
+        transformIndexHtml: {
+          order: 'pre',
+          handler(html: string) {
+            return html
+              .replace(/%GYM_FAVICON%/g, escapeHtml(favicon))
+              .replace(/%GYM_TITLE%/g, escapeHtml(title))
+          },
         },
       },
     ],
